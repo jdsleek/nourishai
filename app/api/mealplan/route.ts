@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getClaude, CLAUDE_MODEL } from "@/lib/claude";
+import { getGroq, GROQ_MODEL } from "@/lib/groq";
 import { macroTargets, goalLabel } from "@/lib/nutrition";
 import type { MacroTargets, Profile } from "@/lib/types";
 
@@ -72,21 +72,25 @@ export async function POST(req: NextRequest) {
     }
     const target = macroTargets(body.profile);
 
-    const claude = getClaude();
-    const msg = await claude.messages.create({
-      model: CLAUDE_MODEL,
+    const groq = getGroq();
+    const completion = await groq.chat.completions.create({
+      model: GROQ_MODEL,
+      temperature: 0.7,
       max_tokens: 4096,
-      system: SYSTEM,
+      response_format: { type: "json_object" },
       messages: [
+        { role: "system", content: SYSTEM },
         { role: "user", content: buildUserPrompt(body.profile, target) },
       ],
     });
 
-    const text =
-      msg.content
-        .filter((b) => b.type === "text")
-        .map((b) => ("text" in b ? b.text : ""))
-        .join("\n") || "";
+    const text = completion.choices[0]?.message?.content ?? "";
+    if (!text) {
+      return Response.json(
+        { error: "Model returned an empty response." },
+        { status: 502 }
+      );
+    }
 
     const jsonStart = text.indexOf("{");
     const jsonEnd = text.lastIndexOf("}");

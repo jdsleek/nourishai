@@ -107,7 +107,7 @@ export default function Home() {
         <Feature
           href="/meal-plan"
           title="7-day AI meal plan"
-          body="Claude builds a full week of meals that hits your calorie and macro goals, tailored to your preferences."
+          body="A fast Llama 3.3 70B agent (via Groq) builds a full week of meals that hits your calorie and macro goals, tailored to your preferences."
         />
         <Feature
           href="/chat"

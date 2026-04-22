@@ -93,8 +93,9 @@ export default function MealPlanPage() {
           <strong>Couldn't generate a plan.</strong>
           <div className="mt-1 text-sm">{error}</div>
           <div className="mt-2 text-xs">
-            Tip: make sure your <code>ANTHROPIC_API_KEY</code> is set in
-            <code> food-app/.env.local</code>, then restart the dev server.
+            Tip: make sure your <code>GROQ_API_KEY</code> is set in
+            <code> food-app/.env.local</code> (or Railway Variables), then
+            restart the server.
           </div>
         </div>
       )}

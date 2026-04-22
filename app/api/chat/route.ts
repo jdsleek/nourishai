@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getClaude, CLAUDE_MODEL } from "@/lib/claude";
+import { getGroq, GROQ_MODEL } from "@/lib/groq";
 import { macroTargets, goalLabel } from "@/lib/nutrition";
 import type { ChatMessage, FoodEntry, Profile } from "@/lib/types";
 
@@ -82,31 +82,30 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as Body;
     const messages = body.messages ?? [];
 
-    const claude = getClaude();
+    const groq = getGroq();
     const system = buildSystemPrompt(body.profile, body.todayEntries);
 
-    const stream = await claude.messages.create({
-      model: CLAUDE_MODEL,
+    const stream = await groq.chat.completions.create({
+      model: GROQ_MODEL,
+      temperature: 0.7,
       max_tokens: 1024,
-      system,
-      messages: messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      })),
       stream: true,
+      messages: [
+        { role: "system", content: system },
+        ...messages.map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        })),
+      ],
     });
 
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          for await (const event of stream) {
-            if (
-              event.type === "content_block_delta" &&
-              event.delta.type === "text_delta"
-            ) {
-              controller.enqueue(encoder.encode(event.delta.text));
-            }
+          for await (const chunk of stream) {
+            const delta = chunk.choices[0]?.delta?.content;
+            if (delta) controller.enqueue(encoder.encode(delta));
           }
           controller.close();
         } catch (err) {

@@ -55,6 +55,8 @@ Visit http://localhost:3000.
 1. Push this repo to GitHub.
 2. On https://railway.app, click **New Project → Deploy from GitHub repo** and pick `nourishai`.
 3. In the service's **Variables** tab add `GROQ_API_KEY=gsk_...`.
+
+**Or** from this repo (uses `RAILWAY_TOKEN` + `GROQ_API_KEY` from `Training Classes Project/.env` and `vault/.env`): `npm run railway:set-groq` — finds the **nourishai** service and sets `GROQ_*` on Railway, then redeploy if needed.
 4. Under **Settings → Networking**, click **Generate Domain**.
 
 Railway auto-detects Next.js, runs `npm run build`, then `npm start`. Next.js reads `PORT` from the environment automatically — no extra config needed.

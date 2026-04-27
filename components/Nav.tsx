@@ -10,6 +10,7 @@ const links = [
   { href: "/tracker", label: "Tracker" },
   { href: "/meal-plan", label: "Meal Plan" },
   { href: "/chat", label: "AI Coach" },
+  { href: "/class-workbook", label: "Class" },
   { href: "/foods", label: "Foods" },
   { href: "/progress", label: "Progress" },
 ];

@@ -8,6 +8,7 @@ A modern food & nutrition web app built with **Next.js 14 + TypeScript + Tailwin
 - **Food tracker** — log foods by the gram; live macro progress bars vs your targets
 - **7-day AI meal plan** — Groq builds a week of meals hitting your calorie + protein goals, tailored to your dietary preferences (uses JSON-mode for reliable output)
 - **AI nutrition coach** — streaming chat that knows your profile and today's logs, suggests specific foods with macros
+- **Class workbook** (`/class-workbook`) — separate in-class notes + non-streaming class assistant on the same Groq key (for live teaching; not tied to nutrition profile)
 - **Food database** — 100+ whole foods and prepared meals with per-100g macros, searchable and filterable
 - **Weight progress** — log weight over time with a Recharts line chart
 

@@ -48,7 +48,7 @@ GROQ_MODEL=llama-3.1-8b-instant
 npm run dev
 ```
 
-Visit http://localhost:3000 for the **Day 03 slide deck** (site index). The nutrition app dashboard is at http://localhost:3000/nourish.
+Visit http://localhost:3000 for the **Day 03 slide deck** (site index). The nutrition app dashboard is at http://localhost:3000/nourish. From the deck header or Class workbook, open **QAF cohort ideation** (`/qaf-product-ideation-registry.html`) — regenerate after CSV updates with `npm run build:qaf-registry` (requires Python 3).
 
 ## Deploy to Railway
 

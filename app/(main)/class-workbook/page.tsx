@@ -116,15 +116,21 @@ export default function ClassWorkbookPage() {
           Class workbook
         </h1>
         <p className="mt-2 text-stone-600 dark:text-stone-400">
-          In-class notes and a live assistant — same Groq key as the rest of
-          NourishAI. Your notes stay on this device only.
+          In-class notes and a live assistant — same Groq key as the Day 03 AI
+          Foundry grader. Your notes stay on this device only.
         </p>
-        <p className="mt-3">
+        <p className="mt-3 flex flex-wrap gap-2">
           <a
             href="/"
             className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-brand-700"
           >
             Open Day 03 — AI Builder slides &amp; Foundry grader
+          </a>
+          <a
+            href="/qaf-product-ideation-registry.html"
+            className="inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-800 shadow-sm hover:bg-stone-50 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800"
+          >
+            QAF cohort ideation (no names)
           </a>
         </p>
       </div>

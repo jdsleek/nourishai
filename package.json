@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:qaf-registry": "python3 scripts/build-qaf-registry.py",
     "start": "next start",
     "lint": "next lint",
     "railway:set-groq": "node scripts/railway-set-groq.mjs"

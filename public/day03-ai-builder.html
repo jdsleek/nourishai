@@ -791,7 +791,7 @@ async function grade(){
     if(!data.result)throw new Error('Invalid response from grading service.');
     render(data.result);
   }catch(err){
-    alert('Grader error: '+(err.message||err)+'\n\nIf you opened this file from disk, use the live site at nourishai.up.railway.app/day03-ai-builder.html');
+    alert('Grader error: '+(err.message||err)+'\n\nIf you opened this file from disk, open the deck from the live site: same domain /foundry/day03');
   }finally{
     document.getElementById('subBtn').disabled=false;
     document.getElementById('loading').classList.remove('on');

@@ -2,6 +2,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * Serves the Qubators Day 03 slide deck (same file as public/day03-ai-builder.html).

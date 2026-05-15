@@ -119,6 +119,14 @@ export default function ClassWorkbookPage() {
           In-class notes and a live assistant — same Groq key as the rest of
           NourishAI. Your notes stay on this device only.
         </p>
+        <p className="mt-3">
+          <a
+            href="/day03-ai-builder.html"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-brand-700"
+          >
+            Open Day 03 — AI Builder slides &amp; Foundry grader
+          </a>
+        </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_minmax(300px,360px)] lg:items-start">

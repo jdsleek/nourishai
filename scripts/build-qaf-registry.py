@@ -24,6 +24,11 @@ def map_cat(bucket: str):
     return "utility", "util"
 
 
+def json_for_html_embed(obj: object) -> str:
+    """Escape '<' so user text cannot close the enclosing <script> tag mid-JSON."""
+    return json.dumps(obj, ensure_ascii=False).replace("<", "\\u003c")
+
+
 rows = []
 with open(csv_path, newline="", encoding="utf-8", errors="replace") as f:
     reader = csv.DictReader(f)
@@ -59,8 +64,8 @@ counts = {k: 0 for k in ("income", "data", "agenda", "espees", "utility")}
 for x in rows:
     counts[x["cat"]] = counts.get(x["cat"], 0) + 1
 
-data_json = json.dumps(rows, ensure_ascii=False)
-counts_json = json.dumps(counts, ensure_ascii=False)
+data_json = json_for_html_embed(rows)
+counts_json = json_for_html_embed(counts)
 
 if not out_path.exists():
     raise SystemExit(
@@ -70,14 +75,14 @@ if not out_path.exists():
 template = out_path.read_text(encoding="utf-8")
 out = re.sub(
     r'(<script type="application/json" id="qaf-data">).*?(</script>)',
-    r"\1" + data_json + r"\2",
+    lambda m: m.group(1) + data_json + m.group(2),
     template,
     count=1,
     flags=re.DOTALL,
 )
 out = re.sub(
     r'(<script type="application/json" id="qaf-counts">).*?(</script>)',
-    r"\1" + counts_json + r"\2",
+    lambda m: m.group(1) + counts_json + m.group(2),
     out,
     count=1,
     flags=re.DOTALL,

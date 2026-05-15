@@ -197,7 +197,39 @@ h2.head{
   display:flex;gap:clamp(12px,2vw,18px);align-items:flex-start;color:var(--text);
 }
 .bullets li:last-child{border:none;}
+.bullets-mindset{max-width:38rem;width:100%;margin:0 auto;}
+.bullets-mindset > li{
+  border:1px solid var(--border);border-radius:14px;
+  background:var(--surface);padding:clamp(16px,2.4vw,22px) clamp(18px,3vw,24px);
+  margin-bottom:clamp(12px,1.8vh,16px);align-items:flex-start;
+}
+.bullets-mindset > li:last-child{margin-bottom:0;}
+.bullet-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:0.5em;text-align:left;}
+.bullet-lead{
+  font-size:clamp(15px,2.45vmin,18px);font-weight:600;color:var(--text);
+  line-height:1.35;margin:0;letter-spacing:-0.01em;
+}
+.bullet-detail{
+  font-size:clamp(14px,2.25vmin,17px);color:var(--muted);line-height:1.6;margin:0;
+}
+.bullet-detail strong{color:var(--text);font-weight:500;}
+.verb-trio{
+  display:inline-flex;flex-wrap:wrap;align-items:center;gap:0.2em 0.55em;
+  font-weight:600;color:var(--orange);font-style:normal;
+}
+.verb-trio em{font-style:normal;font-weight:inherit;color:inherit;}
+.verb-trio .sep{color:var(--muted2);font-weight:400;user-select:none;}
+.bullets-mindset + .big-q{margin-top:clamp(22px,3.5vh,32px);}
+/* Mindset slide: headline + stack share one column */
+.slide-mindset h2.head{margin-bottom:clamp(12px,2vh,20px);}
+.slide-mindset .tag{align-self:stretch;max-width:38rem;margin-left:auto;margin-right:auto;}
+.slide-mindset .big-q{
+  align-self:stretch;max-width:38rem;margin-left:auto;margin-right:auto;text-align:left;
+  font-size:clamp(20px,3.6vmin,34px);line-height:1.2;padding:clamp(14px,2vw,18px) clamp(18px,3vw,24px);
+  background:rgba(24,25,35,0.65);border:1px solid var(--border);border-radius:12px;color:var(--muted);
+}
 .pip{width:7px;height:7px;border-radius:50%;background:var(--orange);margin-top:0.55em;flex-shrink:0;}
+.bullets-mindset .pip{margin-top:0.5em;}
 .big-q{
   font-family:'Bebas Neue',cursive;font-size:clamp(24px,4.5vmin,46px);text-align:center;
   color:var(--muted);max-width:40rem;line-height:1.12;margin-top:clamp(18px,3vh,28px);padding:0 8px;text-wrap:balance;
@@ -471,15 +503,33 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
   </div>
 
   <!-- SLIDE 2: MINDSET -->
-  <div class="slide" data-slide="1">
+  <div class="slide slide-mindset" data-slide="1">
     <div class="tag">The Mindset Shift</div>
     <h2 class="head">YOU ARE THE<br><span class="or">CAPABILITY</span></h2>
-    <ul class="bullets">
-      <li><span class="pip"></span><strong>What you keep is the skill, not one homework app.</strong> Anyone can fork a template; your edge is learning how to <em>brief</em> an AI, <em>review</em> its output, and <em>iterate</em> until the system works in a real folder.</li>
-      <li><span class="pip"></span><strong>Tools change every season; clear thinking does not.</strong> You are practicing how to describe users, constraints, and data flow so that a teammate (human or model) can build the right thing — that transfers to the next stack, job, or product idea.</li>
-      <li><span class="pip"></span><strong>Yesterday was conversation; today is construction.</strong> You move from one-off chat answers to <em>structured work</em>: a project on disk, named files, a terminal, and specs explicit enough that another person (or grader) can follow your logic.</li>
+    <ul class="bullets bullets-mindset">
+      <li>
+        <span class="pip" aria-hidden="true"></span>
+        <div class="bullet-body">
+          <p class="bullet-lead">What you keep is the skill, not one homework app.</p>
+          <p class="bullet-detail">Anyone can fork a template. Your edge is learning to <span class="verb-trio" role="text"><em>brief</em><span class="sep">·</span><em>review</em><span class="sep">·</span><em>iterate</em></span> until the system works in a real folder.</p>
+        </div>
+      </li>
+      <li>
+        <span class="pip" aria-hidden="true"></span>
+        <div class="bullet-body">
+          <p class="bullet-lead">Tools change every season; clear thinking does not.</p>
+          <p class="bullet-detail">You are practicing how to describe users, constraints, and data flow so a teammate — human or model — can build the right thing. That transfers to the next stack, job, or product idea.</p>
+        </div>
+      </li>
+      <li>
+        <span class="pip" aria-hidden="true"></span>
+        <div class="bullet-body">
+          <p class="bullet-lead">Yesterday was conversation; today is construction.</p>
+          <p class="bullet-detail">You move from one-off chat answers to <strong>structured work</strong>: a project on disk, named files, a terminal, and specs clear enough that another person (or the grader) can follow your logic.</p>
+        </div>
+      </li>
     </ul>
-    <div class="big-q">Shift in one line: <em>asking for answers</em> <span class="or">→</span> <em>directing a build</em> (spec → code → check → ship).</div>
+    <div class="big-q">Shift in one line: <em>asking for answers</em> <span class="or">→</span> <em>directing a build</em> — spec, code, check, ship.</div>
   </div>
 
   <!-- SLIDE 3: ARCHITECT PHILOSOPHY -->

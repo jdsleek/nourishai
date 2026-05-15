@@ -665,7 +665,7 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
       <span class="g-badge rv">REVIEW 50–74</span>
       <span class="g-badge rb">REBUILD &lt; 50</span>
     </div>
-    <p class="grader-note">Scores come from an LLM reading your text — screenshots aren’t analyzed unless you describe them in the workspace box. Be specific (tool names, filenames, commands).</p>
+    <p class="grader-note">Scores come from an LLM reading your prompt and architecture output — cite tools and concrete details inside those submissions when helpful.</p>
   </div>
 
   <!-- SLIDE 7: CTA -->
@@ -737,14 +737,7 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
     </div>
 
     <div class="fgroup">
-      <label class="flabel" for="ideDesc">02 · Workspace verification</label>
-      <p class="fhint">Write what a TA would see if they looked over your shoulder: IDE name, project folder name, which file is open, and one concrete detail from the terminal or sidebar (not “I have Cursor open”).</p>
-      <textarea id="ideDesc" class="fi code" rows="5" placeholder="e.g. Cursor on macOS → folder `lagos-fuel-app` in sidebar → `src/App.tsx` open → terminal shows `npm run dev` and `Local: http://localhost:5173`"></textarea>
-      <p class="field-err" id="err-ide">Describe your workspace with specific names and signals.</p>
-    </div>
-
-    <div class="fgroup">
-      <label class="flabel" for="subGroup">03 · Subgroup</label>
+      <label class="flabel" for="subGroup">02 · Subgroup</label>
       <p class="fhint">Pick the same subgroup you used on the <strong>product ideation</strong> form (cohort list).</p>
       <select id="subGroup" class="fi" aria-required="true">
         <option value="">Loading subgroups…</option>
@@ -753,14 +746,14 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
     </div>
 
     <div class="fgroup">
-      <label class="flabel" for="aPrompt">04 · Your architecture prompt</label>
+      <label class="flabel" for="aPrompt">03 · Your architecture prompt</label>
       <p class="fhint">Paste the <strong>exact</strong> prompt you sent. The grader looks for five labeled sections: Role, Task, Context, Constraints, Output Format (headings or bullet labels both count).</p>
       <textarea id="aPrompt" class="fi code" rows="9" placeholder="Role: You are a senior full-stack architect for early-stage products in Nigeria.&#10;&#10;Task: Design a complete system for...&#10;&#10;Context: I am building... for... (audience, region, constraints on users)...&#10;&#10;Constraints: Free-tier only, must integrate with..., no paid X unless...&#10;&#10;Output Format: Return sections: Frontend Stack, Backend API, Database Schema, Data Flow (with headings)."></textarea>
       <p class="field-err" id="err-prompt">Paste your full prompt.</p>
     </div>
 
     <div class="fgroup">
-      <label class="flabel" for="aOutput">05 · AI-generated architecture output</label>
+      <label class="flabel" for="aOutput">04 · AI-generated architecture output</label>
       <p class="fhint">Paste the model’s answer, at minimum the parts that cover <strong>Frontend</strong>, <strong>Backend/API</strong>, <strong>Database</strong>, and <strong>Data flow</strong>. Longer excerpts score more reliably than two vague sentences.</p>
       <textarea id="aOutput" class="fi code" rows="11" placeholder="### Frontend Stack&#10;...&#10;&#10;### Backend API&#10;...&#10;&#10;### Database Schema&#10;...&#10;&#10;### Data Flow&#10;..."></textarea>
       <p class="field-err" id="err-output">Paste enough architecture output for all four areas.</p>
@@ -915,7 +908,6 @@ async function ensureSubgroupsLoaded(){
 async function grade(){
   const name=document.getElementById('sName').value.trim();
   const subgroup=document.getElementById('subGroup').value.trim();
-  const ide=document.getElementById('ideDesc').value.trim();
   const prompt=document.getElementById('aPrompt').value.trim();
   const output=document.getElementById('aOutput').value.trim();
 
@@ -923,7 +915,6 @@ async function grade(){
   let ok=true;
   if(!name){showErr('sName','err-name');ok=false;}
   if(!subgroup){showErr('subGroup','err-sub');ok=false;}
-  if(!ide||ide.length<24){showErr('ideDesc','err-ide');ok=false;}
   if(!prompt||prompt.length<40){showErr('aPrompt','err-prompt');ok=false;}
   if(!output||output.length<80){showErr('aOutput','err-output');ok=false;}
   if(!ok)return;
@@ -936,7 +927,7 @@ async function grade(){
     const res=await fetch('/api/foundry/grade',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({name,subgroup,ide,prompt,output})
+      body:JSON.stringify({name,subgroup,prompt,output})
     });
     const data=await res.json().catch(()=>({}));
     if(!res.ok){
@@ -991,7 +982,7 @@ function render(r){
 }
 
 function resetForm(){
-  ['sName','ideDesc','aPrompt','aOutput'].forEach(id=>document.getElementById(id).value='');
+  ['sName','aPrompt','aOutput'].forEach(id=>document.getElementById(id).value='');
   const sg=document.getElementById('subGroup');
   if(sg&&sg.dataset.ready==='1'){sg.selectedIndex=0;}
   clearFieldErrors();

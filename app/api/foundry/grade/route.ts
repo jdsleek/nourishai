@@ -14,7 +14,6 @@ export const maxDuration = 60;
 type Body = {
   name?: string;
   subgroup?: string;
-  ide?: string;
   prompt?: string;
   output?: string;
 };
@@ -24,7 +23,6 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as Body;
     const name = String(body.name || "").trim();
     const subgroup = String(body.subgroup || "").trim();
-    const ide = String(body.ide || "").trim();
     const prompt = String(body.prompt || "").trim();
     const output = String(body.output || "").trim();
 
@@ -37,12 +35,6 @@ export async function POST(req: NextRequest) {
     if (!subgroup || !QAF_COHORT_SUBGROUPS.includes(subgroup)) {
       return Response.json(
         { error: "Select a valid subgroup from the list." },
-        { status: 400 }
-      );
-    }
-    if (ide.length < 24) {
-      return Response.json(
-        { error: "Workspace description is too short — add specific IDE and file details." },
         { status: 400 }
       );
     }
@@ -60,7 +52,7 @@ export async function POST(req: NextRequest) {
     }
 
     const groq = getGroq();
-    const rubric = buildFoundryRubricPrompt(name, subgroup, ide, prompt, output);
+    const rubric = buildFoundryRubricPrompt(name, subgroup, prompt, output);
 
     const res = await groq.chat.completions.create({
       model: GROQ_MODEL,
@@ -94,7 +86,7 @@ export async function POST(req: NextRequest) {
     const entry = {
       fellowName: name,
       subgroup,
-      ide,
+      ide: "",
       prompt,
       output,
       result,

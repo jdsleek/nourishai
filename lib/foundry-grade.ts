@@ -17,7 +17,6 @@ export type FoundryGradeResult = {
 export function buildFoundryRubricPrompt(
   name: string,
   subgroup: string,
-  ide: string,
   prompt: string,
   output: string
 ): string {
@@ -29,8 +28,7 @@ FELLOW NAME: ${name}
 
 SUBGROUP: ${subgroup}
 
-WORKSPACE DESCRIPTION:
-${ide}
+Note: No separate workspace/IDE verification field is collected. Infer any tooling or environment signals only from explicit text in the PROMPT or OUTPUT below.
 
 ARCHITECTURE PROMPT SUBMITTED:
 ${prompt}
@@ -55,8 +53,7 @@ RUBRIC (total 100 points):
    Data flow or user journey from A to B is clear (10 pts)
 
 3. ENVIRONMENT SETUP (20 points):
-   Evidence of AI-native IDE (Cursor, VS Code with agent, Windsurf, etc.) (10 pts)
-   Evidence of code file, project folder, or terminal visible (10 pts)
+   Workspace description is not submitted this term. Score this category only from explicit mentions of IDE/tooling/local dev in the PROMPT or ARCHITECTURE OUTPUT (e.g. Cursor, VS Code, npm, localhost). If neither document mentions tooling, cap at 8/20 and state that environment was not evidenced in the submission.
 
 Grade thresholds: GO = 75-100 | REVIEW = 50-74 | REBUILD = 0-49
 

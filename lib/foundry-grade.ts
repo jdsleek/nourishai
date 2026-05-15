@@ -16,6 +16,7 @@ export type FoundryGradeResult = {
 
 export function buildFoundryRubricPrompt(
   name: string,
+  subgroup: string,
   ide: string,
   prompt: string,
   output: string
@@ -24,7 +25,9 @@ export function buildFoundryRubricPrompt(
 
 Evaluate the student submission below against the Foundry Rubric. Return ONLY valid JSON — no markdown code fences, no preamble, no explanation outside the JSON object.
 
-STUDENT NAME: ${name}
+FELLOW NAME: ${name}
+
+SUBGROUP: ${subgroup}
 
 WORKSPACE DESCRIPTION:
 ${ide}

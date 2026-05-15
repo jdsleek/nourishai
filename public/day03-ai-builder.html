@@ -412,9 +412,18 @@ code{font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:3
 input[type="text"].fi,textarea.fi{
   width:100%;max-width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;
   color:var(--text);font-family:'DM Sans',sans-serif;font-size:clamp(15px,2.5vmin,17px);padding:14px 16px;
-  outline:none;transition:border-color 0.2s;resize:vertical;line-height:1.5;
+  outline:none;transition:border-color 0.2s;line-height:1.5;
 }
-input[type="text"].fi:focus,textarea.fi:focus{border-color:var(--orange);box-shadow:0 0 0 1px rgba(249,115,22,0.25);}
+textarea.fi{resize:vertical;min-height:3.25rem;}
+select.fi{
+  width:100%;max-width:100%;box-sizing:border-box;
+  min-height:52px;display:block;background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  color:var(--text);font-family:'DM Sans',sans-serif;font-size:clamp(15px,2.5vmin,17px);padding:14px 36px 14px 16px;
+  outline:none;line-height:1.4;
+  cursor:pointer;appearance:auto;-webkit-appearance:menulist;
+  resize:none;color-scheme:dark;
+}
+input[type="text"].fi:focus,textarea.fi:focus,select.fi:focus{border-color:var(--orange);box-shadow:0 0 0 1px rgba(249,115,22,0.25);}
 textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmin,14px);line-height:1.5;}
 .fi.invalid{border-color:rgba(248,113,113,0.65);}
 
@@ -689,7 +698,7 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
         <li>Have your architecture response ready: paste enough text that <strong>Frontend</strong>, <strong>Backend/API</strong>, <strong>Database</strong>, and <strong>Data flow</strong> are all visible (sections can be longer than a few short paragraphs).</li>
       </ul>
     </div>
-    <button type="button" class="cta-main" onclick="openPortal()">SUBMIT TO THE FOUNDRY PORTAL ↓</button>
+    <button type="button" class="cta-main" onclick="void openPortal()">SUBMIT TO THE FOUNDRY PORTAL ↓</button>
     <p class="cta-sub">// The grader returns a score, rubric breakdown, and one “level up” action for your next attempt</p>
   </div>
 
@@ -716,32 +725,42 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
     </div>
 
     <div class="privacy-banner">
-      <strong>Foundry portal.</strong> Submissions are graded automatically on the <strong>Qubators AI Foundry server</strong> when you click submit (same tab/session). Paste only coursework you’re comfortable sharing for class.
+      <strong>Foundry portal.</strong> Submissions are graded automatically on the <strong>Qubators AI Foundry server</strong> when you click submit (same tab/session). Stored for instructor review (password-protected admin, not public). Paste only coursework you’re comfortable sharing for class.
     </div>
 
     <!-- FORM -->
     <div class="fgroup">
-      <label class="flabel" for="sName">01 · Student Name</label>
+      <label class="flabel" for="sName">01 · Fellow / student name</label>
+      <p class="fhint"><strong>Fellow name</strong> · your <strong>full name</strong> as used on the roster.</p>
       <input type="text" id="sName" class="fi" placeholder="Your full name" autocomplete="name">
-      <p class="field-err" id="err-name">Enter your name.</p>
+      <p class="field-err" id="err-name">Enter your fellow name and full name.</p>
     </div>
 
     <div class="fgroup">
-      <label class="flabel" for="ideDesc">02 · Workspace Verification</label>
+      <label class="flabel" for="ideDesc">02 · Workspace verification</label>
       <p class="fhint">Write what a TA would see if they looked over your shoulder: IDE name, project folder name, which file is open, and one concrete detail from the terminal or sidebar (not “I have Cursor open”).</p>
       <textarea id="ideDesc" class="fi code" rows="5" placeholder="e.g. Cursor on macOS → folder `lagos-fuel-app` in sidebar → `src/App.tsx` open → terminal shows `npm run dev` and `Local: http://localhost:5173`"></textarea>
       <p class="field-err" id="err-ide">Describe your workspace with specific names and signals.</p>
     </div>
 
     <div class="fgroup">
-      <label class="flabel" for="aPrompt">03 · Your Architecture Prompt</label>
+      <label class="flabel" for="subGroup">03 · Subgroup</label>
+      <p class="fhint">Pick the same subgroup you used on the <strong>product ideation</strong> form (cohort list).</p>
+      <select id="subGroup" class="fi" aria-required="true">
+        <option value="">Loading subgroups…</option>
+      </select>
+      <p class="field-err" id="err-sub">Select your subgroup from the dropdown.</p>
+    </div>
+
+    <div class="fgroup">
+      <label class="flabel" for="aPrompt">04 · Your architecture prompt</label>
       <p class="fhint">Paste the <strong>exact</strong> prompt you sent. The grader looks for five labeled sections: Role, Task, Context, Constraints, Output Format (headings or bullet labels both count).</p>
       <textarea id="aPrompt" class="fi code" rows="9" placeholder="Role: You are a senior full-stack architect for early-stage products in Nigeria.&#10;&#10;Task: Design a complete system for...&#10;&#10;Context: I am building... for... (audience, region, constraints on users)...&#10;&#10;Constraints: Free-tier only, must integrate with..., no paid X unless...&#10;&#10;Output Format: Return sections: Frontend Stack, Backend API, Database Schema, Data Flow (with headings)."></textarea>
       <p class="field-err" id="err-prompt">Paste your full prompt.</p>
     </div>
 
     <div class="fgroup">
-      <label class="flabel" for="aOutput">04 · AI-Generated Architecture Output</label>
+      <label class="flabel" for="aOutput">05 · AI-generated architecture output</label>
       <p class="fhint">Paste the model’s answer, at minimum the parts that cover <strong>Frontend</strong>, <strong>Backend/API</strong>, <strong>Database</strong>, and <strong>Data flow</strong>. Longer excerpts score more reliably than two vague sentences.</p>
       <textarea id="aOutput" class="fi code" rows="11" placeholder="### Frontend Stack&#10;...&#10;&#10;### Backend API&#10;...&#10;&#10;### Database Schema&#10;...&#10;&#10;### Data Flow&#10;..."></textarea>
       <p class="field-err" id="err-output">Paste enough architecture output for all four areas.</p>
@@ -830,7 +849,13 @@ document.addEventListener('keydown',e=>{
 });
 
 // ── PORTAL ──
-function openPortal(){
+/** Same list as lib/foundry-subgroups.ts — used if GET /api/foundry/subgroups fails. */
+const FALLBACK_QAF_SUBGROUPS = [
+  'Bethel','Carmel','Eden','Gilead','Goshen','Hebron','Israel','Zion','Other / not listed',
+];
+
+async function openPortal(){
+  await ensureSubgroupsLoaded(false);
   document.getElementById('portal').classList.add('open');
   document.getElementById('portal').scrollTop=0;
   document.getElementById('portal').setAttribute('aria-hidden','false');
@@ -856,9 +881,40 @@ function showErr(fieldId, errId){
   if(e)e.classList.add('on');
 }
 
+async function ensureSubgroupsLoaded(){
+  const sel=document.getElementById('subGroup');
+  if(sel.dataset.ready==='1')return;
+  sel.innerHTML='<option value="">Loading subgroups…</option>';
+
+  const fill = (list) => {
+    sel.innerHTML='<option value="">Select subgroup…</option>';
+    list.forEach(s=>{
+      const o=document.createElement('option');
+      o.value=s;
+      o.textContent=s;
+      sel.appendChild(o);
+    });
+    sel.dataset.ready='1';
+  };
+
+  try{
+    const r=await fetch('/api/foundry/subgroups');
+    const j=await r.json().catch(()=>({}));
+    const list=Array.isArray(j.subgroups)?j.subgroups:[];
+    if(list.length){
+      fill(list);
+      return;
+    }
+    fill(FALLBACK_QAF_SUBGROUPS);
+  }catch(_){
+    fill(FALLBACK_QAF_SUBGROUPS);
+  }
+}
+
 // ── GRADER (server-side Groq → POST /api/foundry/grade on AI Foundry) ──
 async function grade(){
   const name=document.getElementById('sName').value.trim();
+  const subgroup=document.getElementById('subGroup').value.trim();
   const ide=document.getElementById('ideDesc').value.trim();
   const prompt=document.getElementById('aPrompt').value.trim();
   const output=document.getElementById('aOutput').value.trim();
@@ -866,6 +922,7 @@ async function grade(){
   clearFieldErrors();
   let ok=true;
   if(!name){showErr('sName','err-name');ok=false;}
+  if(!subgroup){showErr('subGroup','err-sub');ok=false;}
   if(!ide||ide.length<24){showErr('ideDesc','err-ide');ok=false;}
   if(!prompt||prompt.length<40){showErr('aPrompt','err-prompt');ok=false;}
   if(!output||output.length<80){showErr('aOutput','err-output');ok=false;}
@@ -879,7 +936,7 @@ async function grade(){
     const res=await fetch('/api/foundry/grade',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({name,ide,prompt,output})
+      body:JSON.stringify({name,subgroup,ide,prompt,output})
     });
     const data=await res.json().catch(()=>({}));
     if(!res.ok){
@@ -888,6 +945,9 @@ async function grade(){
     }
     if(!data.result)throw new Error('Invalid response from grading service.');
     render(data.result);
+    if(data.persisted===false){
+      alert('Your submission was graded, but storing it failed (disk or server IO). Inform your TA immediately with your name — do not discard your prompt/output until confirmed.');
+    }
   }catch(err){
     alert('Grader error: '+(err.message||err)+'\n\nOpen this deck on the hosted AI Builder site (not a saved copy of the HTML file) so /api/foundry/grade can reach the AI Foundry server.');
   }finally{
@@ -932,6 +992,8 @@ function render(r){
 
 function resetForm(){
   ['sName','ideDesc','aPrompt','aOutput'].forEach(id=>document.getElementById(id).value='');
+  const sg=document.getElementById('subGroup');
+  if(sg&&sg.dataset.ready==='1'){sg.selectedIndex=0;}
   clearFieldErrors();
   document.getElementById('result').classList.remove('on');
   document.getElementById('portal').scrollTop=0;

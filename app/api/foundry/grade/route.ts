@@ -5,12 +5,15 @@ import {
   normalizeGraderResult,
   parseGraderJson,
 } from "@/lib/foundry-grade";
+import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
+import { appendFoundrySubmission } from "@/lib/foundry-store";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 type Body = {
   name?: string;
+  subgroup?: string;
   ide?: string;
   prompt?: string;
   output?: string;
@@ -20,12 +23,22 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Body;
     const name = String(body.name || "").trim();
+    const subgroup = String(body.subgroup || "").trim();
     const ide = String(body.ide || "").trim();
     const prompt = String(body.prompt || "").trim();
     const output = String(body.output || "").trim();
 
     if (!name) {
-      return Response.json({ error: "Name is required." }, { status: 400 });
+      return Response.json(
+        { error: "Fellow / student name is required." },
+        { status: 400 },
+      );
+    }
+    if (!subgroup || !QAF_COHORT_SUBGROUPS.includes(subgroup)) {
+      return Response.json(
+        { error: "Select a valid subgroup from the list." },
+        { status: 400 }
+      );
     }
     if (ide.length < 24) {
       return Response.json(
@@ -47,7 +60,7 @@ export async function POST(req: NextRequest) {
     }
 
     const groq = getGroq();
-    const rubric = buildFoundryRubricPrompt(name, ide, prompt, output);
+    const rubric = buildFoundryRubricPrompt(name, subgroup, ide, prompt, output);
 
     const res = await groq.chat.completions.create({
       model: GROQ_MODEL,
@@ -77,7 +90,39 @@ export async function POST(req: NextRequest) {
     }
 
     const result = normalizeGraderResult(parsed);
-    return Response.json({ ok: true, result });
+
+    const entry = {
+      fellowName: name,
+      subgroup,
+      ide,
+      prompt,
+      output,
+      result,
+    };
+
+    let persisted = false;
+    const delays = [0, 250, 600];
+    for (let attempt = 0; attempt < delays.length; attempt++) {
+      if (delays[attempt] > 0) {
+        await new Promise((r) => setTimeout(r, delays[attempt]));
+      }
+      try {
+        await appendFoundrySubmission(entry);
+        persisted = true;
+        break;
+      } catch (storeErr) {
+        console.error(
+          `[foundry/grade] persist error attempt ${attempt + 1}`,
+          storeErr
+        );
+      }
+    }
+
+    if (!persisted) {
+      console.error("[foundry/grade] all persist attempts failed");
+    }
+
+    return Response.json({ ok: true, result, persisted });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Grading failed.";

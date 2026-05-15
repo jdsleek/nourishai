@@ -14,6 +14,8 @@ A modern food & nutrition web app built with **Next.js 14 + TypeScript + Tailwin
 
 All user data (profile, food logs, weight history) is stored in the **browser's localStorage** — no signup, no database, no server storage.
 
+**Day 03 Foundry portal** (`POST /api/foundry/grade`, admin at `/foundry/admin`): on **production (Railway)** you should set **`DATABASE_URL`** to **managed Postgres** so submissions survive redeploys. Without it, submissions are only appended under `food-app/data/*.jsonl`, which the container discards on each deploy.
+
 ## Setup
 
 ### 1. Install dependencies
@@ -50,14 +52,43 @@ npm run dev
 
 Visit http://localhost:3000 for the **Day 03 slide deck** (site index). The nutrition app dashboard is at http://localhost:3000/nourish. From the deck header or Class workbook, open **QAF cohort ideation** (`/qaf-product-ideation-registry.html`) — regenerate after CSV updates with `npm run build:qaf-registry` (requires Python 3).
 
+For Foundry grading locally you can add Postgres to `.env.local`:
+
+```
+DATABASE_URL=postgresql://user:pass@localhost:5432/nourish_local
+```
+
+Leave it unset to use JSONL under `data/` only (fine for local dev).
+
 ## Deploy to Railway
+
+### Web app
 
 1. Push this repo to GitHub.
 2. On https://railway.app, click **New Project → Deploy from GitHub repo** and pick `nourishai`.
-3. In the service's **Variables** tab add `GROQ_API_KEY=gsk_...`.
-
-**Or** from this repo (uses `RAILWAY_TOKEN` + `GROQ_API_KEY` from `Training Classes Project/.env` and `vault/.env`): `npm run railway:set-groq` — finds the **nourishai** service and sets `GROQ_*` on Railway, then redeploy if needed.
+3. In the Next.js service **Variables** tab add `GROQ_API_KEY=gsk_...`.
 4. Under **Settings → Networking**, click **Generate Domain**.
+
+### Durable Foundry submissions (PostgreSQL)
+
+Railway replaces the filesystem on each deploy, so **JSONL-only storage is not persistent** in production.
+
+1. In the **same project**: **New → Database → PostgreSQL** (Railway’s managed DB includes automated backups).
+2. On your **Next.js service** → **Variables** → **Add variable reference** → **`DATABASE_URL`** from the Postgres service (Railway injects the URL; you do not paste a database “token” into the app for normal operation).
+3. **Redeploy** the web service. The first graded submission creates table `foundry_submissions` automatically.
+4. Successful writes also append to `data/foundry-submissions.jsonl` and `…db-mirror.jsonl` as **best-effort mirrors** (those files can still be wiped on deploy — trust Postgres for history).
+5. To **re-import** rows you still have on disk after adding Postgres:
+
+   ```bash
+   cd food-app
+   DATABASE_URL='postgresql://…' npm run foundry:import-jsonl
+   ```
+
+   Or pass a path to a backup JSONL file as the first argument.
+
+### Groq deploy helper (uses `RAILWAY_TOKEN`)
+
+From this repo you can still run (uses `RAILWAY_TOKEN` + `GROQ_API_KEY` from env): `npm run railway:set-groq` — finds the **nourishai** service, sets `GROQ_*`, and redeploys if needed. That token is for the **Railway API**, not for SQL; database access is via **`DATABASE_URL`** on the service.
 
 Railway auto-detects Next.js, runs `npm run build`, then `npm start`. Next.js reads `PORT` from the environment automatically — no extra config needed.
 
@@ -83,6 +114,7 @@ food-app/
 │  ├─ nutrition.ts             # BMR/TDEE/macro math
 │  ├─ groq.ts                  # server-side Groq client
 │  ├─ foundry-grade.ts
+│  ├─ foundry-store.ts         # Foundry JSON + optional Postgres
 │  ├─ store.ts                 # Zustand + localStorage
 │  ├─ foods.json               # 100+ foods seed DB
 │  └─ types.ts
@@ -99,12 +131,14 @@ food-app/
 
 ## Scripts
 
-| Command         | Purpose                          |
-| --------------- | -------------------------------- |
-| `npm run dev`   | Start Next.js dev server         |
-| `npm run build` | Production build                 |
-| `npm run start` | Start production server          |
-| `npm run lint`  | Lint with Next.js ESLint config  |
+| Command                      | Purpose                                                |
+| ---------------------------- | ------------------------------------------------------ |
+| `npm run dev`                | Start Next.js dev server                               |
+| `npm run build`              | Production build                                       |
+| `npm run start`              | Start production server                                |
+| `npm run lint`               | Lint with Next.js ESLint config                       |
+| `npm run railway:set-groq`   | Push `GROQ_*` to Railway via API (`RAILWAY_TOKEN`)     |
+| `npm run foundry:import-jsonl` | Load `data/` JSONL into Postgres (`DATABASE_URL`)   |
 
 ## Disclaimer
 

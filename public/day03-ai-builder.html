@@ -69,11 +69,10 @@ body.portal-open{overflow:auto;-webkit-overflow-scrolling:touch;}
 }
 .logo strong{color:var(--orange);}
 .registry-link{
-  font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,11px);color:var(--cyan);
-  text-decoration:none;border:1px solid rgba(34,211,238,0.35);padding:6px 12px;border-radius:6px;
-  white-space:nowrap;transition:border-color .2s,color .2s;
+  font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,11px);color:var(--muted2);
+  border:1px solid rgba(100,116,139,0.35);padding:6px 12px;border-radius:6px;
+  white-space:nowrap;cursor:default;opacity:0.95;
 }
-.registry-link:hover{color:var(--orange);border-color:rgba(249,115,22,0.4);}
 .kbd-hints{display:none;gap:8px;align-items:center;font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,11px);color:var(--muted);flex-shrink:0;}
 @media (min-width:720px) and (min-height:500px){.kbd-hints{display:flex;}}
 .key{background:var(--surface);border:1px solid var(--border-hi);padding:2px 8px;border-radius:4px;font-size:clamp(10px,2vmin,11px);}
@@ -494,7 +493,7 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
 <!-- TOP CHROME -->
 <div class="chrome-top">
   <div class="logo"><strong>QUBATORS</strong> AI FOUNDRY · DAY 03</div>
-  <a class="registry-link" href="/qaf-product-ideation-registry.html" title="All cohort product ideas (no names)">Cohort ideation registry →</a>
+  <span class="registry-link" title="Cohort summaries are instructor-only">Ideation summaries (instructors only)</span>
   <div class="kbd-hints" aria-hidden="true">
     <span class="key">←</span><span class="key">→</span> navigate
     &nbsp;&nbsp;
@@ -510,7 +509,7 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
   <div class="slide active" data-slide="0">
     <div class="badge">Day 03 · Qubators AI Foundry</div>
     <h1 class="hero">THE <span class="or">AI</span><br>BUILDER<span class="cur" aria-hidden="true"></span></h1>
-    <div class="subtitle">// The AI Developer's Mindset · From chat prompts to systems you can ship · <a href="/qaf-product-ideation-registry.html" style="color:var(--cyan);text-underline-offset:3px;">Open cohort ideation registry</a></div>
+    <div class="subtitle">// The AI Developer's Mindset · From chat prompts to systems you can ship · cohort ideation is visible in <strong>Foundry admin</strong> (<code>/foundry/admin</code>) only</div>
   </div>
 
   <!-- SLIDE 2: MINDSET -->

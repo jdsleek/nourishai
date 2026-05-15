@@ -10,6 +10,16 @@ const nextConfig = {
       ],
     };
   },
+  async redirects() {
+    return [
+      /** Former public registry — instructor-only in /foundry/admin */
+      {
+        source: "/qaf-product-ideation-registry.html",
+        destination: "/foundry/admin",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

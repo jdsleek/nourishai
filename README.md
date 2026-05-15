@@ -50,7 +50,7 @@ GROQ_MODEL=llama-3.1-8b-instant
 npm run dev
 ```
 
-Visit http://localhost:3000 for the **Day 03 slide deck** (site index). The nutrition app dashboard is at http://localhost:3000/nourish. From the deck header or Class workbook, open **QAF cohort ideation** (`/qaf-product-ideation-registry.html`) — regenerate after CSV updates with `npm run build:qaf-registry` (requires Python 3).
+Visit http://localhost:3000 for the **Day 03 slide deck** (site index). The nutrition app dashboard is at http://localhost:3000/nourish. **QAF cohort ideation** is **not** a public route anymore — instructors regenerate it into `food-app/registry/qaf-product-ideation-registry.html` with **`npm run build:qaf-registry`** (Python 3, reads `vault/data/qaf-ideation/…csv`) and view it (after unlocking) under **`/foundry/admin` → QAF ideation registry**.
 
 For Foundry grading locally you can add Postgres to `.env.local`:
 
@@ -108,7 +108,9 @@ food-app/
 │  ├─ (main)/foods/page.tsx
 │  ├─ (main)/progress/page.tsx
 │  ├─ foundry/day03/route.ts   # Day 03 deck HTML; `/` rewrites here
-│  └─ api/                     # Groq + foundry grade
+│  └─ api/                     # Groq + foundry grade + admin ideation-registry
+├─ registry/
+│  └─ qaf-product-ideation-registry.html  # built by build:qaf-registry (not public)
 ├─ components/                 # Nav, MacroBar, FoodSearch, WeightChart
 ├─ lib/
 │  ├─ nutrition.ts             # BMR/TDEE/macro math
@@ -138,7 +140,10 @@ food-app/
 | `npm run start`              | Start production server                                |
 | `npm run lint`               | Lint with Next.js ESLint config                       |
 | `npm run railway:set-groq`   | Push `GROQ_*` to Railway via API (`RAILWAY_TOKEN`)     |
-| `npm run foundry:import-jsonl` | Load `data/` JSONL into Postgres (`DATABASE_URL`)   |
+| `npm run foundry:import-jsonl` | Load `data/` JSONL into Postgres (`DATABASE_URL`)                   |
+| `npm run foundry:smoke`        | Postgres schema + txn insert rollback (needs **`DATABASE_URL`**)     |
+| `npm run foundry:smoke:full`   | Same + `--api --grade`: needs dev server running + **`GROQ_API_KEY`**  |
+| `npm run foundry:smoke:railway-deploy` | Live test **production Railway** (uses **`RAILWAY_TOKEN`** to resolve app URL); grades + verifies admin count |
 
 ## Disclaimer
 

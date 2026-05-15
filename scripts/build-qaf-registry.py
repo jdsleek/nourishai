@@ -3,14 +3,12 @@ import json
 import re
 from pathlib import Path
 
-csv_path = Path(
-    "/Users/juliusarebo/Desktop/Training Classes Project/vault/data/qaf-ideation/"
-    "QAF 1.0 Product Ideation.csv"
-)
-out_path = Path(
-    "/Users/juliusarebo/Desktop/Training Classes Project/food-app/public/"
-    "qaf-product-ideation-registry.html"
-)
+ROOT = Path(__file__).resolve().parent.parent  # food-app/
+REPO = ROOT.parent
+
+csv_path = REPO / "vault" / "data" / "qaf-ideation" / "QAF 1.0 Product Ideation.csv"
+
+out_path = ROOT / "registry" / "qaf-product-ideation-registry.html"
 
 
 def map_cat(bucket: str):
@@ -66,7 +64,7 @@ counts_json = json.dumps(counts, ensure_ascii=False)
 
 if not out_path.exists():
     raise SystemExit(
-        f"Missing registry shell {out_path}; commit includes the HTML layout first."
+        f"Missing registry shell {out_path}; ensure the HTML template is present under food-app/registry/"
     )
 
 template = out_path.read_text(encoding="utf-8")

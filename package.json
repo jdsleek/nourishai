@@ -9,7 +9,10 @@
     "start": "next start",
     "lint": "next lint",
     "railway:set-groq": "node scripts/railway-set-groq.mjs",
-    "foundry:import-jsonl": "node scripts/foundry-import-jsonl-to-pg.mjs"
+    "foundry:import-jsonl": "node scripts/foundry-import-jsonl-to-pg.mjs",
+    "foundry:smoke": "node scripts/foundry-smoke-test.mjs",
+    "foundry:smoke:full": "node scripts/foundry-smoke-test.mjs --api --grade",
+    "foundry:smoke:railway-deploy": "node scripts/foundry-smoke-railway-deploy.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

@@ -1,9 +1,10 @@
-import { mkdir, appendFile, readFile } from "fs/promises";
+import { mkdir, appendFile, readFile, writeFile } from "fs/promises";
 import path from "path";
 import type { FoundryGradeResult } from "@/lib/foundry-grade";
 import {
   ensureFoundrySubmissionsSchema,
   getFoundryPgPool,
+  pgDeleteSubmissionById,
   pgInsertSubmission,
   pgListSubmissionsNewestFirst,
 } from "@/lib/foundry-pg";
@@ -45,6 +46,58 @@ async function readJsonlFile(fp: string): Promise<FoundrySubmissionRecord[]> {
     .filter(Boolean)
     .map((line) => JSON.parse(line) as FoundrySubmissionRecord);
   return rows;
+}
+
+async function readJsonlFileSafe(fp: string): Promise<FoundrySubmissionRecord[]> {
+  try {
+    return await readJsonlFile(fp);
+  } catch {
+    return [];
+  }
+}
+
+/** Remove submission lines with this id from mirror JSONLs (rewrite files). Returns true if at least one file lost a row. */
+async function stripIdFromMirrorJsonls(id: string): Promise<boolean> {
+  await mkdir(dataDir, { recursive: true });
+  let stripped = false;
+  for (const fp of [storeFile, backupFile]) {
+    const rows = await readJsonlFileSafe(fp);
+    const next = rows.filter((r) => r.id !== id);
+    if (next.length !== rows.length) stripped = true;
+    const body = next.length ? `${next.map((r) => JSON.stringify(r)).join("\n")}\n` : "";
+    await writeFile(fp, body, "utf8");
+  }
+  return stripped;
+}
+
+/**
+ * Removes from Postgres when configured, then rewrites local JSONLs without this id (so merges do not resurrect it).
+ * @returns `{ removed: boolean }` false if nothing was deleted.
+ */
+export async function deleteFoundrySubmission(id: string): Promise<{ removed: boolean }> {
+  const trimmed = String(id || "").trim();
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      trimmed
+    )
+  ) {
+    return { removed: false };
+  }
+
+  let fromPg = false;
+  const pool = getFoundryPgPool();
+
+  if (pool) {
+    try {
+      await ensureFoundrySubmissionsSchema(pool);
+      fromPg = await pgDeleteSubmissionById(pool, trimmed);
+    } catch (e) {
+      console.error("[foundry-store] Postgres delete failed", e);
+    }
+  }
+
+  const fromFiles = await stripIdFromMirrorJsonls(trimmed);
+  return { removed: fromPg || fromFiles };
 }
 
 async function readFileMerged(): Promise<FoundrySubmissionRecord[]> {

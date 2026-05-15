@@ -126,12 +126,9 @@ export default function ClassWorkbookPage() {
           >
             Open Day 03 — AI Builder slides &amp; Foundry grader
           </a>
-          <a
-            href="/qaf-product-ideation-registry.html"
-            className="inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-800 shadow-sm hover:bg-stone-50 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800"
-          >
-            QAF cohort ideation (no names)
-          </a>
+        </p>
+        <p className="mt-2 max-w-xl text-xs text-stone-500 dark:text-stone-500">
+          The cohort-wide <strong className="text-stone-600 dark:text-stone-400">product ideation</strong> summaries are instructor-only (<code className="rounded bg-stone-200/80 px-1 py-0.5 dark:bg-stone-800">/foundry/admin</code> — password protected) so fellows don&apos;t see each other&apos;s ideas.
         </p>
       </div>
 

@@ -114,3 +114,12 @@ export async function pgListSubmissionsNewestFirst(
   );
   return rows.map((r) => rowToRecord(r as Record<string, unknown>));
 }
+
+/** True if a row existed and was removed. */
+export async function pgDeleteSubmissionById(pool: Pool, id: string): Promise<boolean> {
+  const result = await pool.query(
+    `DELETE FROM foundry_submissions WHERE id = $1::uuid RETURNING id`,
+    [id]
+  );
+  return (result.rowCount ?? 0) > 0;
+}

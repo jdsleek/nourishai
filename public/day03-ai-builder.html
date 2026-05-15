@@ -118,7 +118,7 @@ body.portal-open{overflow:auto;-webkit-overflow-scrolling:touch;}
   .badge{margin-bottom:10px;padding:6px 12px;}
 }
 @media (max-width:900px){
-  .pillars,.two-col,.score-grid{grid-template-columns:1fr!important;}
+  .pillars,.two-col,.score-grid,.score-grid--dual{grid-template-columns:1fr!important;}
 }
 @media (min-width:901px) and (max-width:1200px){
   .pillars{grid-template-columns:repeat(3,1fr)!important;}
@@ -290,6 +290,7 @@ code{font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:3
 
 /* ── SLIDE 6 — SCORING ── */
 .score-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(12px,2.5vw,20px);max-width:52rem;width:100%;}
+.score-grid--dual{grid-template-columns:repeat(2,1fr);max-width:40rem;margin-inline:auto;}
 .s-card{
   background:var(--surface);border:1px solid var(--border);border-radius:14px;
   padding:clamp(20px,3vw,30px) clamp(16px,2.5vw,24px);text-align:center;
@@ -359,14 +360,15 @@ code{font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:3
   background:var(--orange);color:#0a0a0c;border:none;
   padding:clamp(16px,3vw,20px) clamp(36px,8vw,56px);
   font-family:'Bebas Neue',cursive;font-size:clamp(20px,3.8vmin,26px);letter-spacing:0.12em;border-radius:10px;
-  cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;width:100%;max-width:min(28rem,100%);
-  min-height:52px;
+  cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;
+  display:block;max-width:min(28rem,100%);width:fit-content;margin-inline:auto;
+  min-height:52px;text-align:center;
 }
 .cta-main:hover{transform:scale(1.02);box-shadow:0 0 40px rgba(249,115,22,0.3);}
 .cta-main:focus-visible{outline:3px solid var(--cyan);outline-offset:3px;}
 .cta-sub{
   font-family:'JetBrains Mono',monospace;font-size:clamp(11px,2vmin,12px);color:var(--muted);margin-top:clamp(12px,2vh,16px);
-  max-width:36rem;text-align:center;line-height:1.6;padding:0 8px;
+  max-width:36rem;margin-inline:auto;text-align:center;line-height:1.6;padding:0 8px;
 }
 
 /* ── PORTAL (readable on phone + shared screen) ── */
@@ -612,30 +614,30 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
       <div class="pillar">
         <span class="p-lbl">ROLE</span>
         <p class="p-desc">Who the model should “be” (e.g. senior architect).</p>
-        <div class="p-pts">8 pts</div>
+        <div class="p-pts">~2 pts</div>
       </div>
       <div class="pillar">
         <span class="p-lbl">TASK</span>
         <p class="p-desc">Exact deliverable: design / plan / compare / decide.</p>
-        <div class="p-pts">8 pts</div>
+        <div class="p-pts">~2 pts</div>
       </div>
       <div class="pillar">
         <span class="p-lbl">CONTEXT</span>
         <p class="p-desc">Product, audience, region, stage (idea, MVP, scale).</p>
-        <div class="p-pts">8 pts</div>
+        <div class="p-pts">~2 pts</div>
       </div>
       <div class="pillar">
         <span class="p-lbl">CONSTRAINTS</span>
         <p class="p-desc">Budget, integrations, tech limits, compliance.</p>
-        <div class="p-pts">8 pts</div>
+        <div class="p-pts">~2 pts</div>
       </div>
       <div class="pillar">
         <span class="p-lbl">FORMAT</span>
         <p class="p-desc">Headings/bullets/diagrams you want back.</p>
-        <div class="p-pts">8 pts</div>
+        <div class="p-pts">~2 pts</div>
       </div>
     </div>
-    <p class="pillar-hint">// Grader checks: all five labels present in your prompt · vague lines lose points · Total 40 pts toward your prompt score</p>
+    <p class="pillar-hint">// Grader checks: all five labels present in your prompt · vague lines lose points · folds into up to <strong>10 pts</strong> (Prompt Quality) toward your Day 03 total</p>
     <p class="callout-strip"><strong>Tip:</strong> Copy your final prompt from the agent chat and paste it verbatim into the portal — don’t summarize from memory.</p>
   </div>
 
@@ -643,29 +645,24 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
   <div class="slide" data-slide="5">
     <div class="tag">How You Get Marked</div>
     <h2 class="head">THE <span class="or">GRADER AGENT</span><br>CHECKS YOUR LOGIC</h2>
-    <div class="score-grid">
+    <div class="score-grid score-grid--dual">
       <div class="s-card">
-        <span class="s-pts">20</span>
-        <div class="s-title">Environment Check</div>
-        <p class="s-desc">Your description shows an AI-native IDE plus a real project signal: open file, folder tree, or terminal output.</p>
-      </div>
-      <div class="s-card">
-        <span class="s-pts">40</span>
+        <span class="s-pts">10</span>
         <div class="s-title">Prompt Structure</div>
-        <p class="s-desc">Role, Task, Context, Constraints, and Output Format are all explicit — not implied in one vague paragraph.</p>
+        <p class="s-desc">Role, Task, Context, Constraints, and Output Format are explicit — counted toward Prompt Quality (/10).</p>
       </div>
       <div class="s-card">
-        <span class="s-pts">40</span>
+        <span class="s-pts">10</span>
         <div class="s-title">Architecture Logic</div>
-        <p class="s-desc">The AI’s answer names a frontend approach, backend/API shape, data model, and how data moves for a user.</p>
+        <p class="s-desc">The model’s answer names frontend approach, backend/API shape, data model, and user data flow (/10).</p>
       </div>
     </div>
     <div class="grade-row">
-      <span class="g-badge go">GO &gt;= 75</span>
-      <span class="g-badge rv">REVIEW 50–74</span>
-      <span class="g-badge rb">REBUILD &lt; 50</span>
+      <span class="g-badge go">GO &gt;= 15 / 20</span>
+      <span class="g-badge rv">REVIEW 10–14 / 20</span>
+      <span class="g-badge rb">REBUILD &lt; 10 / 20</span>
     </div>
-    <p class="grader-note">Scores come from an LLM reading your prompt and architecture output — cite tools and concrete details inside those submissions when helpful.</p>
+    <p class="grader-note">Scores are out of <strong>20 total</strong> (two buckets). Everything is inferred from what you paste: prompt plus architecture output.</p>
   </div>
 
   <!-- SLIDE 7: CTA -->
@@ -953,7 +950,7 @@ function render(r){
   const scoreEl=document.getElementById('rScore');
   const gradeEl=document.getElementById('rGrade');
 
-  scoreEl.textContent=score+'/100';
+  scoreEl.textContent=score+'/20';
   scoreEl.style.color=grade==='GO'?'#4ade80':grade==='REVIEW'?'#fbbf24':'#f87171';
 
   gradeEl.textContent='// STATUS: '+grade;
@@ -961,16 +958,17 @@ function render(r){
 
   const bGrid=document.getElementById('bGrid');
   const cats=[
-    {key:'prompt_quality',label:'Prompt Quality',max:40},
-    {key:'architecture_viability',label:'Architecture Logic',max:40},
-    {key:'environment_setup',label:'Environment Setup',max:20},
+    {key:'prompt_quality',label:'Prompt Quality',max:10},
+    {key:'architecture_viability',label:'Architecture Logic',max:10},
   ];
   bGrid.innerHTML=cats.map(c=>{
-    const fb=r.breakdown[c.key].feedback;
+    const row=r.breakdown[c.key];
+    if(!row)return'';
+    const fb=row.feedback;
     const esc=String(fb).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
     return`<div class="b-item">
       <div class="b-cat">${c.label}</div>
-      <div class="b-pts">${r.breakdown[c.key].score}<small>/${c.max}</small></div>
+      <div class="b-pts">${row.score}<small>/${c.max}</small></div>
       <div class="b-fb">${esc}</div>
     </div>`;
   }).join('');

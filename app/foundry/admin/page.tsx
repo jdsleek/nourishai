@@ -19,6 +19,46 @@ type Submission = {
   };
 };
 
+function isLegacyScoreScale(totalScore: number) {
+  return totalScore > 20;
+}
+
+function breakdownCategoryMax(key: string, legacy: boolean): number {
+  if (!legacy) return 10;
+  if (key === "environment_setup") return 20;
+  return 40;
+}
+
+const BREAKDOWN_LABELS: Record<string, string> = {
+  prompt_quality: "Prompt quality",
+  architecture_viability: "Architecture viability",
+  environment_setup: "Environment setup (legacy rubric)",
+};
+
+function breakdownRows(
+  breakdown: Submission["result"]["breakdown"],
+  legacy: boolean
+): { key: string; label: string; score: number; max: number; feedback: string }[] {
+  const preferred = [
+    "prompt_quality",
+    "architecture_viability",
+    "environment_setup",
+  ];
+  const keys = [
+    ...new Set([...preferred, ...Object.keys(breakdown)]),
+  ].filter((k) => k in breakdown);
+  return keys.map((key) => {
+    const v = breakdown[key]!;
+    return {
+      key,
+      label: BREAKDOWN_LABELS[key] ?? key.replace(/_/g, " "),
+      score: v.score,
+      max: breakdownCategoryMax(key, legacy),
+      feedback: v.feedback,
+    };
+  });
+}
+
 export default function FoundryAdminPage() {
   const [password, setPassword] = useState("");
   const [unlocked, setUnlocked] = useState(false);
@@ -154,7 +194,9 @@ export default function FoundryAdminPage() {
                         <span className="font-mono text-xl font-bold text-white">
                           {s.result.total_score}
                         </span>
-                        <span className="text-slate-500">/100</span>
+                        <span className="text-slate-500">
+                          /{isLegacyScoreScale(s.result.total_score) ? 100 : 20}
+                        </span>
                         <p className="font-mono text-sm text-amber-300">
                           {s.result.grade}
                         </p>
@@ -203,16 +245,17 @@ export default function FoundryAdminPage() {
                             Rubric
                           </h3>
                           <ul className="mt-2 space-y-2 text-slate-400">
-                            {Object.entries(s.result.breakdown).map(
-                              ([k, v]) => (
-                                <li key={k}>
-                                  <strong className="text-slate-300">
-                                    {k}
-                                  </strong>
-                                  : {v.score} — {v.feedback}
-                                </li>
-                              )
-                            )}
+                            {breakdownRows(
+                              s.result.breakdown,
+                              isLegacyScoreScale(s.result.total_score),
+                            ).map((row) => (
+                              <li key={row.key}>
+                                <strong className="text-slate-300">
+                                  {row.label}
+                                </strong>
+                                : {row.score}/{row.max} — {row.feedback}
+                              </li>
+                            ))}
                           </ul>
                           <p className="mt-3 text-amber-200/90">
                             Tip: {s.result.level_up_tip}

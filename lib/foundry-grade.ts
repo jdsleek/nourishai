@@ -8,7 +8,6 @@ export type FoundryGradeResult = {
   breakdown: {
     prompt_quality: { score: number; feedback: string };
     architecture_viability: { score: number; feedback: string };
-    environment_setup: { score: number; feedback: string };
   };
   level_up_tip: string;
   verdict: string;
@@ -28,8 +27,6 @@ FELLOW NAME: ${name}
 
 SUBGROUP: ${subgroup}
 
-Note: No separate workspace/IDE verification field is collected. Infer any tooling or environment signals only from explicit text in the PROMPT or OUTPUT below.
-
 ARCHITECTURE PROMPT SUBMITTED:
 ${prompt}
 
@@ -37,36 +34,25 @@ AI-GENERATED ARCHITECTURE OUTPUT:
 ${output}
 
 ---
-RUBRIC (total 100 points):
+RUBRIC (total 20 points — two categories only):
 
-1. PROMPT QUALITY (40 points):
-   Role defined clearly (8 pts)
-   Task clearly stated (8 pts)
-   Context provided — who is the audience and what is being built (8 pts)
-   Constraints mentioned — technical, cost, integration limits (8 pts)
-   Output Format specified — what the AI should return (8 pts)
+1. PROMPT QUALITY (10 points total):
+   Internally weigh the five pillars (Role, Task, Context, Constraints, Output format). Roughly ~2 pts each where each is clearly labeled and substantive — vague one-paragraph blobs lose marks.
 
-2. ARCHITECTURE VIABILITY (40 points):
-   Frontend stack is named and justified (10 pts)
-   Backend logic / API design described (10 pts)
-   Database schema or data model present (10 pts)
-   Data flow or user journey from A to B is clear (10 pts)
+2. ARCHITECTURE VIABILITY (10 points total):
+   Internally weigh: frontend stack + justification (~2–3 pts), backend/API (~2–3 pts), database or data model (~2–3 pts), clear user data flow (~2–3 pts).
 
-3. ENVIRONMENT SETUP (20 points):
-   Workspace description is not submitted this term. Score this category only from explicit mentions of IDE/tooling/local dev in the PROMPT or ARCHITECTURE OUTPUT (e.g. Cursor, VS Code, npm, localhost). If neither document mentions tooling, cap at 8/20 and state that environment was not evidenced in the submission.
+Grade thresholds (on the 20-point total): GO = 15–20 | REVIEW = 10–14 | REBUILD = 0–9
 
-Grade thresholds: GO = 75-100 | REVIEW = 50-74 | REBUILD = 0-49
-
-If the model output is too short to judge architecture, cap ARCHITECTURE VIABILITY at 15/40 and mention that in feedback.
+If the model architecture output is too short to judge, cap ARCHITECTURE VIABILITY at 4/10 and mention that in feedback.
 
 Return this exact JSON structure with no extra text:
 {
-  "total_score": <integer 0-100>,
+  "total_score": <integer 0-20>,
   "grade": "<GO or REVIEW or REBUILD>",
   "breakdown": {
-    "prompt_quality": { "score": <integer 0-40>, "feedback": "<one crisp sentence>" },
-    "architecture_viability": { "score": <integer 0-40>, "feedback": "<one crisp sentence>" },
-    "environment_setup": { "score": <integer 0-20>, "feedback": "<one crisp sentence>" }
+    "prompt_quality": { "score": <integer 0-10>, "feedback": "<one crisp sentence>" },
+    "architecture_viability": { "score": <integer 0-10>, "feedback": "<one crisp sentence>" }
   },
   "level_up_tip": "<one specific actionable tip to raise their score on the next attempt>",
   "verdict": "<2-3 sentences, firm but encouraging, addressing the student by first name>"
@@ -84,35 +70,37 @@ export function parseGraderJson(raw: string): Record<string, unknown> {
   return JSON.parse(s.slice(first, last + 1)) as Record<string, unknown>;
 }
 
+/** Map old 40-pt category scores onto the current /10 buckets. */
+function scoreFromLegacy40(n: number): number {
+  return Math.max(0, Math.min(10, Math.round((Math.min(40, Math.max(0, n)) / 40) * 10)));
+}
+
 export function normalizeGraderResult(obj: Record<string, unknown>): FoundryGradeResult {
-  const g = String(obj.grade || "").toUpperCase();
-  const grade = (["GO", "REVIEW", "REBUILD"].includes(g) ? g : "REVIEW") as
-    | "GO"
-    | "REVIEW"
-    | "REBUILD";
-  const total = Math.max(
-    0,
-    Math.min(100, parseInt(String(obj.total_score), 10) || 0)
-  );
   const b = (obj.breakdown || {}) as Record<string, unknown>;
   const pq = (b.prompt_quality || {}) as Record<string, unknown>;
   const av = (b.architecture_viability || {}) as Record<string, unknown>;
-  const es = (b.environment_setup || {}) as Record<string, unknown>;
+  const rawPq = parseInt(String(pq.score), 10) || 0;
+  const rawAv = parseInt(String(av.score), 10) || 0;
+  const hadLegacyEnvColumn =
+    Object.prototype.hasOwnProperty.call(b, "environment_setup") &&
+    b.environment_setup != null;
+  const looksLegacyScale = hadLegacyEnvColumn || rawPq > 10 || rawAv > 10;
+  const pqScore = looksLegacyScale ? scoreFromLegacy40(rawPq) : Math.max(0, Math.min(10, rawPq));
+  const avScore = looksLegacyScale ? scoreFromLegacy40(rawAv) : Math.max(0, Math.min(10, rawAv));
+  const totalAligned = Math.min(20, pqScore + avScore);
+  const grade: "GO" | "REVIEW" | "REBUILD" =
+    totalAligned >= 15 ? "GO" : totalAligned >= 10 ? "REVIEW" : "REBUILD";
   return {
-    total_score: total,
+    total_score: totalAligned,
     grade,
     breakdown: {
       prompt_quality: {
-        score: Math.max(0, Math.min(40, parseInt(String(pq.score), 10) || 0)),
+        score: pqScore,
         feedback: String(pq.feedback || ""),
       },
       architecture_viability: {
-        score: Math.max(0, Math.min(40, parseInt(String(av.score), 10) || 0)),
+        score: avScore,
         feedback: String(av.feedback || ""),
-      },
-      environment_setup: {
-        score: Math.max(0, Math.min(20, parseInt(String(es.score), 10) || 0)),
-        feedback: String(es.feedback || ""),
       },
     },
     level_up_tip: String(

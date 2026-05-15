@@ -8,7 +8,7 @@ A modern food & nutrition web app built with **Next.js 14 + TypeScript + Tailwin
 - **Food tracker** — log foods by the gram; live macro progress bars vs your targets
 - **7-day AI meal plan** — Groq builds a week of meals hitting your calorie + protein goals, tailored to your dietary preferences (uses JSON-mode for reliable output)
 - **AI nutrition coach** — streaming chat that knows your profile and today's logs, suggests specific foods with macros
-- **Class workbook** (`/class-workbook`) — separate in-class notes + non-streaming class assistant on the same Groq key (for live teaching; not tied to nutrition profile). Includes a link to **Qubators Day 03 — AI Builder** slides and Foundry grader at `/foundry/day03` (grading via `POST /api/foundry/grade`, server-side only).
+- **Class workbook** (`/class-workbook`) — in-class notes + class assistant (same Groq key). Link to **Day 03 — AI Builder** slides at **`/`** (site index; grading via `POST /api/foundry/grade`).
 - **Food database** — 100+ whole foods and prepared meals with per-100g macros, searchable and filterable
 - **Weight progress** — log weight over time with a Recharts line chart
 
@@ -48,7 +48,7 @@ GROQ_MODEL=llama-3.1-8b-instant
 npm run dev
 ```
 
-Visit http://localhost:3000.
+Visit http://localhost:3000 for the **Day 03 slide deck** (site index). The nutrition app dashboard is at http://localhost:3000/nourish.
 
 ## Deploy to Railway
 
@@ -66,25 +66,27 @@ Railway auto-detects Next.js, runs `npm run build`, then `npm start`. Next.js re
 ```
 food-app/
 ├─ app/
-│  ├─ layout.tsx              # root layout, nav
-│  ├─ page.tsx                # landing / dashboard
-│  ├─ profile/page.tsx        # profile + live TDEE calculator
-│  ├─ tracker/page.tsx        # daily calorie & macro log
-│  ├─ meal-plan/page.tsx      # 7-day AI plan
-│  ├─ chat/page.tsx           # streaming AI coach
-│  ├─ foods/page.tsx          # food database browser
-│  ├─ progress/page.tsx       # weight chart
-│  └─ api/
-│     ├─ chat/route.ts        # Groq streaming chat
-│     └─ mealplan/route.ts    # Groq meal plan (JSON mode)
-├─ components/                # Nav, MacroBar, FoodSearch, WeightChart
+│  ├─ layout.tsx               # root: html + body only
+│  ├─ (main)/layout.tsx        # Nourish nav, main, footer
+│  ├─ (main)/nourish/page.tsx  # nutrition dashboard
+│  ├─ (main)/profile/page.tsx
+│  ├─ (main)/tracker/page.tsx
+│  ├─ (main)/meal-plan/page.tsx
+│  ├─ (main)/chat/page.tsx
+│  ├─ (main)/class-workbook/page.tsx
+│  ├─ (main)/foods/page.tsx
+│  ├─ (main)/progress/page.tsx
+│  ├─ foundry/day03/route.ts   # Day 03 deck HTML; `/` rewrites here
+│  └─ api/                     # Groq + foundry grade
+├─ components/                 # Nav, MacroBar, FoodSearch, WeightChart
 ├─ lib/
-│  ├─ nutrition.ts            # BMR/TDEE/macro math
-│  ├─ groq.ts                 # server-side Groq client
-│  ├─ store.ts                # Zustand + localStorage
-│  ├─ foods.json              # 100+ foods seed DB
+│  ├─ nutrition.ts             # BMR/TDEE/macro math
+│  ├─ groq.ts                  # server-side Groq client
+│  ├─ foundry-grade.ts
+│  ├─ store.ts                 # Zustand + localStorage
+│  ├─ foods.json               # 100+ foods seed DB
 │  └─ types.ts
-└─ .env.local                 # your GROQ_API_KEY
+└─ .env.local                  # your GROQ_API_KEY
 ```
 
 ## Tech Stack

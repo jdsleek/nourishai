@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import clsx from "clsx";
 
 const links = [
-  { href: "/", label: "Home" },
+  { href: "/", label: "Slides" },
+  { href: "/nourish", label: "Nourish" },
   { href: "/profile", label: "Profile" },
   { href: "/tracker", label: "Tracker" },
   { href: "/meal-plan", label: "Meal Plan" },
@@ -20,7 +21,7 @@ export default function Nav() {
   return (
     <header className="sticky top-0 z-40 border-b border-stone-200/70 bg-white/80 backdrop-blur dark:border-stone-800 dark:bg-stone-950/80">
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 font-semibold">
+        <Link href="/nourish" className="flex items-center gap-2 font-semibold">
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-white">
             N
           </span>

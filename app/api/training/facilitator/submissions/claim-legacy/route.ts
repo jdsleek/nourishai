@@ -22,16 +22,14 @@ export async function POST() {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
 
   const before = await pgCountSubmissionsLegacyNoAssessment(pool);
-  const { moved, assessmentId } = await pgFacilitatorClaimLegacySubmissions(
-    pool,
-    fac.id,
-  );
+  const { moved, assessmentId, siteDefaultWasAutoSet } =
+    await pgFacilitatorClaimLegacySubmissions(pool, fac.id);
 
   if (!assessmentId) {
     return Response.json(
       {
         error:
-          "Set one assessment as your site default (class deck) first, then claim again.",
+          "Create at least one assessment under the Assessments tab, then try again.",
       },
       { status: 400 },
     );
@@ -42,6 +40,7 @@ export async function POST() {
     moved,
     orphanBefore: before,
     assessmentId,
+    siteDefaultWasAutoSet: siteDefaultWasAutoSet === true,
   });
 }
 

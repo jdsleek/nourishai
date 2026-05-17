@@ -331,21 +331,38 @@ export async function pgSetSiteDefaultAssessment(
 export async function pgFacilitatorClaimLegacySubmissions(
   pool: Pool,
   facilitatorId: string,
-): Promise<{ moved: number; assessmentId: string | null }> {
-  const def = await pool.query(
+): Promise<{ moved: number; assessmentId: string | null; siteDefaultWasAutoSet?: boolean }> {
+  let def = await pool.query(
     `SELECT id FROM training_assessments
      WHERE facilitator_id = $1::uuid AND is_site_default = true LIMIT 1`,
     [facilitatorId.trim()],
   );
+  let siteDefaultWasAutoSet = false;
   if (!def.rows.length) {
-    return { moved: 0, assessmentId: null };
+    const fallback = await pool.query(
+      `SELECT id FROM training_assessments
+       WHERE facilitator_id = $1::uuid
+       ORDER BY updated_at DESC
+       LIMIT 1`,
+      [facilitatorId.trim()],
+    );
+    if (!fallback.rows.length) {
+      return { moved: 0, assessmentId: null };
+    }
+    const fallbackId = String((fallback.rows[0] as { id: string }).id);
+    await pgSetSiteDefaultAssessment(pool, facilitatorId, fallbackId);
+    siteDefaultWasAutoSet = true;
+    def = await pool.query(
+      `SELECT id FROM training_assessments WHERE id = $1::uuid`,
+      [fallbackId],
+    );
   }
   const aid = String((def.rows[0] as { id: string }).id);
   const r = await pool.query(
     `UPDATE foundry_submissions SET assessment_id = $1::uuid WHERE assessment_id IS NULL`,
     [aid],
   );
-  return { moved: r.rowCount ?? 0, assessmentId: aid };
+  return { moved: r.rowCount ?? 0, assessmentId: aid, siteDefaultWasAutoSet };
 }
 
 export async function pgAdminListAssessmentLockSummaries(

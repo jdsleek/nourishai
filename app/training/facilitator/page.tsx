@@ -74,10 +74,15 @@ export default function FacilitatorDashboard() {
   const [mp, setMp] = useState(40);
   const [mo, setMo] = useState(80);
 
-  const siteDefault = useMemo(
-    () => assessments.find((a) => a.isSiteDefault) ?? assessments[0] ?? null,
+  const markedSiteDefault = useMemo(
+    () => assessments.find((a) => a.isSiteDefault) ?? null,
     [assessments],
   );
+  const primaryAssessment = useMemo(
+    () => markedSiteDefault ?? assessments[0] ?? null,
+    [assessments, markedSiteDefault],
+  );
+  const canClaimLegacy = assessments.length > 0;
 
   const load = useCallback(async () => {
     setErr(null);
@@ -124,9 +129,18 @@ export default function FacilitatorDashboard() {
         method: "POST",
         credentials: "include",
       });
-      const data = (await res.json()) as { error?: string; moved?: number };
+      const data = (await res.json()) as {
+        error?: string;
+        moved?: number;
+        siteDefaultWasAutoSet?: boolean;
+      };
       if (!res.ok) throw new Error(data.error || "Claim failed.");
-      setClaimMsg(`Attached ${data.moved ?? 0} prior class submission(s) to your course inbox.`);
+      const extra = data.siteDefaultWasAutoSet
+        ? " Your most recent assessment was set as the site default (class deck)."
+        : "";
+      setClaimMsg(
+        `Attached ${data.moved ?? 0} prior class submission(s) to your course inbox.${extra}`,
+      );
       await load();
       setTab("submissions");
     } catch (e) {
@@ -279,11 +293,19 @@ export default function FacilitatorDashboard() {
                   without <code className="rounded bg-black/40 px-1 font-mono text-xs">?assessment=</code>{" "}
                   attach to your course automatically.
                 </p>
-                {siteDefault ? (
+                {primaryAssessment ? (
                   <div className="mt-4 space-y-3">
                     <p className="font-mono text-xs text-emerald-300">
-                      Site default: {siteDefault.title} ({siteDefault.slug})
+                      {markedSiteDefault ? "Site default" : "Your course"}:{" "}
+                      {primaryAssessment.title} ({primaryAssessment.slug})
                     </p>
+                    {!markedSiteDefault ? (
+                      <p className="text-xs text-amber-200/90">
+                        Not marked as site default yet — use{" "}
+                        <strong>Use as site default</strong> under Assessments, or attach
+                        submissions below (we will set it automatically).
+                      </p>
+                    ) : null}
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                       <button
                         type="button"
@@ -297,7 +319,7 @@ export default function FacilitatorDashboard() {
                         onClick={() =>
                           void copyText(
                             originUrl(
-                              `/foundry/day03?assessment=${encodeURIComponent(siteDefault.slug)}`,
+                              `/foundry/day03?assessment=${encodeURIComponent(primaryAssessment.slug)}`,
                             ),
                             "slug URL",
                           )
@@ -326,14 +348,40 @@ export default function FacilitatorDashboard() {
                     These were graded on the deck before they were linked to your facilitator course.
                     One click attaches them to your <strong>site default</strong> assessment.
                   </p>
-                  <button
-                    type="button"
-                    disabled={claimBusy || !siteDefault}
-                    onClick={() => void claimLegacy()}
-                    className="mt-4 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-[#1a1005] disabled:opacity-45"
-                  >
-                    {claimBusy ? "Working…" : "Attach class submissions to my course"}
-                  </button>
+                  {!canClaimLegacy ? (
+                    <div className="mt-4 space-y-3">
+                      <p className="text-sm text-amber-100/95">
+                        This account has <strong>no assessments yet</strong>, so there is
+                        nowhere to attach these rows. Create one under{" "}
+                        <strong>Assessments</strong>, or ask the organizer to assign an
+                        existing course (e.g. sprint-architecture) to your email in{" "}
+                        <code className="rounded bg-black/40 px-1 font-mono text-[11px]">
+                          /foundry/admin
+                        </code>
+                        .
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setTab("assessments")}
+                        className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-[#1a1005]"
+                      >
+                        Go to Assessments
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={claimBusy}
+                      onClick={() => void claimLegacy()}
+                      className="mt-4 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-[#1a1005] disabled:opacity-45"
+                    >
+                      {claimBusy
+                        ? "Working…"
+                        : markedSiteDefault
+                          ? "Attach class submissions to my course"
+                          : "Set site default & attach class submissions"}
+                    </button>
+                  )}
                   {claimMsg ? (
                     <p className="mt-3 text-xs text-amber-100/90">{claimMsg}</p>
                   ) : null}

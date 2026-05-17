@@ -188,7 +188,7 @@ export async function pgFacilitatorCourseCatalogBySlug(
   const { rows } = await pool.query(
     `SELECT slug, title, submissions_open FROM training_assessments
      WHERE facilitator_id = $1::uuid
-     ORDER BY created_at ASC`,
+     ORDER BY created_at DESC`,
     [a.facilitator_id],
   );
 
@@ -227,7 +227,7 @@ export async function pgLiveOpenCoursesPublic(
      FROM training_assessments ta
      INNER JOIN training_facilitators tf ON tf.id = ta.facilitator_id
      WHERE ta.submissions_open = TRUE AND ta.is_site_default = FALSE
-     ORDER BY LOWER(tf.email), ta.created_at ASC`,
+     ORDER BY ta.created_at DESC, LOWER(tf.email)`,
   );
 
   return rows.map((r) => {
@@ -255,7 +255,7 @@ export async function pgListAssessmentsForFacilitator(
   const { rows } = await pool.query(
     `SELECT ${ASSESSMENT_SELECT}
      FROM training_assessments WHERE facilitator_id = $1::uuid
-     ORDER BY created_at ASC`,
+     ORDER BY created_at DESC`,
     [facilitatorId]
   );
   return rows.map((r) => rowAssessment(r as Record<string, unknown>));

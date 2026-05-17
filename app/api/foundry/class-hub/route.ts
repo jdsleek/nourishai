@@ -80,6 +80,7 @@ export async function GET(req: NextRequest) {
       facilitatorDisplayName,
       assessmentSlug: a.slug,
       assessmentTitle: a.title,
+      assessmentIntro: a.assessment_intro ?? "",
       submissionsOpen: a.submissions_open,
       subgroups,
       minPromptChars: Math.max(0, a.min_prompt_chars),

@@ -537,6 +537,20 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
   line-height:1.55;border:1px solid rgba(255,255,255,0.05);font-family:'DM Sans',sans-serif;font-size:clamp(13px,2.2vmin,15px);
 }
 .facilitator-desk-panel[hidden]{display:none;}
+
+/* Cohort deck (/foundry/deck/slug): facilitator assignment is the deck — not stacked on full Day 03 curriculum. */
+body.cohort-assessment-deck .slide[data-slide="1"],
+body.cohort-assessment-deck .slide[data-slide="2"],
+body.cohort-assessment-deck .slide[data-slide="3"],
+body.cohort-assessment-deck .slide[data-slide="4"],
+body.cohort-assessment-deck .slide[data-slide="5"]{display:none!important;}
+body.cohort-assessment-deck #facilitator-desk-banner{display:none!important;}
+body.cohort-assessment-deck .slide[data-slide="0"] .cohort-intro-body{
+  max-width:min(52rem,92vw);margin:1.5rem auto 0;padding:1.25rem 1.5rem;text-align:left;
+  background:rgba(6,10,18,0.78);border:1px solid rgba(251,146,60,0.35);border-radius:12px;
+  color:#e2e8f0;font-size:clamp(14px,2.4vmin,16px);line-height:1.65;font-family:'DM Sans',sans-serif;
+}
+body.cohort-assessment-deck .slide[data-slide="0"] .hero{font-size:clamp(2rem,6vmin,3.2rem);}
 </style>
 </head>
 <body class="deck-mode">
@@ -901,11 +915,28 @@ for(let i=0;i<TOTAL;i++){
   dotsEl.appendChild(d);
 }
 
+function visibleSlideIndices(){
+  if(document.body.classList.contains('cohort-assessment-deck')) return [0,6];
+  const out=[];
+  for(let i=0;i<TOTAL;i++) out.push(i);
+  return out;
+}
+
 function updateUI(){
-  document.querySelectorAll('.dot-pip').forEach((d,i)=>d.classList.toggle('active',i===cur));
-  document.getElementById('slideNum').textContent=String(cur+1).padStart(2,'0')+' / '+String(TOTAL).padStart(2,'0');
-  document.getElementById('progressBar').style.width=((cur+1)/TOTAL*100)+'%';
-  setProgressA11y();
+  const vis=visibleSlideIndices();
+  const pos=Math.max(0,vis.indexOf(cur));
+  const displayTotal=vis.length;
+  const displayNum=pos+1;
+  document.querySelectorAll('.dot-pip').forEach((d,i)=>{
+    const show=vis.includes(i);
+    d.style.display=show?'':'none';
+    d.classList.toggle('active',i===cur);
+  });
+  document.getElementById('slideNum').textContent=String(displayNum).padStart(2,'0')+' / '+String(displayTotal).padStart(2,'0');
+  document.getElementById('progressBar').style.width=(displayNum/displayTotal*100)+'%';
+  const bar=document.getElementById('progressBar');
+  if(bar) bar.setAttribute('aria-valuenow',String(displayNum));
+  if(bar) bar.setAttribute('aria-valuemax',String(displayTotal));
 }
 
 function goTo(n){
@@ -919,8 +950,16 @@ function goTo(n){
   updateUI();
 }
 
-function nextSlide(){if(cur<TOTAL-1)goTo(cur+1);}
-function prevSlide(){if(cur>0)goTo(cur-1);}
+function nextSlide(){
+  const vis=visibleSlideIndices();
+  const i=vis.indexOf(cur);
+  if(i>=0&&i<vis.length-1) goTo(vis[i+1]);
+}
+function prevSlide(){
+  const vis=visibleSlideIndices();
+  const i=vis.indexOf(cur);
+  if(i>0) goTo(vis[i-1]);
+}
 
 document.addEventListener('keydown',e=>{
   if(document.getElementById('portal').classList.contains('open')){
@@ -999,6 +1038,15 @@ let CFG_MIN_PROMPT = 40;
 let CFG_MIN_OUTPUT = 80;
 let CURRENT_ASSESSMENT_TITLE = '';
 let CURRENT_ASSESSMENT_INTRO = '';
+let CFG_COHORT_CONFIG_OK = false;
+
+function escapeHtml(s){
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
 
 function syncFacilitatorDesk(){
   const wrap=document.getElementById('facilitator-desk-banner');
@@ -1020,6 +1068,41 @@ function syncFacilitatorDesk(){
     btn.textContent=open?'Collapse':'Expand';
   }
 }
+
+/** Cohort URL: one assignment deck (title + intro) + submit slide — not generic Day 03 slides on top. */
+function applyCohortDeckPresentation(){
+  const isCohort = !!(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK);
+  document.body.classList.toggle('cohort-assessment-deck', isCohort);
+  if(!isCohort){
+    syncFacilitatorDesk();
+    return;
+  }
+  const wrap=document.getElementById('facilitator-desk-banner');
+  if(wrap) wrap.hidden=true;
+  const slide0=document.querySelector('.slide[data-slide="0"]');
+  if(slide0){
+    const title=CURRENT_ASSESSMENT_TITLE.trim()||('Course · '+ASSESSMENT_SLUG);
+    const intro=(CURRENT_ASSESSMENT_INTRO||'').trim();
+    const introBlock=intro
+      ? '<div class="cohort-intro-body">'+escapeHtml(intro).replace(/\n/g,'<br>')+'</div>'
+      : '<p class="subtitle" style="margin-top:1.25rem">Your facilitator will add assignment details here. Use the next slide to submit when ready.</p>';
+    slide0.innerHTML=
+      '<div class="badge">Your course · '+escapeHtml(ASSESSMENT_SLUG)+'</div>'+
+      '<h1 class="hero">'+escapeHtml(title)+'</h1>'+
+      introBlock+
+      '<p class="subtitle" style="margin-top:1.25rem">Grading uses your facilitator&apos;s rubric for this cohort.</p>';
+  }
+  const logo=document.querySelector('.chrome-top .logo');
+  if(logo&&CURRENT_ASSESSMENT_TITLE.trim()){
+    logo.innerHTML='<strong>QUBATORS</strong> · '+escapeHtml(CURRENT_ASSESSMENT_TITLE.trim());
+  }
+  const slide6tag=document.querySelector('.slide[data-slide="6"] .tag');
+  if(slide6tag) slide6tag.textContent='Submit assignment';
+  const vis=visibleSlideIndices();
+  if(!vis.includes(cur)) goTo(0);
+  updateUI();
+}
+
 /** Facilitator assessments can be closed to block repeat submissions server-side too. */
 let CFG_SUBMISSIONS_OPEN = true;
 /** When the deck has no ?assessment=, the server returns legacy built‑in subgroup limits (global site‑default grading was removed). */
@@ -1064,10 +1147,26 @@ function saveStudentProfileFromForm(){
     subgroup: g ? g.value.trim() : '',
   });
 }
+function lastGradeForCurrentAssessment(){
+  const lg=readStudentStore().lastGrade;
+  if(!lg||!lg.result) return null;
+  const savedSlug=typeof lg.assessmentSlug==='string'?lg.assessmentSlug:'';
+  if(ASSESSMENT_SLUG){
+    if(savedSlug!==ASSESSMENT_SLUG) return null;
+  }else if(savedSlug){
+    return null;
+  }
+  return lg;
+}
+
 function saveLastGradeOnDevice(payload){
-  writeStudentStore({ lastGrade: payload });
+  writeStudentStore({
+    lastGrade: Object.assign({}, payload, {
+      assessmentSlug: ASSESSMENT_SLUG||'',
+    }),
+  });
   const btn = document.getElementById('btnLastGrade');
-  if(btn) btn.style.display = '';
+  if(btn) btn.style.display = lastGradeForCurrentAssessment() ? '' : 'none';
 }
 function formatReceiptTime(iso){
   try{
@@ -1088,7 +1187,7 @@ function showReceipt(meta){
   }
 }
 async function viewLastGradeOnDevice(){
-  const lg = readStudentStore().lastGrade;
+  const lg = lastGradeForCurrentAssessment();
   if(!lg || !lg.result){
     alert('No saved grade on this device yet. Submit once through the portal first.');
     return;
@@ -1151,6 +1250,7 @@ async function ensureSubgroupsLoaded(force){
     const r=await fetch('/api/foundry/assessment-config'+q);
     const j=await r.json().catch(()=>({}));
     if(ASSESSMENT_SLUG && !r.ok){
+      CFG_COHORT_CONFIG_OK = false;
       CFG_SUBMISSIONS_OPEN = false;
       CFG_MIN_PROMPT = typeof j.minPromptChars==='number' ? Math.max(0,j.minPromptChars):40;
       CFG_MIN_OUTPUT = typeof j.minOutputChars==='number' ? Math.max(0,j.minOutputChars):80;
@@ -1164,7 +1264,7 @@ async function ensureSubgroupsLoaded(force){
         banner.textContent='Assessment · could not load config ('+ASSESSMENT_SLUG+')'+fac;
       }
       applySubmissionLockUI();
-      syncFacilitatorDesk();
+      applyCohortDeckPresentation();
       applyDeckDocumentTitle();
       sel.innerHTML='<option value="">—</option>';
       sel.dataset.slugKey=key;
@@ -1173,6 +1273,7 @@ async function ensureSubgroupsLoaded(force){
     }
     CFG_SUBMISSIONS_OPEN = j.submissionsOpen !== false;
     SITE_DEFAULT_MODE = !ASSESSMENT_SLUG && j.siteDefault === true;
+    CFG_COHORT_CONFIG_OK = !!ASSESSMENT_SLUG;
     CFG_MIN_PROMPT = typeof j.minPromptChars==='number' ? Math.max(0,j.minPromptChars):40;
     CFG_MIN_OUTPUT = typeof j.minOutputChars==='number' ? Math.max(0,j.minOutputChars):80;
     CURRENT_ASSESSMENT_TITLE = typeof j.title==='string'? j.title:'';
@@ -1191,7 +1292,7 @@ async function ensureSubgroupsLoaded(force){
       }
     }
     applySubmissionLockUI();
-    syncFacilitatorDesk();
+    applyCohortDeckPresentation();
     applyDeckDocumentTitle();
     const list=Array.isArray(j.subgroups)?j.subgroups:[];
     if(list.length){
@@ -1200,13 +1301,16 @@ async function ensureSubgroupsLoaded(force){
     }
     fill(FALLBACK_QAF_SUBGROUPS);
   }catch(_){
+    CFG_COHORT_CONFIG_OK = false;
     CURRENT_ASSESSMENT_INTRO = '';
-    syncFacilitatorDesk();
+    applyCohortDeckPresentation();
     applyDeckDocumentTitle();
     CFG_SUBMISSIONS_OPEN = !ASSESSMENT_SLUG;
     applySubmissionLockUI();
     fill(FALLBACK_QAF_SUBGROUPS);
   }
+  const btnLast=document.getElementById('btnLastGrade');
+  if(btnLast) btnLast.style.display=lastGradeForCurrentAssessment()?'':'none';
 }
 function syncPortalAriaOpen(open){
   const el=document.documentElement;
@@ -1395,9 +1499,8 @@ void ensureSubgroupsLoaded(false);
       syncFacilitatorDesk();
     });
   }
-  const lg = readStudentStore().lastGrade;
   const btn = document.getElementById('btnLastGrade');
-  if(btn && (!lg || !lg.result)) btn.style.display='none';
+  if(btn && !lastGradeForCurrentAssessment()) btn.style.display='none';
 })();
 
 // init progress

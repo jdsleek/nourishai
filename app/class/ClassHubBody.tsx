@@ -16,6 +16,7 @@ type HubConfig = {
   facilitatorDisplayName?: string | null;
   assessmentSlug: string | null;
   assessmentTitle: string | null;
+  assessmentIntro?: string | null;
   submissionsOpen: boolean;
   siteDefaultActive: boolean;
   mode?: "builtin" | "course";
@@ -278,13 +279,17 @@ export default function ClassHubBody({
             </p>
           ) : null}
           <p className={`${facilitatorLabel ? "mt-1" : "mt-2"} text-sm text-slate-400`}>
-            Your facilitator&apos;s class — slides, submit portal, and private workbook.
+            {courseSlug
+              ? "Your cohort assignment, submit portal, and private workbook."
+              : "Your facilitator's class — slides, submit portal, and private workbook."}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
-            Slides follow the shared Qubators curriculum; your facilitator&apos;s grading rules and desk
-            text apply once you choose the right{" "}
-            <span className="font-mono text-slate-400">/learn/&lt;slug&gt;</span> link.
-          </p>
+          {!courseSlug ? (
+            <p className="mt-1 text-xs text-slate-500">
+              Pick your facilitator&apos;s link{" "}
+              <span className="font-mono text-slate-400">/learn/&lt;slug&gt;</span> — each cohort has its
+              own assignment deck and rubric, not the generic program hub alone.
+            </p>
+          ) : null}
           {courseSlug ? (
             <p className="mt-3 rounded-lg border border-cyan-500/25 bg-cyan-950/20 px-3 py-2 text-xs leading-relaxed text-cyan-100/95">
               <strong className="text-white">This page is your cohort home — it does not auto-open the slides.</strong>{" "}
@@ -328,7 +333,7 @@ export default function ClassHubBody({
           <p className="text-xs text-slate-600">Loading open cohorts…</p>
         ) : null}
 
-        {liveOpen && liveOpen.length > 0 ? (
+        {!courseSlug && liveOpen && liveOpen.length > 0 ? (
           <section className="rounded-2xl border border-emerald-500/25 bg-emerald-950/15 p-5">
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-300/85">
               Open cohorts · accepting submissions
@@ -454,6 +459,11 @@ export default function ClassHubBody({
                 <p className="mt-1 font-mono text-xs text-slate-500">
                   Slug · {hub.assessmentSlug}
                 </p>
+              ) : null}
+              {courseSlug && hub.assessmentIntro?.trim() ? (
+                <div className="mt-4 rounded-xl border border-orange-500/25 bg-[#0c0e14] p-4 text-sm leading-relaxed text-slate-200 whitespace-pre-wrap">
+                  {hub.assessmentIntro.trim()}
+                </div>
               ) : null}
               {courseSlug ? (
                 <p className="mt-2 text-xs text-slate-500">

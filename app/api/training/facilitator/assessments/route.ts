@@ -1,8 +1,9 @@
-import { facilitatorFromCookie } from "@/lib/training-session-cookie";
 import { learnerDeckPath } from "@/lib/foundry-learner-course";
-import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import {
-  pgFacilitatorByEmail,
+  facilitatorAuthFailureResponse,
+  resolveFacilitatorRequest,
+} from "@/lib/training-facilitator-auth";
+import {
   pgInsertAssessment,
   pgListAssessmentsForFacilitator,
 } from "@/lib/training-pg";
@@ -20,23 +21,11 @@ type PostBody = {
   graderInstructions?: string;
 };
 
-async function requireFacilitator() {
-  const ses = facilitatorFromCookie();
-  if (!ses) return null;
-  const pool = getFoundryPgPool();
-  if (!pool) return null;
-  await ensureFoundrySubmissionsSchema(pool);
-  const fac = await pgFacilitatorByEmail(pool, ses.email);
-  if (!fac || fac.id !== ses.fid) return null;
-  return { pool, facilitatorId: fac.id };
-}
-
 /** List facilitator-authored assessments */
 export async function GET() {
-  const ctx = await requireFacilitator();
-  if (!ctx) {
-    return Response.json({ error: "Unauthorized." }, { status: 401 });
-  }
+  const auth = await resolveFacilitatorRequest();
+  if (!auth.ok) return facilitatorAuthFailureResponse(auth);
+  const ctx = auth.ctx;
   const list = await pgListAssessmentsForFacilitator(ctx.pool, ctx.facilitatorId);
   return Response.json({
     assessments: list.map((a) => ({
@@ -58,10 +47,9 @@ export async function GET() {
 
 /** Create assessment */
 export async function POST(req: Request) {
-  const ctx = await requireFacilitator();
-  if (!ctx) {
-    return Response.json({ error: "Unauthorized." }, { status: 401 });
-  }
+  const auth = await resolveFacilitatorRequest();
+  if (!auth.ok) return facilitatorAuthFailureResponse(auth);
+  const ctx = auth.ctx;
 
   const body = (await req.json()) as PostBody;
   const title = String(body.title || "").trim();

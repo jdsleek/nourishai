@@ -1,31 +1,19 @@
 import { readFoundrySubmissionsNewestFirst } from "@/lib/foundry-store";
-import { facilitatorFromCookie } from "@/lib/training-session-cookie";
-import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import {
-  pgCountSubmissionsLegacyNoAssessment,
-  pgFacilitatorByEmail,
-  pgListAssessmentsForFacilitator,
-} from "@/lib/training-pg";
+  facilitatorAuthFailureResponse,
+  resolveFacilitatorRequest,
+} from "@/lib/training-facilitator-auth";
+import { pgCountSubmissionsLegacyNoAssessment, pgListAssessmentsForFacilitator } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const ses = facilitatorFromCookie();
-  if (!ses)
-    return Response.json({ error: "Unauthorized." }, { status: 401 });
+  const auth = await resolveFacilitatorRequest();
+  if (!auth.ok) return facilitatorAuthFailureResponse(auth);
 
-  const pool = getFoundryPgPool();
-  if (!pool)
-    return Response.json({ error: "No database configured." }, { status: 503 });
-
-  await ensureFoundrySubmissionsSchema(pool);
-
-  const fac = await pgFacilitatorByEmail(pool, ses.email);
-  if (!fac || fac.id !== ses.fid)
-    return Response.json({ error: "Unauthorized." }, { status: 401 });
-
-  const mine = await pgListAssessmentsForFacilitator(pool, ses.fid);
+  const { pool, facilitatorId } = auth.ctx;
+  const mine = await pgListAssessmentsForFacilitator(pool, facilitatorId);
   const allow = new Set(mine.map((a) => a.id));
   const orphanLegacyCount = await pgCountSubmissionsLegacyNoAssessment(pool);
 
@@ -35,7 +23,10 @@ export async function GET() {
   );
 
   return Response.json({
-    facilitator: { email: fac.email, displayName: fac.display_name },
+    facilitator: {
+      email: auth.ctx.facilitatorEmail,
+      displayName: auth.ctx.facilitatorDisplayName,
+    },
     submissions,
     stats: {
       submissionCount: submissions.length,

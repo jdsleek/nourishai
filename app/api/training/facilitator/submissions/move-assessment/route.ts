@@ -1,9 +1,10 @@
 import type { Pool } from "pg";
-import { facilitatorFromCookie } from "@/lib/training-session-cookie";
-import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
+import {
+  facilitatorAuthFailureResponse,
+  resolveFacilitatorRequest,
+} from "@/lib/training-facilitator-auth";
 import {
   pgCountSubmissionsForAssessment,
-  pgFacilitatorByEmail,
   pgFacilitatorMergeSubmissionsToAssessment,
   pgListAssessmentsForFacilitator,
   looksLikeUuid,
@@ -18,15 +19,13 @@ type Body = {
   dryRun?: boolean;
 };
 
-async function ctx() {
-  const ses = facilitatorFromCookie();
-  if (!ses) return null;
-  const pool = getFoundryPgPool();
-  if (!pool) return null;
-  await ensureFoundrySubmissionsSchema(pool);
-  const fac = await pgFacilitatorByEmail(pool, ses.email);
-  if (!fac || fac.id !== ses.fid) return null;
-  return { pool, facilitatorId: fac.id };
+async function ctx(): Promise<
+  | { ok: true; pool: Pool; facilitatorId: string }
+  | { ok: false; response: Response }
+> {
+  const auth = await resolveFacilitatorRequest();
+  if (!auth.ok) return { ok: false, response: facilitatorAuthFailureResponse(auth) };
+  return { ok: true, pool: auth.ctx.pool, facilitatorId: auth.ctx.facilitatorId };
 }
 
 async function facilitatorOwnsBoth(
@@ -43,8 +42,7 @@ async function facilitatorOwnsBoth(
 /** Move all learner submissions tied to one of your assessments onto another slug you manage. */
 export async function POST(req: Request) {
   const c = await ctx();
-  if (!c)
-    return Response.json({ error: "Unauthorized." }, { status: 401 });
+  if (!c.ok) return c.response;
 
   const body = (await req.json()) as Body;
   const from = String(body.fromAssessmentId || "").trim();

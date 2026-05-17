@@ -1,7 +1,10 @@
-import { facilitatorFromCookie } from "@/lib/training-session-cookie";
+import type { Pool } from "pg";
 import { learnerDeckPath } from "@/lib/foundry-learner-course";
-import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
-import { pgFacilitatorByEmail, pgUpdateAssessment } from "@/lib/training-pg";
+import {
+  facilitatorAuthFailureResponse,
+  resolveFacilitatorRequest,
+} from "@/lib/training-facilitator-auth";
+import { pgUpdateAssessment } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,15 +20,13 @@ type PatchBody = {
   submissionsOpen?: boolean;
 };
 
-async function auth() {
-  const ses = facilitatorFromCookie();
-  if (!ses) return null;
-  const pool = getFoundryPgPool();
-  if (!pool) return null;
-  await ensureFoundrySubmissionsSchema(pool);
-  const fac = await pgFacilitatorByEmail(pool, ses.email);
-  if (!fac || fac.id !== ses.fid) return null;
-  return { pool, facilitatorId: fac.id };
+async function auth(): Promise<
+  | { ok: true; pool: Pool; facilitatorId: string }
+  | { ok: false; response: Response }
+> {
+  const r = await resolveFacilitatorRequest();
+  if (!r.ok) return { ok: false, response: facilitatorAuthFailureResponse(r) };
+  return { ok: true, pool: r.ctx.pool, facilitatorId: r.ctx.facilitatorId };
 }
 
 export async function PATCH(
@@ -33,8 +34,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   const ctx = await auth();
-  if (!ctx)
-    return Response.json({ error: "Unauthorized." }, { status: 401 });
+  if (!ctx.ok) return ctx.response;
 
   const { id } = params;
 

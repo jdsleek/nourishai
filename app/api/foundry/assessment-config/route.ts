@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { learnerChecklistFromRows } from "@/lib/foundry-learner-checklist";
 import { mergePortalForm } from "@/lib/foundry-portal-form";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import { pgAssessmentBySlug, pgFacilitatorById } from "@/lib/training-pg";
@@ -21,6 +22,8 @@ export async function GET(req: NextRequest) {
         minOutputChars: 80,
         submissionsOpen: true,
         siteDefault: false,
+        studentChecklist: learnerChecklistFromRows([]),
+        levelUpUrl: null as string | null,
         portalForm: mergePortalForm({}),
       },
       { status: 200 },
@@ -59,6 +62,8 @@ export async function GET(req: NextRequest) {
     minPromptChars: Math.max(0, a.min_prompt_chars),
     minOutputChars: Math.max(0, a.min_output_chars),
     submissionsOpen: a.submissions_open,
+    studentChecklist: learnerChecklistFromRows(a.student_checklist),
+    levelUpUrl: a.level_up_url.trim().length > 0 ? a.level_up_url.trim() : null,
     portalForm: mergePortalForm(a.portal_form_copy),
   });
 }

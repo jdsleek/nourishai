@@ -1,4 +1,8 @@
 import { learnerDeckPath } from "@/lib/foundry-learner-course";
+import {
+  sanitizeLevelUpUrl,
+  sanitizeStudentChecklistInput,
+} from "@/lib/foundry-learner-checklist";
 import { mergePortalForm } from "@/lib/foundry-portal-form";
 import {
   facilitatorAuthFailureResponse,
@@ -20,6 +24,8 @@ type PostBody = {
   minOutputChars?: number;
   assessmentIntro?: string;
   graderInstructions?: string;
+  levelUpUrl?: string;
+  studentChecklist?: string[];
 };
 
 /** List facilitator-authored assessments */
@@ -42,6 +48,8 @@ export async function GET() {
       portalForm: mergePortalForm(a.portal_form_copy),
       studentUrlHint: learnerDeckPath(a.slug),
       classHubPath: `/learn/${encodeURIComponent(a.slug)}`,
+      levelUpUrl: a.level_up_url,
+      studentChecklist: a.student_checklist,
     })),
     studentDeckBasePath: "/foundry/deck",
   });
@@ -67,6 +75,8 @@ export async function POST(req: Request) {
   const minOutputChars = Number(body.minOutputChars ?? 80);
   const assessmentIntro = String(body.assessmentIntro || "");
   const graderInstructions = String(body.graderInstructions || "").trim();
+  const levelUpUrl = sanitizeLevelUpUrl(String(body.levelUpUrl || ""));
+  const studentChecklist = sanitizeStudentChecklistInput(body.studentChecklist);
 
   if (!title) {
     return Response.json({ error: "Assessment title required." }, { status: 400 });
@@ -90,6 +100,8 @@ export async function POST(req: Request) {
       min_output_chars: minOutputChars,
       assessment_intro: assessmentIntro,
       grader_instructions: graderInstructions,
+      level_up_url: levelUpUrl,
+      student_checklist: studentChecklist,
     });
 
     return Response.json({

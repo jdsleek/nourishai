@@ -5,6 +5,10 @@ import {
   facilitatorAuthFailureResponse,
   resolveFacilitatorRequest,
 } from "@/lib/training-facilitator-auth";
+import {
+  sanitizeLevelUpUrl,
+  sanitizeStudentChecklistInput,
+} from "@/lib/foundry-learner-checklist";
 import { pgUpdateAssessment } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
@@ -21,6 +25,8 @@ type PatchBody = {
   submissionsOpen?: boolean;
   /** Fully merged learner portal wording (validated + merged onto defaults server-side). */
   portalForm?: unknown;
+  levelUpUrl?: string;
+  studentChecklist?: string[];
 };
 
 async function auth(): Promise<
@@ -52,6 +58,8 @@ export async function PATCH(
     grader_instructions?: string;
     submissions_open?: boolean;
     portal_form_copy?: Record<string, unknown>;
+    level_up_url?: string;
+    student_checklist?: string[];
   } = {};
   if (body.title !== undefined) patch.title = body.title;
   if (body.slug !== undefined)
@@ -76,6 +84,10 @@ export async function PATCH(
       string,
       unknown
     >;
+  if (body.levelUpUrl !== undefined)
+    patch.level_up_url = sanitizeLevelUpUrl(String(body.levelUpUrl));
+  if (body.studentChecklist !== undefined)
+    patch.student_checklist = sanitizeStudentChecklistInput(body.studentChecklist);
 
   try {
     const next = await pgUpdateAssessment(ctx.pool, ctx.facilitatorId, id, patch);

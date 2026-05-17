@@ -19,6 +19,10 @@ export type TrainingAssessmentRow = {
   assessment_intro: string;
   /** Facilitator overrides for learner submit-portal labels/hints (merged client-side). */
   portal_form_copy: Record<string, unknown>;
+  /** Optional learner “next step” link (hosted URL); shown after grading when valid. */
+  level_up_url: string;
+  /** Custom pre-submit bullets; empty in DB ⇒ learner-facing code uses curated defaults. */
+  student_checklist: string[];
   /** False → learners cannot POST new grades for this slug (admin-managed). */
   submissions_open: boolean;
   /** When true, bare site URL (/) grades attach here without ?assessment=. */
@@ -33,6 +37,8 @@ const ASSESSMENT_SELECT = `
   grader_instructions, submissions_open,
   COALESCE(is_site_default, false) AS is_site_default,
   COALESCE(portal_form_copy, '{}'::jsonb) AS portal_form_copy,
+  COALESCE(level_up_url, '') AS level_up_url,
+  COALESCE(student_checklist, '[]'::jsonb) AS student_checklist,
   created_at, updated_at`;
 
 export type AssessmentLockSummary = {
@@ -111,6 +117,16 @@ export async function ensureTrainingSchema(pool: Pool): Promise<void> {
         `ALTER TABLE training_assessments ADD COLUMN portal_form_copy JSONB NOT NULL DEFAULT '{}'::jsonb`,
       );
 
+      await execIgnoreDuplicateColumn(
+        pool,
+        `ALTER TABLE training_assessments ADD COLUMN level_up_url TEXT NOT NULL DEFAULT ''`,
+      );
+
+      await execIgnoreDuplicateColumn(
+        pool,
+        `ALTER TABLE training_assessments ADD COLUMN student_checklist JSONB NOT NULL DEFAULT '[]'::jsonb`,
+      );
+
       await pool.query(`
         CREATE INDEX IF NOT EXISTS idx_foundry_submissions_assessment_id
           ON foundry_submissions (assessment_id);
@@ -145,6 +161,30 @@ function readPortalFormCopy(row: Record<string, unknown>): Record<string, unknow
   return {};
 }
 
+function readStudentChecklistColumn(row: Record<string, unknown>): string[] {
+  const v = row.student_checklist as unknown;
+  if (Array.isArray(v)) {
+    return v
+      .map((x) => String(x ?? "").trim())
+      .filter(Boolean)
+      .slice(0, 12);
+  }
+  if (typeof v === "string" && v.trim().length > 0) {
+    try {
+      const p = JSON.parse(v) as unknown;
+      if (Array.isArray(p)) {
+        return p
+          .map((x) => String(x ?? "").trim())
+          .filter(Boolean)
+          .slice(0, 12);
+      }
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 function rowAssessment(row: Record<string, unknown>): TrainingAssessmentRow {
   const sg = row.subgroup_options as unknown;
   const subgroup_options = Array.isArray(sg)
@@ -161,6 +201,8 @@ function rowAssessment(row: Record<string, unknown>): TrainingAssessmentRow {
     grader_instructions: String(row.grader_instructions ?? ""),
     assessment_intro: String(row.assessment_intro ?? ""),
     portal_form_copy: readPortalFormCopy(row),
+    level_up_url: String(row.level_up_url ?? ""),
+    student_checklist: readStudentChecklistColumn(row),
     submissions_open: readSubmissionsOpen(row),
     is_site_default: row.is_site_default === true,
     created_at: row.created_at ? new Date(row.created_at as string).toISOString() : "",
@@ -297,13 +339,18 @@ export async function pgInsertAssessment(
     min_output_chars?: number;
     assessment_intro?: string;
     grader_instructions: string;
+    level_up_url?: string;
+    student_checklist?: string[];
   }
 ): Promise<TrainingAssessmentRow> {
+  const levelUrl = patch.level_up_url ?? "";
+  const checklistJson = JSON.stringify(patch.student_checklist ?? []);
   const { rows } = await pool.query(
     `INSERT INTO training_assessments
       (facilitator_id, title, slug, subgroup_options,
-       min_prompt_chars, min_output_chars, assessment_intro, grader_instructions, is_site_default)
-     VALUES ($1::uuid, $2, $3, $4::jsonb, $5, $6, $7, $8, false)
+       min_prompt_chars, min_output_chars, assessment_intro, grader_instructions, is_site_default,
+       level_up_url, student_checklist)
+     VALUES ($1::uuid, $2, $3, $4::jsonb, $5, $6, $7, $8, false, $9, $10::jsonb)
      RETURNING ${ASSESSMENT_SELECT}`,
     [
       facilitatorId,
@@ -314,6 +361,8 @@ export async function pgInsertAssessment(
       Math.max(0, patch.min_output_chars ?? 80),
       patch.assessment_intro ?? "",
       patch.grader_instructions,
+      levelUrl,
+      checklistJson,
     ]
   );
   return rowAssessment(rows[0] as Record<string, unknown>);
@@ -333,6 +382,8 @@ export async function pgUpdateAssessment(
     grader_instructions: string;
     submissions_open: boolean;
     portal_form_copy: Record<string, unknown>;
+    level_up_url: string;
+    student_checklist: string[];
   }>
 ): Promise<TrainingAssessmentRow | null> {
   const prev = await pool.query(
@@ -364,6 +415,9 @@ export async function pgUpdateAssessment(
     add("submissions_open", patch.submissions_open);
   if (patch.portal_form_copy !== undefined)
     add("portal_form_copy", patch.portal_form_copy);
+  if (patch.level_up_url !== undefined) add("level_up_url", patch.level_up_url);
+  if (patch.student_checklist !== undefined)
+    add("student_checklist", JSON.stringify(patch.student_checklist));
 
   if (!fields.length) {
     const cur = await pool.query(

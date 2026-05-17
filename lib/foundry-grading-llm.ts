@@ -49,6 +49,18 @@ function gradeLlmAttempts(): number {
   return Math.min(Math.max(raw, 1), 8);
 }
 
+/**
+ * Sub-attempt budget specifically for HTTP 429 (RPM/TPM). Default 1 = no in-provider retry;
+ * failover to the next entry in FOUNDRY_GRADING_PROVIDER_ORDER immediately instead of burning
+ * 30–90s on the same capped upstream (what OpenRouter "free tier" stalls look like).
+ * Range 1–8 (same semantics as attempts: total tries = this value).
+ */
+function gradeLlm429Attempts(): number {
+  const raw = parseInt(process.env.FOUNDRY_GRADE_429_MAX_ATTEMPTS ?? "", 10);
+  if (!Number.isFinite(raw)) return 1;
+  return Math.min(Math.max(raw, 1), 8);
+}
+
 function backoffMs(attemptIndex: number): number {
   const base = 450 * Math.pow(2, attemptIndex);
   const cap = Math.min(base, 8000);
@@ -165,7 +177,13 @@ function openAiResponseShouldRetry(
   const s = resp.status;
   if (s === 413 || s === 400 || s === 401 || s === 403 || s === 404)
     return false;
-  if (s === 429 || s === 408 || s === 529) return true;
+  if (s === 408 || s === 529) return true;
+  if (s === 429) {
+    /** When already at last allowed 429 try, bail out so Nvidia/Groq can run */
+    const cap429 = gradeLlm429Attempts();
+    if (attemptIdx >= cap429 - 1) return false;
+    return true;
+  }
   if (s >= 500 && s !== 501) return true;
   return false;
 }
@@ -276,6 +294,8 @@ async function chatOpenAiCompatibleWithRetries(
         event: retry ? "retry" : "give_up_attempts",
         attempt: a + 1,
         maxAttempts,
+        maxAttempts429:
+          last.status === 429 ? gradeLlm429Attempts() : undefined,
         httpStatus: last.status,
         detail: scrubForLogSnippet(last.bodyPreview ?? "(no preview)", 180),
       })
@@ -389,6 +409,9 @@ async function groqGrade(
       lastCatch = e;
       const st = groqErrStatus(e);
       if (st === 413 || !groqRetriesForError(st))
+        throw e;
+
+      if (st === 429 && a + 1 >= gradeLlm429Attempts())
         throw e;
 
       console.warn(
@@ -519,6 +542,7 @@ export async function runFoundryGradeWithFallbacks(params: {
       event: "start",
       chain: order.filter(hasCredentialFor),
       maxAttemptsPerProvider: gradeLlmAttempts(),
+      maxAttemptsRateLimit429: gradeLlm429Attempts(),
       promptChars: userContent.length,
     })
   );

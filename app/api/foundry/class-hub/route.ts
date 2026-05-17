@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { learnerChecklistFromRows } from "@/lib/foundry-learner-checklist";
 import { learnerDeckPath } from "@/lib/foundry-learner-course";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
@@ -28,6 +29,8 @@ export async function GET(req: NextRequest) {
     minOutputChars: 80,
     siteDefaultActive: false,
     mode: "builtin" as const,
+    studentChecklist: learnerChecklistFromRows([]),
+    levelUpUrl: null as string | null,
   };
 
   const slugRequested = req.nextUrl.searchParams.get("slug")?.trim();
@@ -87,6 +90,8 @@ export async function GET(req: NextRequest) {
       minOutputChars: Math.max(0, a.min_output_chars),
       siteDefaultActive: false,
       mode: "course" as const,
+      studentChecklist: learnerChecklistFromRows(a.student_checklist),
+      levelUpUrl: a.level_up_url.trim().length > 0 ? a.level_up_url.trim() : null,
     });
   }
 

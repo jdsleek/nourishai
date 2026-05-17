@@ -13,6 +13,10 @@ import {
   mergePortalForm,
   STEPS_KEYS,
 } from "@/lib/foundry-portal-form";
+import {
+  portalFormFromTemplate,
+  PORTAL_TEMPLATE_OPTIONS,
+} from "@/lib/foundry-portal-presets";
 
 type FacTab = "overview" | "share" | "submissions" | "assessments";
 
@@ -28,6 +32,8 @@ type Assessment = {
   portalForm: PortalFormMerged;
   studentUrlHint: string;
   submissionsOpen: boolean;
+  levelUpUrl: string;
+  studentChecklist: string[];
 };
 
 type Submission = {
@@ -63,6 +69,16 @@ const TAB_LABELS: { id: FacTab; label: string }[] = [
   { id: "submissions", label: "Submissions" },
   { id: "assessments", label: "Assessments" },
 ];
+
+function facilitatorRubricMayBeVague(instr: string): boolean {
+  const t = instr.trim().toLowerCase();
+  return (
+    t.length >= 34 &&
+    !/score|rubric|criterion|criteria|grading|evaluate|dimension|scale|prompt|architecture|output/i.test(
+      t,
+    )
+  );
+}
 
 function originUrl(path: string) {
   if (typeof window === "undefined") return path;
@@ -100,12 +116,16 @@ export default function FacilitatorDashboard() {
   const [graderInstructions, setGraderInstructions] = useState("");
   const [mp, setMp] = useState(40);
   const [mo, setMo] = useState(80);
+  const [newLevelUpUrl, setNewLevelUpUrl] = useState("");
+  const [newStudentChecklistText, setNewStudentChecklistText] = useState("");
   /** Inline edit desk + rubric for an existing assessment */
   const [editingDesk, setEditingDesk] = useState<{
     id: string;
     intro: string;
     grader: string;
     portal: PortalFormMerged;
+    levelUpUrl: string;
+    studentChecklistText: string;
   } | null>(null);
   const [deskSaveBusy, setDeskSaveBusy] = useState(false);
 
@@ -159,6 +179,10 @@ export default function FacilitatorDashboard() {
         portalForm: mergePortalForm((x as { portalForm?: unknown }).portalForm),
         studentUrlHint: String(x.studentUrlHint ?? ""),
         submissionsOpen: x.submissionsOpen !== false,
+        levelUpUrl: String((x as { levelUpUrl?: string }).levelUpUrl ?? ""),
+        studentChecklist: Array.isArray((x as { studentChecklist?: unknown }).studentChecklist)
+          ? (x as { studentChecklist: string[] }).studentChecklist.map((s) => String(s))
+          : [],
       })),
     );
 
@@ -234,6 +258,11 @@ export default function FacilitatorDashboard() {
             assessmentIntro: editingDesk.intro,
             graderInstructions: editingDesk.grader.trim(),
             portalForm: editingDesk.portal,
+            levelUpUrl: editingDesk.levelUpUrl,
+            studentChecklist: editingDesk.studentChecklistText
+              .split(/\r?\n/)
+              .map((s) => s.trim())
+              .filter(Boolean),
           }),
         },
       );
@@ -722,6 +751,8 @@ export default function FacilitatorDashboard() {
                                         intro: a.assessmentIntro,
                                         grader: a.graderInstructions,
                                         portal: structuredClone(a.portalForm),
+                                        levelUpUrl: a.levelUpUrl,
+                                        studentChecklistText: a.studentChecklist.join("\n"),
                                       },
                                 )
                               }
@@ -792,27 +823,93 @@ export default function FacilitatorDashboard() {
                                 className="mt-1 w-full rounded-lg border border-white/15 bg-[#07080d] px-3 py-2 font-mono text-[12px] text-slate-100"
                               />
                             </label>
+                            {facilitatorRubricMayBeVague(editingDesk.grader) ? (
+                              <p className="rounded-lg border border-amber-500/30 bg-amber-950/20 px-3 py-2 text-[11px] leading-snug text-amber-100/95">
+                                Your rubric is light on scoring language. Mention what to score (dimensions,
+                                point guidance, GO/NO-GO thresholds) so the model grades tightly and learners
+                                get consistent feedback — especially if portal fields still borrow Day&nbsp;03
+                                architecture wording.
+                              </p>
+                            ) : null}
+                            <label className="block text-xs text-slate-400">
+                              Optional · “next step” link after grading (https only)
+                              <input
+                                type="url"
+                                value={editingDesk.levelUpUrl}
+                                onChange={(e) =>
+                                  setEditingDesk((d) =>
+                                    d ? { ...d, levelUpUrl: e.target.value } : null,
+                                  )
+                                }
+                                placeholder="https://..."
+                                className="mt-1 w-full rounded-lg border border-white/15 bg-[#07080d] px-3 py-2 font-mono text-xs text-emerald-100"
+                              />
+                            </label>
+                            <label className="block text-xs text-slate-400">
+                              Optional · class hub checklist (one line per bullet; learners also see curated
+                              defaults when this is blank)
+                              <textarea
+                                value={editingDesk.studentChecklistText}
+                                onChange={(e) =>
+                                  setEditingDesk((d) =>
+                                    d ? { ...d, studentChecklistText: e.target.value } : null,
+                                  )
+                                }
+                                rows={6}
+                                className="mt-1 w-full rounded-lg border border-white/15 bg-[#07080d] px-3 py-2 text-[13px] leading-relaxed text-slate-100"
+                                placeholder="Use the facilitator’s hosted /learn/your-course link..."
+                              />
+                            </label>
                             <div className="space-y-4 rounded-xl border border-orange-400/35 bg-orange-950/18 p-4">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-orange-300/95">
                                   Submit portal (learner-facing form)
                                 </p>
-                                <button
-                                  type="button"
-                                  className="rounded border border-white/20 px-2 py-1 text-[10px] text-slate-300 hover:bg-white/[0.04]"
-                                  onClick={() =>
-                                    setEditingDesk((d) =>
-                                      d
-                                        ? {
-                                            ...d,
-                                            portal: structuredClone(DEFAULT_PORTAL_FORM),
-                                          }
-                                        : null,
-                                    )
-                                  }
-                                >
-                                  Restore built-in wording
-                                </button>
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                  <select
+                                    aria-label="Apply portal wording template"
+                                    className="max-w-[14rem] rounded border border-white/20 bg-[#07080d] px-2 py-1 text-[10px] text-slate-200"
+                                    defaultValue=""
+                                    onChange={(e) => {
+                                      const id = e.target.value;
+                                      if (!id) return;
+                                      setEditingDesk((d) =>
+                                        d
+                                          ? {
+                                              ...d,
+                                              portal: portalFormFromTemplate(id),
+                                            }
+                                          : null,
+                                      );
+                                      e.currentTarget.selectedIndex = 0;
+                                    }}
+                                  >
+                                    <option value="" disabled>
+                                      Template…
+                                    </option>
+                                    {PORTAL_TEMPLATE_OPTIONS.map((o) => (
+                                      <option key={o.id} value={o.id}>
+                                        {o.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    type="button"
+                                    className="rounded border border-white/20 px-2 py-1 text-[10px] text-slate-300 hover:bg-white/[0.04]"
+                                    onClick={() =>
+                                      setEditingDesk((d) =>
+                                        d
+                                          ? {
+                                              ...d,
+                                              portal: structuredClone(DEFAULT_PORTAL_FORM),
+                                            }
+                                          : null,
+                                      )
+                                    }
+                                  >
+                                    Restore built-in wording
+                                  </button>
+                                </div>
                               </div>
                               <p className="text-[11px] leading-snug text-slate-400">
                                 Edit the numbered fields on your deck—the title next to each box,
@@ -979,6 +1076,11 @@ export default function FacilitatorDashboard() {
                             graderInstructions,
                             minPromptChars: mp,
                             minOutputChars: mo,
+                            levelUpUrl: newLevelUpUrl,
+                            studentChecklist: newStudentChecklistText
+                              .split(/\r?\n/)
+                              .map((s) => s.trim())
+                              .filter(Boolean),
                           }),
                         });
                         const data = (await res.json().catch(() => ({}))) as {
@@ -992,6 +1094,8 @@ export default function FacilitatorDashboard() {
                         setSlug("");
                         setIntro("");
                         setGraderInstructions("");
+                        setNewLevelUpUrl("");
+                        setNewStudentChecklistText("");
                         const row = data.assessment;
                         if (row?.slug && row.title) {
                           setNewCourseShare({ slug: row.slug, title: row.title });
@@ -1048,6 +1152,26 @@ export default function FacilitatorDashboard() {
                       required
                       rows={10}
                       className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 font-mono text-[13px]"
+                    />
+                  </label>
+                  <label className="block text-xs text-slate-400">
+                    Optional · “next step” link after grading (<code className="font-mono">https</code> only)
+                    <input
+                      type="url"
+                      value={newLevelUpUrl}
+                      onChange={(e) => setNewLevelUpUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 font-mono text-xs text-emerald-200"
+                    />
+                  </label>
+                  <label className="block text-xs text-slate-400">
+                    Optional · class hub checklist — one bullet per line
+                    <textarea
+                      value={newStudentChecklistText}
+                      onChange={(e) => setNewStudentChecklistText(e.target.value)}
+                      rows={5}
+                      className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-[13px] leading-relaxed"
+                      placeholder={`Use your facilitator's official /learn/… link.${"\n"}Subgroup must match roster.`}
                     />
                   </label>
                   <button

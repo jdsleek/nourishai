@@ -20,6 +20,9 @@ type HubConfig = {
   submissionsOpen: boolean;
   siteDefaultActive: boolean;
   mode?: "builtin" | "course";
+  /** Curated facilitator lines merged with programmatic defaults server-side */
+  studentChecklist?: string[];
+  levelUpUrl?: string | null;
 };
 
 type SavedGrade = {
@@ -465,6 +468,32 @@ export default function ClassHubBody({
                 )}
               </p>
             </div>
+
+            {Array.isArray(hub.studentChecklist) && hub.studentChecklist.length > 0 ? (
+              <aside
+                className="rounded-2xl border border-emerald-500/20 bg-[#0c120f] px-5 py-4 shadow-inner shadow-black/20"
+              >
+                <p className={HUB_CARD_KICKER}>Before you submit</p>
+                <ul className="mt-4 list-disc space-y-2.5 pl-5 text-sm leading-relaxed text-slate-100">
+                  {hub.studentChecklist.map((line, i) => (
+                    <li key={`${i}-${line.slice(0, 48)}`}>{line}</li>
+                  ))}
+                </ul>
+                {hub.levelUpUrl && /^https?:\/\//i.test(hub.levelUpUrl) ? (
+                  <p className="mt-4 text-xs leading-relaxed text-slate-400">
+                    Facilitator follow-up ·{" "}
+                    <a
+                      href={hub.levelUpUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-cyan-300 underline underline-offset-[3px] hover:text-cyan-200"
+                    >
+                      Open facilitator “next step” link
+                    </a>
+                  </p>
+                ) : null}
+              </aside>
+            ) : null}
 
             <div className="grid gap-3">
               <a

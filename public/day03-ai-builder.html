@@ -490,6 +490,20 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
 }
 .reset-btn:hover{border-color:var(--cyan);color:var(--cyan);}
 .reset-btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+.receipt-box{
+  margin-top:clamp(16px,2vh,20px);padding:clamp(14px,3vw,16px);border-radius:10px;
+  background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.22);
+  font-size:clamp(12px,2.2vmin,14px);color:var(--muted);line-height:1.55;
+}
+.receipt-box strong{color:var(--cyan);}
+.receipt-id{font-family:'JetBrains Mono',monospace;font-size:clamp(10px,1.9vmin,11px);color:var(--muted2);word-break:break-all;margin-top:8px;}
+.cta-secondary{
+  margin-top:12px;background:transparent;border:1px solid var(--border-hi);color:var(--muted);
+  padding:14px 22px;border-radius:10px;cursor:pointer;font-family:'DM Sans',sans-serif;
+  font-size:clamp(14px,2.4vmin,15px);min-height:48px;width:100%;max-width:28rem;
+}
+.cta-secondary:hover{border-color:var(--cyan);color:var(--cyan);}
+
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 </style>
 </head>
@@ -502,6 +516,7 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
 <div class="chrome-top">
   <div class="logo"><strong>QUBATORS</strong> AI FOUNDRY · DAY 03</div>
   <div class="chrome-actions">
+    <a href="/class" class="facilitator-link" style="margin-right:12px">Class hub</a>
     <a href="/training/facilitator/login" class="facilitator-link">Trainer login</a>
     <span class="registry-link" title="Cohort summaries are instructor-only">Ideation summaries (instructors only)</span>
     <div class="kbd-hints" aria-hidden="true">
@@ -707,6 +722,7 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
     </div>
     <button type="button" class="cta-main" onclick="void openPortal()">SUBMIT TO THE FOUNDRY PORTAL ↓</button>
     <p class="cta-sub">// The grader returns a score, rubric breakdown, and one “level up” action for your next attempt</p>
+    <button type="button" class="cta-secondary" id="btnLastGrade" onclick="viewLastGradeOnDevice()">See my last grade on this device</button>
   </div>
 
 </div><!-- /deck -->
@@ -732,7 +748,7 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
     </div>
 
     <div class="privacy-banner">
-      <strong>Foundry portal.</strong> Submissions are graded automatically on the <strong>Qubators AI Foundry server</strong> when you click submit (same tab/session). Stored for instructor review (password-protected admin, not public). Paste only coursework you’re comfortable sharing for class.
+      <strong>Foundry portal.</strong> Your work is graded automatically when you submit. It is saved for your facilitator and program staff only — not visible to other students. Paste only coursework you are comfortable sharing for class.
       <div id="portal-assessment-label" class="fhint" style="margin-top:10px;color:#bef264;font-family:JetBrains Mono,monospace;"></div>
       <p id="portal-submissions-closed" class="fhint" role="alert" style="display:none;margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.35);color:#fca5a5;font-weight:600;font-family:JetBrains Mono, monospace;"></p>
     </div>
@@ -787,6 +803,12 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
         <div class="lu-txt" id="luTip">—</div>
       </div>
       <div class="verdict" id="verdict">—</div>
+      <div class="receipt-box" id="receiptBox" style="display:none" aria-live="polite">
+        <strong>Saved for your facilitator</strong>
+        <p id="receiptWhen" style="margin-top:6px"></p>
+        <p class="receipt-id" id="receiptId"></p>
+        <p style="margin-top:8px;font-size:12px">Screenshot or copy the reference if you need proof of submission.</p>
+      </div>
       <button type="button" class="reset-btn" onclick="resetForm()">Submit Another →</button>
     </div>
 
@@ -866,12 +888,82 @@ let CFG_MIN_OUTPUT = 80;
 let CURRENT_ASSESSMENT_TITLE = '';
 /** Facilitator assessments can be closed to block repeat submissions server-side too. */
 let CFG_SUBMISSIONS_OPEN = true;
+/** Home deck using facilitator site-default course (no ?assessment= in URL). */
+let SITE_DEFAULT_MODE = false;
+const STUDENT_STORE_KEY = 'foundry.student.v1';
+function readStudentStore(){
+  try{ return JSON.parse(localStorage.getItem(STUDENT_STORE_KEY)||'{}'); }
+  catch(_){ return {}; }
+}
+function writeStudentStore(patch){
+  try{
+    const next = Object.assign({}, readStudentStore(), patch);
+    localStorage.setItem(STUDENT_STORE_KEY, JSON.stringify(next));
+  }catch(_){}
+}
+function loadStudentProfileIntoForm(){
+  const s = readStudentStore();
+  const n = document.getElementById('sName');
+  const g = document.getElementById('subGroup');
+  if(n && s.name) n.value = s.name;
+  if(g && s.subgroup && g.dataset.ready==='1'){
+    for(let i=0;i<g.options.length;i++){
+      if(g.options[i].value===s.subgroup){ g.selectedIndex=i; break; }
+    }
+  }
+}
+function saveStudentProfileFromForm(){
+  const n = document.getElementById('sName');
+  const g = document.getElementById('subGroup');
+  writeStudentStore({
+    name: n ? n.value.trim() : '',
+    subgroup: g ? g.value.trim() : '',
+  });
+}
+function saveLastGradeOnDevice(payload){
+  writeStudentStore({ lastGrade: payload });
+  const btn = document.getElementById('btnLastGrade');
+  if(btn) btn.style.display = '';
+}
+function formatReceiptTime(iso){
+  try{
+    return new Date(iso).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});
+  }catch(_){ return iso||''; }
+}
+function showReceipt(meta){
+  const box = document.getElementById('receiptBox');
+  const when = document.getElementById('receiptWhen');
+  const rid = document.getElementById('receiptId');
+  if(!box) return;
+  if(meta && meta.submissionId){
+    box.style.display='block';
+    if(when) when.textContent = 'Submitted '+formatReceiptTime(meta.submittedAt||'');
+    if(rid) rid.textContent = 'Reference: '+meta.submissionId;
+  }else{
+    box.style.display='none';
+  }
+}
+function viewLastGradeOnDevice(){
+  const lg = readStudentStore().lastGrade;
+  if(!lg || !lg.result){
+    alert('No saved grade on this device yet. Submit once through the portal first.');
+    return;
+  }
+  void openPortal();
+  render(lg.result, {
+    submissionId: lg.submissionId,
+    submittedAt: lg.submittedAt,
+    assessmentTitle: lg.assessmentTitle,
+    fromCache: true,
+  });
+}
+
 
 function applySubmissionLockUI(){
   const btn = document.getElementById('subBtn');
   const bar = document.getElementById('portal-submissions-closed');
   if(!btn || !bar) return;
-  if(ASSESSMENT_SLUG && !CFG_SUBMISSIONS_OPEN){
+  if((ASSESSMENT_SLUG || SITE_DEFAULT_MODE) && !CFG_SUBMISSIONS_OPEN){
     bar.style.display='block';
     bar.textContent = 'Closed for submissions — this assessment no longer accepts new grades. Contact your facilitator if you need access.';
     btn.disabled = true;
@@ -930,6 +1022,7 @@ async function ensureSubgroupsLoaded(force){
       return;
     }
     CFG_SUBMISSIONS_OPEN = j.submissionsOpen !== false;
+    SITE_DEFAULT_MODE = !ASSESSMENT_SLUG && j.siteDefault === true;
     CFG_MIN_PROMPT = typeof j.minPromptChars==='number' ? Math.max(0,j.minPromptChars):40;
     CFG_MIN_OUTPUT = typeof j.minOutputChars==='number' ? Math.max(0,j.minOutputChars):80;
     CURRENT_ASSESSMENT_TITLE = typeof j.title==='string'? j.title:'';
@@ -937,7 +1030,7 @@ async function ensureSubgroupsLoaded(force){
     if(banner){
       banner.textContent = ASSESSMENT_SLUG
         ? ('Assessment · '+CURRENT_ASSESSMENT_TITLE+' ('+ASSESSMENT_SLUG+')')
-        : 'Built-in Day 03 AI Builder deck';
+        : (SITE_DEFAULT_MODE ? ('Class course · '+CURRENT_ASSESSMENT_TITLE) : 'Day 03 AI Builder');
     }
     applySubmissionLockUI();
     const list=Array.isArray(j.subgroups)?j.subgroups:[];
@@ -954,6 +1047,7 @@ async function ensureSubgroupsLoaded(force){
 }
 async function openPortal(){
   await ensureSubgroupsLoaded(true);
+  loadStudentProfileIntoForm();
   document.getElementById('portal').classList.add('open');
   document.getElementById('portal').scrollTop=0;
   document.getElementById('portal').setAttribute('aria-hidden','false');
@@ -990,13 +1084,14 @@ async function grade(){
   let ok=true;
   if(!name){showErr('sName','err-name');ok=false;}
   if(!subgroup){showErr('subGroup','err-sub');ok=false;}
-  if(ASSESSMENT_SLUG && !CFG_SUBMISSIONS_OPEN){
-    alert('Submissions are closed for this assessment. Contact your facilitator.');
+  if((ASSESSMENT_SLUG || SITE_DEFAULT_MODE) && !CFG_SUBMISSIONS_OPEN){
+    alert('Submissions are closed for this course. Contact your facilitator.');
     ok=false;
   }
   if(!prompt||prompt.length<CFG_MIN_PROMPT){showErr('aPrompt','err-prompt');ok=false;}
   if(!output||output.length<CFG_MIN_OUTPUT){showErr('aOutput','err-output');ok=false;}
   if(!ok)return;
+  saveStudentProfileFromForm();
 
   document.getElementById('subBtn').disabled=true;
   document.getElementById('loading').classList.add('on');
@@ -1017,9 +1112,23 @@ async function grade(){
       throw new Error(msg);
     }
     if(!data.result)throw new Error('Invalid response from grading service.');
-    render(data.result);
+    saveStudentProfileFromForm();
+    const meta = {
+      submissionId: data.submissionId || null,
+      submittedAt: data.submittedAt || null,
+      assessmentTitle: CURRENT_ASSESSMENT_TITLE || '',
+    };
+    render(data.result, meta);
+    if(data.submissionId){
+      saveLastGradeOnDevice({
+        submissionId: data.submissionId,
+        submittedAt: data.submittedAt,
+        assessmentTitle: CURRENT_ASSESSMENT_TITLE,
+        result: data.result,
+      });
+    }
     if(data.persisted===false){
-      alert('Your submission was graded, but storing it failed (disk or server IO). Inform your TA immediately with your name — do not discard your prompt/output until confirmed.');
+      alert('Your work was graded but could not be saved on the server. Copy your prompt and output, then tell your facilitator immediately.');
     }
   }catch(err){
     alert('Grader error: '+(err.message||err)+'\n\nOpen this deck on the hosted AI Builder site (not a saved copy of the HTML file) so /api/foundry/grade can reach the AI Foundry server.');
@@ -1029,7 +1138,7 @@ async function grade(){
   }
 }
 
-function render(r){
+function render(r, meta){
   const score=r.total_score;
   const grade=r.grade;
   const scoreEl=document.getElementById('rScore');
@@ -1060,6 +1169,7 @@ function render(r){
 
   document.getElementById('luTip').textContent=r.level_up_tip;
   document.getElementById('verdict').textContent=r.verdict;
+  showReceipt(meta||null);
   document.getElementById('result').classList.add('on');
   document.getElementById('result').scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -1070,12 +1180,20 @@ function resetForm(){
   if(sg&&sg.dataset.ready==='1'){sg.selectedIndex=0;}
   clearFieldErrors();
   document.getElementById('result').classList.remove('on');
+  showReceipt(null);
   document.getElementById('portal').scrollTop=0;
   applySubmissionLockUI();
 }
 
 // prefetch subgroup list (& assessment config when ?assessment= is present)
 void ensureSubgroupsLoaded(false);
+
+
+(function initStudentUi(){
+  const lg = readStudentStore().lastGrade;
+  const btn = document.getElementById('btnLastGrade');
+  if(btn && (!lg || !lg.result)) btn.style.display='none';
+})();
 
 // init progress
 updateUI();

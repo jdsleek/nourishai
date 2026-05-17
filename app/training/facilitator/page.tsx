@@ -345,6 +345,12 @@ export default function FacilitatorDashboard() {
                 />
               </DashboardStatGrid>
               <div className="flex flex-wrap gap-2">
+                <a
+                  href="/class"
+                  className="rounded-lg border border-white/20 px-4 py-2 text-sm text-slate-200 hover:bg-white/5"
+                >
+                  Student class hub
+                </a>
                 <button
                   type="button"
                   onClick={() => setTab("share")}
@@ -417,7 +423,18 @@ export default function FacilitatorDashboard() {
                       >
                         Copy URL with ?assessment=
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => void copyText(originUrl("/class"), "student class hub")}
+                        className="rounded-lg border border-emerald-400/35 px-4 py-2 text-sm text-emerald-100 hover:bg-emerald-950/30"
+                      >
+                        Copy student class hub (/class)
+                      </button>
                     </div>
+                    <p className="text-xs text-slate-500">
+                      Share the <strong className="text-slate-400">class hub</strong> link in
+                      WhatsApp or Slack — fellows see submission status and your deck in one place.
+                    </p>
                   </div>
                 ) : (
                   <p className="mt-3 text-sm text-amber-200/90">

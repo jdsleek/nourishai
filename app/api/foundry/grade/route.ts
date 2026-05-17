@@ -219,14 +219,16 @@ export async function POST(req: NextRequest) {
     };
 
     let persisted = false;
+    let saved: { id: string; submittedAt: string } | null = null;
     const delays = [0, 250, 600];
     for (let attempt = 0; attempt < delays.length; attempt++) {
       if (delays[attempt] > 0) {
         await new Promise((r) => setTimeout(r, delays[attempt]));
       }
       try {
-        await appendFoundrySubmission(entry);
+        const rec = await appendFoundrySubmission(entry);
         persisted = true;
+        saved = { id: rec.id, submittedAt: rec.submittedAt };
         break;
       } catch (storeErr) {
         console.error(
@@ -244,6 +246,8 @@ export async function POST(req: NextRequest) {
       ok: true,
       result,
       persisted,
+      submissionId: saved?.id ?? null,
+      submittedAt: saved?.submittedAt ?? null,
       gradedWithTruncatedExcerpt: clipped.truncated,
       gradingProvider: graded.meta.provider,
       gradingModel: graded.meta.model,

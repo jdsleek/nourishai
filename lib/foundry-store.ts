@@ -153,7 +153,7 @@ function mergeDedupeSorted(
 /** Primary append: Postgres when DATABASE_URL is set; always mirrors to JSONL as backup/fallback anchor. Falls back to file-only if Postgres fails. */
 export async function appendFoundrySubmission(
   entry: Omit<FoundrySubmissionRecord, "id" | "submittedAt">
-): Promise<void> {
+): Promise<FoundrySubmissionRecord> {
   const rec: FoundrySubmissionRecord = {
     id: crypto.randomUUID(),
     submittedAt: new Date().toISOString(),
@@ -167,7 +167,7 @@ export async function appendFoundrySubmission(
       await ensureFoundrySubmissionsSchema(pool);
       await pgInsertSubmission(pool, rec);
       await appendJsonlLines([storeFile, backupFile], line);
-      return;
+      return rec;
     } catch (e) {
       console.error("[foundry-store] Postgres insert failed; falling back to file only", e);
     }
@@ -175,6 +175,47 @@ export async function appendFoundrySubmission(
 
   await mkdir(dataDir, { recursive: true });
   await appendJsonlLines([storeFile, backupFile], line);
+  return rec;
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Learner lookup: grade summary only (no prompt/output). */
+export async function getFoundrySubmissionGradeById(
+  id: string,
+): Promise<Pick<FoundrySubmissionRecord, "id" | "submittedAt" | "result"> | null> {
+  const trimmed = id.trim();
+  if (!UUID_RE.test(trimmed)) return null;
+
+  const pool = getFoundryPgPool();
+  if (pool) {
+    try {
+      await ensureFoundrySubmissionsSchema(pool);
+      const { rows } = await pool.query(
+        `SELECT id, submitted_at, result FROM foundry_submissions WHERE id = $1::uuid LIMIT 1`,
+        [trimmed],
+      );
+      if (rows.length) {
+        const row = rows[0] as Record<string, unknown>;
+        return {
+          id: String(row.id),
+          submittedAt: new Date(String(row.submitted_at)).toISOString(),
+          result:
+            typeof row.result === "string"
+              ? (JSON.parse(row.result) as FoundrySubmissionRecord["result"])
+              : (row.result as FoundrySubmissionRecord["result"]),
+        };
+      }
+    } catch (e) {
+      console.error("[foundry-store] grade lookup failed", e);
+    }
+  }
+
+  const all = await readFoundrySubmissionsNewestFirst();
+  const hit = all.find((r) => r.id === trimmed);
+  if (!hit) return null;
+  return { id: hit.id, submittedAt: hit.submittedAt, result: hit.result };
 }
 
 /** Reads Postgres (newest-first) merged with JSONL backups (dedupe by id). Postgres wins on conflict. */

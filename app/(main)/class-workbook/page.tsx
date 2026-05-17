@@ -121,14 +121,17 @@ export default function ClassWorkbookPage() {
         </p>
         <p className="mt-3 flex flex-wrap gap-2">
           <a
-            href="/"
+            href="/class"
             className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-brand-700"
           >
-            Open Day 03 — AI Builder slides &amp; Foundry grader
+            Class hub — slides &amp; submit
           </a>
-        </p>
-        <p className="mt-2 max-w-xl text-xs text-stone-500 dark:text-stone-500">
-          The cohort-wide <strong className="text-stone-600 dark:text-stone-400">product ideation</strong> summaries are for facilitators and organizers only so fellows don&apos;t see each other&apos;s ideas.
+          <a
+            href="/"
+            className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-100 dark:border-stone-600 dark:text-stone-200 dark:hover:bg-stone-900"
+          >
+            Open slides directly
+          </a>
         </p>
       </div>
 

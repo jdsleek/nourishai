@@ -1039,6 +1039,19 @@ let CFG_MIN_OUTPUT = 80;
 let CURRENT_ASSESSMENT_TITLE = '';
 let CURRENT_ASSESSMENT_INTRO = '';
 let CFG_COHORT_CONFIG_OK = false;
+let SLIDE_0_DEFAULT_HTML = "";
+let SLIDE_6_DEFAULT_HTML = "";
+
+function captureDefaultSlideHtml(){
+  if(!SLIDE_0_DEFAULT_HTML){
+    const s0=document.querySelector(".slide[data-slide=\"0\"]");
+    if(s0) SLIDE_0_DEFAULT_HTML=s0.innerHTML;
+  }
+  if(!SLIDE_6_DEFAULT_HTML){
+    const s6=document.querySelector(".slide[data-slide=\"6\"]");
+    if(s6) SLIDE_6_DEFAULT_HTML=s6.innerHTML;
+  }
+}
 
 function escapeHtml(s){
   return String(s)
@@ -1071,9 +1084,16 @@ function syncFacilitatorDesk(){
 
 /** Cohort URL: one assignment deck (title + intro) + submit slide — not generic Day 03 slides on top. */
 function applyCohortDeckPresentation(){
+  captureDefaultSlideHtml();
   const isCohort = !!(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK);
   document.body.classList.toggle('cohort-assessment-deck', isCohort);
   if(!isCohort){
+    const slide0r=document.querySelector('.slide[data-slide="0"]');
+    const slide6r=document.querySelector('.slide[data-slide="6"]');
+    if(slide0r&&SLIDE_0_DEFAULT_HTML) slide0r.innerHTML=SLIDE_0_DEFAULT_HTML;
+    if(slide6r&&SLIDE_6_DEFAULT_HTML) slide6r.innerHTML=SLIDE_6_DEFAULT_HTML;
+    const logor=document.querySelector('.chrome-top .logo');
+    if(logor) logor.innerHTML='<strong>QUBATORS</strong> AI FOUNDRY · DAY 03';
     syncFacilitatorDesk();
     return;
   }
@@ -1096,8 +1116,26 @@ function applyCohortDeckPresentation(){
   if(logo&&CURRENT_ASSESSMENT_TITLE.trim()){
     logo.innerHTML='<strong>QUBATORS</strong> · '+escapeHtml(CURRENT_ASSESSMENT_TITLE.trim());
   }
-  const slide6tag=document.querySelector('.slide[data-slide="6"] .tag');
-  if(slide6tag) slide6tag.textContent='Submit assignment';
+  const slide6=document.querySelector('.slide[data-slide="6"]');
+  if(slide6){
+    const submitTitle=CURRENT_ASSESSMENT_TITLE.trim()||ASSESSMENT_SLUG;
+    slide6.innerHTML=
+      '<div class="tag">Submit assignment</div>'+
+      '<h2 class="head">'+escapeHtml(submitTitle)+'</h2>'+
+      '<p class="subtitle" style="max-width:36rem;margin:0.75rem auto 0">When your work matches what your facilitator asked for on the previous slide, open the portal and submit.</p>'+
+      '<div class="submit-prep">'+
+      '<h4>Before you submit</h4>'+
+      '<ul>'+
+      '<li>Paste the <strong>exact prompt</strong> you used — not a summary from memory.</li>'+
+      '<li>Paste the AI output your facilitator expects (at least <strong>'+CFG_MIN_PROMPT+'</strong> characters in the prompt and <strong>'+CFG_MIN_OUTPUT+'</strong> in the output unless they said otherwise).</li>'+
+      '<li>Select your <strong>subgroup</strong> from this cohort&apos;s list in the portal.</li>'+
+      '</ul></div>'+
+      '<button type="button" class="cta-main" onclick="void openPortal()">SUBMIT FOR GRADING →</button>'+
+      '<p class="cta-sub">// Graded with your facilitator&apos;s rubric · saved to their inbox only</p>'+
+      '<button type="button" class="cta-secondary" id="btnLastGrade" onclick="void viewLastGradeOnDevice()">See my last grade on this device</button>';
+    const btnLast=document.getElementById('btnLastGrade');
+    if(btnLast) btnLast.style.display=lastGradeForCurrentAssessment()?'':'none';
+  }
   const vis=visibleSlideIndices();
   if(!vis.includes(cur)) goTo(0);
   updateUI();

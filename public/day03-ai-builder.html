@@ -977,6 +977,16 @@ function syncFacilitatorDesk(){
 let CFG_SUBMISSIONS_OPEN = true;
 /** When the deck has no ?assessment=, the server returns legacy built‑in subgroup limits (global site‑default grading was removed). */
 let SITE_DEFAULT_MODE = false;
+function applyDeckDocumentTitle(){
+  try{
+    if(typeof document==='undefined') return;
+    if(ASSESSMENT_SLUG && CURRENT_ASSESSMENT_TITLE.trim()){
+      document.title = CURRENT_ASSESSMENT_TITLE.trim()+' · Foundry · Qubators AI';
+      return;
+    }
+    document.title = 'Day 03 · AI Builder | Qubators AI Foundry';
+  }catch(_){/* ignore */}
+}
 const STUDENT_STORE_KEY = 'foundry.student.v1';
 function readStudentStore(){
   try{ return JSON.parse(localStorage.getItem(STUDENT_STORE_KEY)||'{}'); }
@@ -1108,6 +1118,7 @@ async function ensureSubgroupsLoaded(force){
       }
       applySubmissionLockUI();
       syncFacilitatorDesk();
+      applyDeckDocumentTitle();
       sel.innerHTML='<option value="">—</option>';
       sel.dataset.slugKey=key;
       sel.dataset.ready='1';
@@ -1134,6 +1145,7 @@ async function ensureSubgroupsLoaded(force){
     }
     applySubmissionLockUI();
     syncFacilitatorDesk();
+    applyDeckDocumentTitle();
     const list=Array.isArray(j.subgroups)?j.subgroups:[];
     if(list.length){
       fill(list);
@@ -1143,6 +1155,7 @@ async function ensureSubgroupsLoaded(force){
   }catch(_){
     CURRENT_ASSESSMENT_INTRO = '';
     syncFacilitatorDesk();
+    applyDeckDocumentTitle();
     CFG_SUBMISSIONS_OPEN = !ASSESSMENT_SLUG;
     applySubmissionLockUI();
     fill(FALLBACK_QAF_SUBGROUPS);
@@ -1294,6 +1307,7 @@ void ensureSubgroupsLoaded(false);
 
 (function initStudentUi(){
   syncDeckClassHubLink();
+  applyDeckDocumentTitle();
   const tg = document.getElementById('facilitator-desk-toggle');
   if(tg){
     tg.addEventListener('click', ()=>{

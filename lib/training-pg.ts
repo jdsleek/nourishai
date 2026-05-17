@@ -158,6 +158,96 @@ export async function pgAssessmentBySlug(
   return rowAssessment(rows[0] as Record<string, unknown>);
 }
 
+export type FacilitatorCourseCard = {
+  slug: string;
+  title: string;
+  submissionsOpen: boolean;
+};
+
+export type FacilitatorCourseCatalogResult = {
+  facilitatorEmail: string | null;
+  facilitatorDisplayName: string | null;
+  courses: FacilitatorCourseCard[];
+};
+
+/** Same trainer as `slugLookup` — all their assignments (student hub cards). Unknown slug → null. */
+export async function pgFacilitatorCourseCatalogBySlug(
+  pool: Pool,
+  slugLookup: string,
+): Promise<FacilitatorCourseCatalogResult | null> {
+  const a = await pgAssessmentBySlug(pool, slugLookup);
+  if (!a) return null;
+  const fac = await pgFacilitatorById(pool, a.facilitator_id);
+  const facilitatorEmail =
+    typeof fac?.email === "string" && fac.email.trim().length > 0 ? fac.email.trim() : null;
+  const facilitatorDisplayName =
+    typeof fac?.display_name === "string" && fac.display_name.trim().length > 0
+      ? fac.display_name.trim()
+      : null;
+
+  const { rows } = await pool.query(
+    `SELECT slug, title, submissions_open FROM training_assessments
+     WHERE facilitator_id = $1::uuid
+     ORDER BY created_at ASC`,
+    [a.facilitator_id],
+  );
+
+  const courses = rows.map((r) => {
+    const row = r as Record<string, unknown>;
+    return {
+      slug: String(row.slug ?? ""),
+      title: String(row.title ?? ""),
+      submissionsOpen: readSubmissionsOpen(row),
+    };
+  });
+
+  return {
+    facilitatorEmail,
+    facilitatorDisplayName,
+    courses,
+  };
+}
+
+export type LiveOpenCourseCard = {
+  slug: string;
+  title: string;
+  submissionsOpen: true;
+  facilitatorDisplayName: string | null;
+};
+
+/**
+ * Every facilitator assessment that is open for submit and not the site-default demo row.
+ * For student-facing “pick your cohort” discovery on the class hub.
+ */
+export async function pgLiveOpenCoursesPublic(
+  pool: Pool,
+): Promise<LiveOpenCourseCard[]> {
+  const { rows } = await pool.query(
+    `SELECT ta.slug, ta.title, tf.display_name, tf.email
+     FROM training_assessments ta
+     INNER JOIN training_facilitators tf ON tf.id = ta.facilitator_id
+     WHERE ta.submissions_open = TRUE AND ta.is_site_default = FALSE
+     ORDER BY LOWER(tf.email), ta.created_at ASC`,
+  );
+
+  return rows.map((r) => {
+    const row = r as Record<string, unknown>;
+    const dn =
+      typeof row.display_name === "string" && row.display_name.trim().length > 0
+        ? row.display_name.trim()
+        : null;
+    const email = typeof row.email === "string" ? row.email.trim() : "";
+    const local =
+      email.length > 0 ? (email.split("@")[0]?.trim() || null) : null;
+    return {
+      slug: String(row.slug ?? ""),
+      title: String(row.title ?? ""),
+      submissionsOpen: true as const,
+      facilitatorDisplayName: dn ?? local,
+    };
+  });
+}
+
 export async function pgListAssessmentsForFacilitator(
   pool: Pool,
   facilitatorId: string

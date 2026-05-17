@@ -834,6 +834,14 @@ export default function FoundryAdminPage() {
                 {locksErr ? (
                   <p className="mt-2 text-sm text-red-400">{locksErr}</p>
                 ) : null}
+                {unlocked && locks.length > 0 ? (
+                  <p className="mt-2 rounded-md border border-red-500/25 bg-red-950/15 px-3 py-2 text-xs text-red-100/90">
+                    <strong className="font-semibold">Organizer delete:</strong> red{" "}
+                    <span className="font-mono uppercase">Delete</span> is in the{" "}
+                    <strong>same row</strong> as Close / Re‑open submits — use your admin password and
+                    unlock submissions above first.
+                  </p>
+                ) : null}
                 {locksLoading ? (
                   <p className="mt-3 text-xs text-slate-500">
                     Loading assignment rules…
@@ -907,6 +915,22 @@ export default function FoundryAdminPage() {
                             className="rounded-lg border border-emerald-400/35 bg-emerald-950/35 px-3 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-900/25 disabled:opacity-40"
                           >
                             Re‑open submits
+                          </button>
+                          <button
+                            type="button"
+                            disabled={
+                              assessmentDeletingId !== null ||
+                              !!lockToggling ||
+                              !!ownerMoveBusy ||
+                              !password ||
+                              loading ||
+                              deletingId !== null
+                            }
+                            onClick={() => void deleteAssessmentRow(password, a)}
+                            className="rounded-lg border border-red-500/55 bg-red-950/55 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-red-100 hover:bg-red-900/35 disabled:opacity-40"
+                            title="Removes Postgres row · frees slug for a new assignment"
+                          >
+                            {assessmentDeletingId === a.id ? "Deleting…" : "Delete"}
                           </button>
                           </div>
                         </div>
@@ -995,26 +1019,9 @@ export default function FoundryAdminPage() {
                             {ownerMoveBusy === a.id ? "Moving…" : "Move"}
                           </button>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 border-t border-red-500/15 pt-3">
-                          <button
-                            type="button"
-                            disabled={
-                              assessmentDeletingId !== null ||
-                              !!lockToggling ||
-                              !!ownerMoveBusy ||
-                              !password ||
-                              loading ||
-                              deletingId !== null
-                            }
-                            onClick={() => void deleteAssessmentRow(password, a)}
-                            className="rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-900/35 disabled:opacity-40"
-                          >
-                            {assessmentDeletingId === a.id ? "Deleting…" : "Delete assignment"}
-                          </button>
-                          <span className="max-w-xl text-[11px] text-slate-500">
-                            Drops the facilitator course row · frees slug for trainer to publish again ·
-                            does not erase submission ledger rows.
-                          </span>
+                        <div className="border-t border-red-500/10 pt-2 text-[11px] text-slate-500">
+                          Organizer only: deleting drops the Postgres assignment row · frees slug ·
+                          submission ledger rows remain (unlinked).
                         </div>
                       </li>
                     ))}

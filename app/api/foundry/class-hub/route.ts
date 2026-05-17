@@ -65,12 +65,17 @@ export async function GET(req: NextRequest) {
     const fac = await pgFacilitatorById(pool, a.facilitator_id);
     const facilitatorEmail =
       typeof fac?.email === "string" && fac.email.trim().length > 0 ? fac.email.trim() : null;
+    const facilitatorDisplayName =
+      typeof fac?.display_name === "string" && fac.display_name.trim().length > 0
+        ? fac.display_name.trim()
+        : null;
 
     return Response.json({
       programName: "Qubators AI Foundry",
       deckHref: deckWithAssessment(a.slug),
       workbookPath,
       facilitatorEmail,
+      facilitatorDisplayName,
       assessmentSlug: a.slug,
       assessmentTitle: a.title,
       submissionsOpen: a.submissions_open,

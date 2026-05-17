@@ -2,7 +2,9 @@ import { readFoundrySubmissionsNewestFirst } from "@/lib/foundry-store";
 import { facilitatorFromCookie } from "@/lib/training-session-cookie";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import {
+  pgCountSubmissionsLegacyNoAssessment,
   pgFacilitatorByEmail,
+  pgGetSiteDefaultAssessment,
   pgListAssessmentsForFacilitator,
 } from "@/lib/training-pg";
 
@@ -25,6 +27,8 @@ export async function GET() {
 
   const mine = await pgListAssessmentsForFacilitator(pool, ses.fid);
   const allow = new Set(mine.map((a) => a.id));
+  const siteDefault = await pgGetSiteDefaultAssessment(pool);
+  const orphanLegacyCount = await pgCountSubmissionsLegacyNoAssessment(pool);
 
   const all = await readFoundrySubmissionsNewestFirst();
   const submissions = all.filter(
@@ -34,5 +38,13 @@ export async function GET() {
   return Response.json({
     facilitator: { email: fac.email, displayName: fac.display_name },
     submissions,
+    stats: {
+      submissionCount: submissions.length,
+      assessmentCount: mine.length,
+      orphanLegacyCount,
+      siteDefaultAssessmentId: siteDefault?.id ?? null,
+      siteDefaultSlug: siteDefault?.slug ?? null,
+      siteDefaultTitle: siteDefault?.title ?? null,
+    },
   });
 }

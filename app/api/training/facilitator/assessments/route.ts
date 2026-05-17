@@ -45,7 +45,9 @@ export async function GET() {
       minPromptChars: a.min_prompt_chars,
       minOutputChars: a.min_output_chars,
       submissionsOpen: a.submissions_open,
+      isSiteDefault: a.is_site_default,
       studentUrlHint: `/foundry/day03?assessment=${encodeURIComponent(a.slug)}`,
+      siteRootUrl: "/",
     })),
     studentDeckBasePath: "/foundry/day03",
   });

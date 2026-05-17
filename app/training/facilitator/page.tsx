@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+
+type FacTab = "share" | "submissions" | "assessments";
 
 type Assessment = {
   id: string;
@@ -11,8 +13,8 @@ type Assessment = {
   minPromptChars: number;
   minOutputChars: number;
   studentUrlHint: string;
-  /** When false, learners cannot POST new grades for this slug. */
   submissionsOpen: boolean;
+  isSiteDefault: boolean;
 };
 
 type Submission = {
@@ -29,16 +31,38 @@ type Submission = {
   };
 };
 
+type Stats = {
+  submissionCount: number;
+  assessmentCount: number;
+  orphanLegacyCount: number;
+  siteDefaultSlug: string | null;
+  siteDefaultTitle: string | null;
+};
+
+const TAB_LABELS: { id: FacTab; label: string }[] = [
+  { id: "share", label: "Share with class" },
+  { id: "submissions", label: "Submissions" },
+  { id: "assessments", label: "Assessments" },
+];
+
+function originUrl(path: string) {
+  if (typeof window === "undefined") return path;
+  return `${window.location.origin}${path}`;
+}
+
 export default function FacilitatorDashboard() {
   const router = useRouter();
-  const [me, setMe] = useState<{ email: string; displayName: string } | null>(
-    null,
-  );
+  const [tab, setTab] = useState<FacTab>("share");
+  const [me, setMe] = useState<{ email: string; displayName: string } | null>(null);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [subs, setSubs] = useState<Submission[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [lockBusy, setLockBusy] = useState<string | null>(null);
+  const [claimBusy, setClaimBusy] = useState(false);
+  const [claimMsg, setClaimMsg] = useState<string | null>(null);
+  const [copyMsg, setCopyMsg] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -50,108 +74,92 @@ export default function FacilitatorDashboard() {
   const [mp, setMp] = useState(40);
   const [mo, setMo] = useState(80);
 
-  const [mvFrom, setMvFrom] = useState("");
-  const [mvTo, setMvTo] = useState("");
-  const [mvMsg, setMvMsg] = useState<string | null>(null);
-  const [mvBusy, setMvBusy] = useState(false);
+  const siteDefault = useMemo(
+    () => assessments.find((a) => a.isSiteDefault) ?? assessments[0] ?? null,
+    [assessments],
+  );
 
   const load = useCallback(async () => {
     setErr(null);
-    const m = await fetch("/api/training/facilitator/me", {
-      credentials: "include",
-    });
+    const m = await fetch("/api/training/facilitator/me", { credentials: "include" });
     if (m.status === 401) {
       router.replace("/training/facilitator/login");
       return;
     }
-    const mj = (await m.json()) as {
-      email: string;
-      displayName?: string;
-      error?: string;
-    };
+    const mj = (await m.json()) as { email: string; displayName?: string; error?: string };
     if (!m.ok) throw new Error(mj.error || "Session error.");
     setMe({ email: mj.email, displayName: mj.displayName || mj.email });
 
-    const a = await fetch("/api/training/facilitator/assessments", {
-      credentials: "include",
-    });
+    const a = await fetch("/api/training/facilitator/assessments", { credentials: "include" });
     const aj = await a.json();
     if (!a.ok) throw new Error(aj.error || "Could not load assessments.");
-    const raw = (aj.assessments ?? []) as Partial<Assessment>[];
+    const raw = (aj.assessments ?? []) as Partial<Assessment & { isSiteDefault?: boolean }>[];
     setAssessments(
       raw.map((x) => ({
-        ...x,
         id: String(x.id),
         title: String(x.title ?? ""),
         slug: String(x.slug ?? ""),
-        subgroupOptions: Array.isArray(x.subgroupOptions)
-          ? x.subgroupOptions.map(String)
-          : [],
+        subgroupOptions: Array.isArray(x.subgroupOptions) ? x.subgroupOptions.map(String) : [],
         minPromptChars: Number(x.minPromptChars ?? 40),
         minOutputChars: Number(x.minOutputChars ?? 80),
         studentUrlHint: String(x.studentUrlHint ?? ""),
         submissionsOpen: x.submissionsOpen !== false,
-      })) as Assessment[],
+        isSiteDefault: x.isSiteDefault === true,
+      })),
     );
 
-    const s = await fetch("/api/training/facilitator/submissions", {
-      credentials: "include",
-    });
+    const s = await fetch("/api/training/facilitator/submissions", { credentials: "include" });
     const sj = await s.json();
     if (!s.ok) throw new Error(sj.error || "Could not load submissions.");
     setSubs((sj.submissions ?? []) as Submission[]);
+    const st = (sj as { stats?: Stats }).stats;
+    if (st) setStats(st);
   }, [router]);
 
-  useEffect(() => {
-    if (assessments.length < 2) return;
-    setMvFrom((f) => (f ? f : assessments[0]!.id));
-    setMvTo((t) => {
-      if (t) return t;
-      const first = assessments[0]!.id;
-      return assessments.find((a) => a.id !== first)?.id ?? "";
-    });
-  }, [assessments]);
+  const claimLegacy = useCallback(async () => {
+    setClaimBusy(true);
+    setClaimMsg(null);
+    try {
+      const res = await fetch("/api/training/facilitator/submissions/claim-legacy", {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = (await res.json()) as { error?: string; moved?: number };
+      if (!res.ok) throw new Error(data.error || "Claim failed.");
+      setClaimMsg(`Attached ${data.moved ?? 0} prior class submission(s) to your course inbox.`);
+      await load();
+      setTab("submissions");
+    } catch (e) {
+      setClaimMsg(e instanceof Error ? e.message : "Claim failed.");
+    } finally {
+      setClaimBusy(false);
+    }
+  }, [load]);
 
-  const moveSubmitsBetweenMySlugs = useCallback(
-    async (dryRun: boolean) => {
-      if (!mvFrom || !mvTo || mvFrom === mvTo) {
-        setMvMsg("Pick two different assessments that you manage.");
-        return;
-      }
-      setMvBusy(true);
-      setMvMsg(null);
+  const setSiteDefault = useCallback(
+    async (id: string) => {
+      setLockBusy(id);
+      setErr(null);
       try {
-        const res = await fetch("/api/training/facilitator/submissions/move-assessment", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fromAssessmentId: mvFrom,
-            toAssessmentId: mvTo,
-            dryRun,
-          }),
-        });
-        const data = (await res.json()) as {
-          error?: string;
-          submissionCount?: number;
-          moved?: number;
-        };
-        if (!res.ok) throw new Error(data.error || "Request failed.");
-        if (dryRun) {
-          setMvMsg(
-            `Preview: ${data.submissionCount ?? 0} submission(s) on the chosen “from” slug would repoint toward “into”.`,
-          );
-        } else {
-          setMvMsg(`Done — moved ${data.moved ?? 0} PostgreSQL submission row(s).`);
-          await load();
-        }
+        const res = await fetch(
+          `/api/training/facilitator/assessments/${encodeURIComponent(id)}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ siteDefault: true }),
+          },
+        );
+        const data = (await res.json()) as { error?: string };
+        if (!res.ok) throw new Error(data.error || "Could not set site default.");
+        await load();
       } catch (e) {
-        setMvMsg(e instanceof Error ? e.message : "Failed.");
+        setErr(e instanceof Error ? e.message : "Update failed.");
       } finally {
-        setMvBusy(false);
+        setLockBusy(null);
       }
     },
-    [mvFrom, mvTo, load],
+    [load],
   );
 
   const setAssessmentOpens = useCallback(
@@ -168,10 +176,8 @@ export default function FacilitatorDashboard() {
             body: JSON.stringify({ submissionsOpen: open }),
           },
         );
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        if (!res.ok) {
-          throw new Error(data.error || "Could not update submission window.");
-        }
+        const data = (await res.json()) as { error?: string };
+        if (!res.ok) throw new Error(data.error || "Could not update submission window.");
         await load();
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Update failed.");
@@ -181,6 +187,16 @@ export default function FacilitatorDashboard() {
     },
     [load],
   );
+
+  const copyText = useCallback(async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyMsg(`Copied ${label}`);
+      setTimeout(() => setCopyMsg(null), 2000);
+    } catch {
+      setCopyMsg("Copy failed — select and copy manually.");
+    }
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -201,403 +217,330 @@ export default function FacilitatorDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#07080d] px-4 py-10 text-slate-100">
-      <div className="mx-auto max-w-4xl space-y-8">
-        <header className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-6">
-          <div>
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-cyan-400">
+    <div className="min-h-screen bg-[#07080d] px-4 py-8 text-slate-100">
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 lg:flex-row">
+        <aside className="lg:w-52 lg:shrink-0">
+          <header className="mb-4 border-b border-white/10 pb-4 lg:border-none lg:pb-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-400">
               Trainer console
             </p>
-            <h1 className="mt-2 text-2xl font-bold">
-              Assessments · {me?.displayName}
-            </h1>
-            <p className="mt-2 text-sm text-slate-400">{me?.email}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              void fetch("/api/training/facilitator/auth/logout", {
-                method: "POST",
-                credentials: "include",
-              }).then(() => router.replace("/training/facilitator/login"));
-            }}
-            className="rounded-lg border border-white/15 px-3 py-2 text-sm hover:bg-white/5"
-          >
-            Log out
-          </button>
-        </header>
-
-        {err ? (
-          <p className="rounded-lg border border-red-500/30 bg-red-950/35 px-3 py-2 text-sm text-red-300">
-            {err}
-          </p>
-        ) : null}
-
-        <section className="rounded-2xl border border-white/10 bg-[#111520] p-6">
-          <h2 className="text-lg font-semibold text-white">
-            Create facilitator assessment
-          </h2>
-          <p className="mt-2 text-sm text-slate-400">
-            Students open <code className="rounded bg-white/10 px-1">/foundry/day03</code>{" "}
-            with{" "}
-            <code className="rounded bg-white/10 px-1">?assessment=your-slug</code>.
-          </p>
-          <form
-            className="mt-6 space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              setBusy(true);
-              void (async () => {
-                try {
-                  const subgroupOptions = subOpts
-                    .split(/[,\\n]+/)
-                    .map((s) => s.trim())
-                    .filter(Boolean);
-                  const res = await fetch("/api/training/facilitator/assessments", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "include",
-                    body: JSON.stringify({
-                      title,
-                      slug,
-                      subgroupOptions,
-                      assessmentIntro: intro,
-                      graderInstructions,
-                      minPromptChars: mp,
-                      minOutputChars: mo,
-                    }),
-                  });
-                  const data = await res.json().catch(() => ({}));
-                  if (!res.ok)
-                    throw new Error(
-                      (data as { error?: string }).error || "Save failed.",
-                    );
-                  await load();
-                  setTitle("");
-                  setSlug("");
-                  setIntro("");
-                  setGraderInstructions("");
-                  setMp(40);
-                  setMo(80);
-                } catch (er) {
-                  setErr(er instanceof Error ? er.message : "Save failed.");
-                } finally {
-                  setBusy(false);
-                }
-              })();
-            }}
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block text-xs text-slate-400">
-                Title
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                  className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
-                  placeholder="Sprint checkpoint"
-                />
-              </label>
-              <label className="block text-xs text-slate-400">
-                URL slug
-                <input
-                  value={slug}
-                  onChange={(e) =>
-                    setSlug(
-                      e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""),
-                    )
-                  }
-                  required
-                  className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 font-mono text-sm text-emerald-200"
-                  placeholder="sprint-architecture"
-                  minLength={3}
-                />
-              </label>
-            </div>
-            <label className="block text-xs text-slate-400">
-              Subgroup list (comma or newline; blank → cohort defaults)
-              <textarea
-                value={subOpts}
-                onChange={(e) => setSubOpts(e.target.value)}
-                rows={3}
-                className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 font-mono text-sm text-slate-200"
-              />
-            </label>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block text-xs text-slate-400">
-                Min prompt chars
-                <input
-                  type="number"
-                  min={10}
-                  value={mp}
-                  onChange={(e) => setMp(Number(e.target.value))}
-                  className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
-                />
-              </label>
-              <label className="block text-xs text-slate-400">
-                Min output chars
-                <input
-                  type="number"
-                  min={40}
-                  value={mo}
-                  onChange={(e) => setMo(Number(e.target.value))}
-                  className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
-                />
-              </label>
-            </div>
-            <label className="block text-xs text-slate-400">
-              Context for learner / grader (optional)
-              <textarea
-                value={intro}
-                onChange={(e) => setIntro(e.target.value)}
-                rows={3}
-                className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-200"
-              />
-            </label>
-            <label className="block text-xs text-slate-400">
-              Rubric / grading prose (authority for the AI grader — same JSON result shape)
-              <textarea
-                value={graderInstructions}
-                onChange={(e) => setGraderInstructions(e.target.value)}
-                required
-                rows={14}
-                className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 font-mono text-[13px] leading-relaxed text-slate-200"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={busy || graderInstructions.trim().length < 20}
-              className="rounded-lg bg-emerald-500 px-6 py-2 font-semibold text-[#08120c] disabled:opacity-50"
-            >
-              {busy ? "Saving…" : "Publish assessment"}
-            </button>
-          </form>
-        </section>
-
-        <section className="space-y-3">
-          <h2 className="text-lg font-semibold text-white">
-            Learner submissions (scoped to your assessment links)
-          </h2>
-          <div className="rounded-xl border border-amber-500/25 bg-amber-950/20 p-4 text-xs leading-relaxed text-slate-300">
-            <p className="font-semibold text-amber-100">
-              Why past class submits may look “missing” here
-            </p>
-            <ul className="mt-2 list-disc space-y-2 pl-4 marker:text-amber-500/70">
-              <li>
-                This list only pulls grades tied to{" "}
-                <strong className="text-slate-200">your facilitator assessments</strong>{" "}
-                — i.e. the learner opened the portal with{" "}
-                <code className="rounded bg-white/10 px-1 font-mono text-[11px]">
-                  ?assessment=
-                </code>{" "}
-                set to{" "}
-                <strong className="text-slate-200">one of your published slugs</strong>{" "}
-                (e.g. <code className="rounded bg-white/10 px-1 font-mono">sprint-architecture</code>). That is when Postgres stores{" "}
-                <code className="rounded bg-white/10 px-1 font-mono text-[11px]">
-                  assessment_id
-                </code>{" "}
-                on the row.
-              </li>
-              <li>
-                Any work graded from the slide deck{" "}
-                <strong className="text-slate-200">without</strong> that parameter is{" "}
-                <strong className="text-slate-200">legacy pool</strong> — it intentionally does{" "}
-                <strong className="text-slate-200">not</strong> show in trainer consoles
-                (only the organizer inbox has the full cohort view).
-              </li>
-              <li>
-                If learners graded against <strong className="text-slate-200">another slug row</strong>{" "}
-                that you still own alongside this sprint inbox, consolidate them with{" "}
-                <strong className="text-slate-200">Move submits between my slug rows</strong>{" "}
-                — it only updates Postgres <code className="rounded bg-black/60 px-1 font-mono text-[10px]">assessment_id</code>; rubric/display uses the slug you merge <em>into</em>.
-              </li>
-              <li>
-                <strong className="text-slate-200">Whole-cohort legacy</strong> (never used{" "}
-                <code className="rounded bg-white/10 px-1 font-mono text-[11px]">?assessment=</code>) — ask the organizer to use{" "}
-                <strong className="text-slate-200">/foundry/admin → cohort legacy submits</strong> and choose your inbox slug.
-              </li>
-              <li>
-                If students used{" "}
-                <strong className="text-slate-200">someone else’s</strong> assessment slug /
-                facilitator row, those rows attach to{" "}
-                <em>that</em> assessment UUID — yours stays empty until they re-grade with{" "}
-                <em>your</em> link or an organizer adjusts ownership upstream.
-              </li>
-            </ul>
-            <p className="mt-3 text-[11px] text-slate-400">
-              Cohort-wide history (all assessments + legacy):{" "}
-              <code className="rounded bg-white/10 px-1 font-mono">/foundry/admin</code>{" "}
-              (organizer password).
-            </p>
-          </div>
-          {assessments.length >= 2 ? (
-            <div className="rounded-xl border border-teal-500/30 bg-teal-950/20 p-4 text-xs leading-relaxed text-slate-200">
-              <p className="font-semibold text-teal-200">
-                Move submits between slug rows you manage
-              </p>
-              <p className="mt-2 text-slate-400">
-                Postgres stores one UUID per learner grade. Consolidate everything into the inbox you actively monitor (typically your Sprint slug) whenever you still legitimately{" "}
-                <strong className="text-slate-200">own both assessment definitions</strong> — for example duplicate SIEST-era rows plus today's sprint inbox.
-              </p>
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <label className="block min-w-[160px] flex-1 text-[11px] text-slate-400">
-                  From (source inbox)
-                  <select
-                    className="mt-1 block w-full rounded-lg border border-white/15 bg-[#0c0e14] px-2 py-2 font-mono text-[11px] text-emerald-200"
-                    disabled={mvBusy}
-                    value={mvFrom}
-                    onChange={(e) => setMvFrom(e.target.value)}
-                  >
-                    {assessments.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.slug} · {x.title.slice(0, 40)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block min-w-[160px] flex-1 text-[11px] text-slate-400">
-                  Into (destination inbox)
-                  <select
-                    className="mt-1 block w-full rounded-lg border border-white/15 bg-[#0c0e14] px-2 py-2 font-mono text-[11px] text-emerald-200"
-                    disabled={mvBusy}
-                    value={mvTo}
-                    onChange={(e) => setMvTo(e.target.value)}
-                  >
-                    {assessments.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.slug} · {x.title.slice(0, 40)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={mvBusy || mvFrom === mvTo}
-                  onClick={() => void moveSubmitsBetweenMySlugs(true)}
-                  className="rounded-lg border border-teal-400/40 bg-teal-950/35 px-3 py-2 text-[11px] font-semibold text-teal-100 hover:bg-teal-900/30 disabled:opacity-40"
-                >
-                  Preview
-                </button>
-                <button
-                  type="button"
-                  disabled={mvBusy || mvFrom === mvTo}
-                  onClick={() => void moveSubmitsBetweenMySlugs(false)}
-                  className="rounded-lg bg-teal-500 px-3 py-2 text-[11px] font-semibold text-[#041c18] hover:bg-teal-400 disabled:opacity-40"
-                >
-                  Move rows now
-                </button>
-              </div>
-              {mvMsg ? (
-                <p className="mt-3 whitespace-pre-wrap text-[11px] text-teal-100/90">{mvMsg}</p>
-              ) : null}
-            </div>
-          ) : (
-            <p className="rounded-lg border border-white/10 bg-black/25 p-3 text-[11px] text-slate-500">
-              Only one facilitator assessment published — duplicate SIEST submits show up{" "}
-              <strong className="text-slate-300">after organizer routes legacy submits</strong> or after you publish a{" "}
-              <strong className="text-slate-300">second slug</strong> and merge submits between them below.
-            </p>
-          )}
-          {!subs.length ? (
-            <p className="text-sm text-slate-500">
-              Nothing graded through your slug(s) yet. Share the learner link from “Your assessment
-              links” below — new submits will accumulate here automatically.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {subs.map((x) => (
-                <li
-                  key={x.id}
-                  className="rounded-xl border border-white/10 bg-[#111520] px-4 py-3 text-sm"
-                >
-                  <p className="font-medium text-white">
-                    {x.fellowName}{" "}
-                    <span className="font-normal text-slate-400">· {x.subgroup}</span>
-                  </p>
-                  <p className="font-mono text-xs text-orange-300">
-                    {(x.assessmentTitle || x.assessmentSlug || "Assessment") +
-                      ` · ${x.result.total_score}/20 · ${x.result.grade}`}
-                  </p>
-                  <p className="mt-1 text-slate-500">
-                    {new Date(x.submittedAt).toLocaleString()}
-                  </p>
-                  <p className="mt-2 text-xs text-slate-400">{x.result.verdict}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Your assessment links</h2>
+            <h1 className="mt-1 text-lg font-bold text-white">{me?.displayName}</h1>
+            <p className="text-xs text-slate-500">{me?.email}</p>
             <button
               type="button"
-              onClick={() => void load()}
-              className="text-xs text-slate-400 underline hover:text-white"
+              onClick={() => {
+                void fetch("/api/training/facilitator/auth/logout", {
+                  method: "POST",
+                  credentials: "include",
+                }).then(() => router.replace("/training/facilitator/login"));
+              }}
+              className="mt-3 text-xs text-slate-400 underline hover:text-white"
             >
-              Refresh
+              Log out
             </button>
-          </div>
-          {!assessments.length ? (
-            <p className="text-sm text-slate-500">Publish at least one row above.</p>
-          ) : (
-            <ul className="space-y-2">
-              {assessments.map((a) => (
-                <li
-                  key={a.id}
-                  className="rounded-xl border border-white/10 bg-[#111520] px-4 py-3 text-sm"
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0 font-mono text-xs text-emerald-200">
-                      <span className="text-base font-semibold text-white">
-                        {a.title}
-                      </span>
-                      <p className="mt-1 break-all">{a.studentUrlHint}</p>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap items-center gap-2">
-                      <span
-                        className={`rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-wide ${
-                          a.submissionsOpen
-                            ? "bg-emerald-500/15 text-emerald-300"
-                            : "bg-red-500/15 text-red-300"
-                        }`}
-                      >
-                        {a.submissionsOpen ? "Open" : "Closed"}
-                      </span>
+          </header>
+          <nav className="flex flex-row flex-wrap gap-1 lg:flex-col" aria-label="Trainer sections">
+            {TAB_LABELS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={`rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
+                  tab === t.id
+                    ? "bg-cyan-500/15 text-cyan-100 ring-1 ring-cyan-400/35"
+                    : "text-slate-400 hover:bg-white/5 hover:text-white"
+                }`}
+              >
+                {t.label}
+                {t.id === "submissions" && stats ? (
+                  <span className="ml-2 font-mono text-xs text-orange-300">
+                    {stats.submissionCount}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        <main className="min-w-0 flex-1 space-y-6">
+          {err ? (
+            <p className="rounded-lg border border-red-500/30 bg-red-950/35 px-3 py-2 text-sm text-red-300">
+              {err}
+            </p>
+          ) : null}
+
+          {tab === "share" ? (
+            <section className="space-y-4">
+              <div className="rounded-2xl border border-cyan-500/30 bg-cyan-950/20 p-5">
+                <h2 className="text-lg font-semibold text-cyan-100">Class deck &amp; portal</h2>
+                <p className="mt-2 text-sm text-slate-300">
+                  Your students use the <strong>site home page</strong> (slides 1–7 + submit portal).
+                  When you mark an assessment as <strong>site default</strong>, grades from that URL
+                  without <code className="rounded bg-black/40 px-1 font-mono text-xs">?assessment=</code>{" "}
+                  attach to your course automatically.
+                </p>
+                {siteDefault ? (
+                  <div className="mt-4 space-y-3">
+                    <p className="font-mono text-xs text-emerald-300">
+                      Site default: {siteDefault.title} ({siteDefault.slug})
+                    </p>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                       <button
                         type="button"
-                        disabled={lockBusy === a.id || busy}
-                        onClick={() => void setAssessmentOpens(a.id, false)}
-                        className="rounded-lg border border-red-400/35 bg-red-950/35 px-2.5 py-1 text-[11px] font-semibold text-red-100 hover:bg-red-900/30 disabled:opacity-40"
+                        onClick={() => void copyText(originUrl("/"), "class deck URL")}
+                        className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-[#041018] hover:bg-cyan-500"
                       >
-                        {lockBusy === a.id ? "…" : "Close"}
+                        Copy class URL (home / slides)
                       </button>
                       <button
                         type="button"
-                        disabled={lockBusy === a.id || busy}
-                        onClick={() => void setAssessmentOpens(a.id, true)}
-                        className="rounded-lg border border-emerald-400/35 bg-emerald-950/35 px-2.5 py-1 text-[11px] font-semibold text-emerald-100 hover:bg-emerald-900/25 disabled:opacity-40"
+                        onClick={() =>
+                          void copyText(
+                            originUrl(
+                              `/foundry/day03?assessment=${encodeURIComponent(siteDefault.slug)}`,
+                            ),
+                            "slug URL",
+                          )
+                        }
+                        className="rounded-lg border border-cyan-400/40 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-900/30"
                       >
-                        {lockBusy === a.id ? "…" : "Re-open"}
+                        Copy URL with ?assessment=
                       </button>
                     </div>
                   </div>
-                  <details className="mt-3 text-[11px] text-slate-400">
-                    <summary className="cursor-pointer font-mono hover:text-emerald-200">
-                      Subgroup allow-list
-                    </summary>
-                    <pre className="mt-2 whitespace-pre-wrap text-slate-500">
-                      {a.subgroupOptions.join(", ")}
-                    </pre>
-                  </details>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+                ) : (
+                  <p className="mt-3 text-sm text-amber-200/90">
+                    Publish an assessment under <strong>Assessments</strong>, then click{" "}
+                    <strong>Use as site default</strong> so the home page counts as your course.
+                  </p>
+                )}
+                {copyMsg ? <p className="mt-2 text-xs text-cyan-200/80">{copyMsg}</p> : null}
+              </div>
+
+              {(stats?.orphanLegacyCount ?? 0) > 0 ? (
+                <div className="rounded-2xl border border-amber-500/35 bg-amber-950/25 p-5">
+                  <h3 className="font-semibold text-amber-100">
+                    {stats!.orphanLegacyCount} submission(s) from class not in your inbox yet
+                  </h3>
+                  <p className="mt-2 text-sm text-slate-300">
+                    These were graded on the deck before they were linked to your facilitator course.
+                    One click attaches them to your <strong>site default</strong> assessment.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={claimBusy || !siteDefault}
+                    onClick={() => void claimLegacy()}
+                    className="mt-4 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-[#1a1005] disabled:opacity-45"
+                  >
+                    {claimBusy ? "Working…" : "Attach class submissions to my course"}
+                  </button>
+                  {claimMsg ? (
+                    <p className="mt-3 text-xs text-amber-100/90">{claimMsg}</p>
+                  ) : null}
+                </div>
+              ) : stats && stats.submissionCount > 0 ? (
+                <p className="text-sm text-slate-400">
+                  {stats.submissionCount} submission(s) in your inbox. Open{" "}
+                  <button
+                    type="button"
+                    className="text-cyan-300 underline"
+                    onClick={() => setTab("submissions")}
+                  >
+                    Submissions
+                  </button>{" "}
+                  to review.
+                </p>
+              ) : null}
+            </section>
+          ) : null}
+
+          {tab === "submissions" ? (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-white">Learner submissions</h2>
+                <button
+                  type="button"
+                  onClick={() => void load()}
+                  className="text-xs text-slate-400 underline hover:text-white"
+                >
+                  Refresh
+                </button>
+              </div>
+              {!subs.length ? (
+                <div className="rounded-xl border border-white/10 bg-[#111520] p-6 text-sm text-slate-400">
+                  <p>No submissions in your course inbox yet.</p>
+                  <p className="mt-2">
+                    Share the class URL from <strong>Share with class</strong>, or attach prior work
+                    if students already submitted on the home deck.
+                  </p>
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {subs.map((x) => (
+                    <li
+                      key={x.id}
+                      className="rounded-xl border border-white/10 bg-[#111520] px-4 py-3 text-sm"
+                    >
+                      <p className="font-medium text-white">
+                        {x.fellowName}{" "}
+                        <span className="font-normal text-slate-400">· {x.subgroup}</span>
+                      </p>
+                      <p className="font-mono text-xs text-orange-300">
+                        {(x.assessmentTitle || x.assessmentSlug || "Course") +
+                          ` · ${x.result.total_score}/20 · ${x.result.grade}`}
+                      </p>
+                      <p className="mt-1 text-slate-500">
+                        {new Date(x.submittedAt).toLocaleString()}
+                      </p>
+                      <p className="mt-2 text-xs text-slate-400">{x.result.verdict}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ) : null}
+
+          {tab === "assessments" ? (
+            <section className="space-y-6">
+              <div className="rounded-2xl border border-white/10 bg-[#111520] p-6">
+                <h2 className="text-lg font-semibold text-white">Your assessments</h2>
+                {!assessments.length ? (
+                  <p className="mt-2 text-sm text-slate-500">None yet — create one below.</p>
+                ) : (
+                  <ul className="mt-4 space-y-3">
+                    {assessments.map((a) => (
+                      <li
+                        key={a.id}
+                        className="rounded-lg border border-white/10 bg-[#0c0e14] p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-white">{a.title}</p>
+                            <p className="mt-1 font-mono text-xs text-emerald-300">{a.slug}</p>
+                            {a.isSiteDefault ? (
+                              <span className="mt-2 inline-block rounded bg-cyan-500/20 px-2 py-0.5 font-mono text-[10px] text-cyan-200">
+                                Site default (home URL)
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {!a.isSiteDefault ? (
+                              <button
+                                type="button"
+                                disabled={lockBusy === a.id}
+                                onClick={() => void setSiteDefault(a.id)}
+                                className="rounded border border-cyan-400/40 px-2 py-1 text-[11px] text-cyan-100"
+                              >
+                                Use as site default
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              disabled={lockBusy === a.id}
+                              onClick={() => void setAssessmentOpens(a.id, !a.submissionsOpen)}
+                              className="rounded border border-white/20 px-2 py-1 text-[11px]"
+                            >
+                              {a.submissionsOpen ? "Close submits" : "Re-open"}
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#111520] p-6">
+                <h2 className="text-lg font-semibold text-white">Create assessment</h2>
+                <form
+                  className="mt-4 space-y-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setBusy(true);
+                    void (async () => {
+                      try {
+                        const subgroupOptions = subOpts
+                          .split(/[,\n]+/)
+                          .map((s) => s.trim())
+                          .filter(Boolean);
+                        const res = await fetch("/api/training/facilitator/assessments", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          credentials: "include",
+                          body: JSON.stringify({
+                            title,
+                            slug,
+                            subgroupOptions,
+                            assessmentIntro: intro,
+                            graderInstructions,
+                            minPromptChars: mp,
+                            minOutputChars: mo,
+                          }),
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok)
+                          throw new Error((data as { error?: string }).error || "Save failed.");
+                        await load();
+                        setTitle("");
+                        setSlug("");
+                        setIntro("");
+                        setGraderInstructions("");
+                        setTab("share");
+                      } catch (er) {
+                        setErr(er instanceof Error ? er.message : "Save failed.");
+                      } finally {
+                        setBusy(false);
+                      }
+                    })();
+                  }}
+                >
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="block text-xs text-slate-400">
+                      Title
+                      <input
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        required
+                        className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2"
+                        placeholder="Sprint checkpoint"
+                      />
+                    </label>
+                    <label className="block text-xs text-slate-400">
+                      URL slug
+                      <input
+                        value={slug}
+                        onChange={(e) =>
+                          setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))
+                        }
+                        required
+                        minLength={3}
+                        className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 font-mono text-emerald-200"
+                        placeholder="sprint-architecture"
+                      />
+                    </label>
+                  </div>
+                  <label className="block text-xs text-slate-400">
+                    Rubric / grading instructions (required)
+                    <textarea
+                      value={graderInstructions}
+                      onChange={(e) => setGraderInstructions(e.target.value)}
+                      required
+                      rows={10}
+                      className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 font-mono text-[13px]"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={busy || graderInstructions.trim().length < 20}
+                    className="rounded-lg bg-emerald-500 px-6 py-2 font-semibold text-[#08120c] disabled:opacity-50"
+                  >
+                    {busy ? "Saving…" : "Publish assessment"}
+                  </button>
+                </form>
+              </div>
+            </section>
+          ) : null}
+        </main>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AdminNav, type AdminNavSection } from "@/components/foundry/AdminNav";
 
 type Submission = {
   id: string;
@@ -71,7 +72,7 @@ function breakdownRows(
   });
 }
 
-type AdminSection = "submissions" | "ideation";
+type AdminSection = AdminNavSection;
 
 /** Must stay in sync with API `confirm` checker */
 const LEGACY_LINK_CONFIRM_PHRASE = "LINK_ALL_LEGACY_SUBMISSIONS";
@@ -566,15 +567,15 @@ export default function FoundryAdminPage() {
           <>
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
               <div className="flex flex-wrap items-center gap-4">
-                {section === "submissions" ? (
-                  <p className="font-mono text-sm text-cyan-300">
-                    {subs.length} submission{subs.length === 1 ? "" : "s"}
-                  </p>
-                ) : (
-                  <p className="font-mono text-sm text-slate-500">
-                    Cohort ideation (from CSV rebuild)
-                  </p>
-                )}
+                <p className="font-mono text-sm text-cyan-300">
+                  {section === "submissions"
+                    ? `${subs.length} submission${subs.length === 1 ? "" : "s"}`
+                    : section === "facilitators"
+                      ? `${facilitators.length} facilitator${facilitators.length === 1 ? "" : "s"}`
+                      : section === "assessments"
+                        ? `${locks.length} assessment${locks.length === 1 ? "" : "s"}`
+                        : "Ideation registry"}
+                </p>
                 <button
                   type="button"
                   onClick={() => {
@@ -599,7 +600,16 @@ export default function FoundryAdminPage() {
                 >
                   Close admin panel
                 </button>
-                {section === "submissions" ? (
+                {section === "ideation" ? (
+                  <button
+                    type="button"
+                    disabled={ideationLoading || deletingId !== null}
+                    onClick={() => setIdeationReloadKey((k) => k + 1)}
+                    className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-slate-200 hover:bg-white/5 disabled:opacity-50"
+                  >
+                    Reload registry HTML
+                  </button>
+                ) : (
                   <button
                     type="button"
                     disabled={loading || deletingId !== null}
@@ -611,54 +621,21 @@ export default function FoundryAdminPage() {
                     }}
                     className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-slate-200 hover:bg-white/5 disabled:opacity-50"
                   >
-                    Refresh submissions
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={ideationLoading || deletingId !== null}
-                    onClick={() => setIdeationReloadKey((k) => k + 1)}
-                    className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-slate-200 hover:bg-white/5 disabled:opacity-50"
-                  >
-                    Reload registry HTML
+                    Refresh data
                   </button>
                 )}
               </div>
-              <div
-                role="tablist"
-                aria-label="Admin section"
-                className="flex flex-wrap gap-2"
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={section === "submissions"}
-                  onClick={() => setSection("submissions")}
-                  className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
-                    section === "submissions"
-                      ? "border-orange-400/70 bg-orange-500/15 text-orange-100"
-                      : "border-white/15 text-slate-400 hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  Portal submissions
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={section === "ideation"}
-                  onClick={() => setSection("ideation")}
-                  className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
-                    section === "ideation"
-                      ? "border-orange-400/70 bg-orange-500/15 text-orange-100"
-                      : "border-white/15 text-slate-400 hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  QAF ideation registry
-                </button>
-              </div>
             </div>
 
-            {section === "submissions" ? (
+            <div className="flex flex-col gap-6 lg:flex-row">
+              <AdminNav
+                section={section}
+                onSection={setSection}
+                submissionCount={subs.length}
+                facilitatorCount={facilitators.length}
+              />
+              <div className="min-w-0 flex-1">
+            {section === "assessments" ? (
               <div className="mb-6 rounded-xl border border-amber-500/25 bg-amber-950/10 p-4 text-sm">
                 <p className="font-semibold text-amber-200">
                   Assignment submission window (facilitator assessments)
@@ -809,7 +786,7 @@ export default function FoundryAdminPage() {
               </div>
             ) : null}
 
-            {section === "submissions" ? (
+            {section === "facilitators" ? (
               <div className="mb-6 rounded-xl border border-cyan-500/25 bg-cyan-950/15 p-4 text-sm">
                 <p className="font-semibold text-cyan-200">
                   Organizer: facilitator roster
@@ -817,7 +794,7 @@ export default function FoundryAdminPage() {
                 <p className="mt-2 text-slate-400">
                   Trainer accounts ({facilitators.length}). Use{" "}
                   <strong className="text-slate-200">Ownership</strong> on each assignment
-                  above to move SIEST — or similar — bundles under one login without losing
+                  in the <strong className="text-slate-200">Assessments</strong> tab to move SIEST — or similar — bundles under one login without losing
                   submission history (rows stay keyed by assessment id).
                 </p>
                 {facDirErr ? (
@@ -865,7 +842,7 @@ export default function FoundryAdminPage() {
               </div>
             ) : null}
 
-            {section === "submissions" ? (
+            {section === "assessments" ? (
               <div className="mb-6 rounded-xl border border-rose-500/30 bg-rose-950/15 p-4 text-sm">
                 <p className="font-semibold text-rose-200">
                   Organizer: cohort legacy submits → facilitator inbox
@@ -939,7 +916,7 @@ export default function FoundryAdminPage() {
               </div>
             ) : null}
 
-            {section === "submissions" ? (
+            {section === "facilitators" ? (
               <details className="mb-6 rounded-xl border border-emerald-500/25 bg-emerald-950/20 p-4 text-sm">
                 <summary className="cursor-pointer font-semibold text-emerald-200">
                   Organizer: create facilitator account
@@ -1001,7 +978,7 @@ export default function FoundryAdminPage() {
               </details>
             ) : null}
 
-            {section === "submissions" ? (
+            {section === "facilitators" ? (
               <details className="mb-6 rounded-xl border border-sky-500/25 bg-sky-950/15 p-4 text-sm">
                 <summary className="cursor-pointer font-semibold text-sky-200">
                   Organizer: update existing facilitator credentials
@@ -1197,8 +1174,9 @@ export default function FoundryAdminPage() {
                   ))}
                 </ul>
               )
-            )
-            : (
+            ) : null}
+
+            {section === "ideation" ? (
               <div className="space-y-3">
                 <p className="text-xs text-slate-500">
                   Regenerated from CSV with{" "}
@@ -1232,7 +1210,9 @@ export default function FoundryAdminPage() {
                   </p>
                 ) : null}
               </div>
-            )}
+            ) : null}
+              </div>
+            </div>
           </>
         )}
       </div>

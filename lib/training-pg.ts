@@ -19,9 +19,18 @@ export type TrainingAssessmentRow = {
   assessment_intro: string;
   /** False → learners cannot POST new grades for this slug (admin-managed). */
   submissions_open: boolean;
+  /** When true, bare site URL (/) grades attach here without ?assessment=. */
+  is_site_default: boolean;
   created_at: string;
   updated_at: string;
 };
+
+const ASSESSMENT_SELECT = `
+  id, facilitator_id, title, slug, subgroup_options,
+  min_prompt_chars, min_output_chars, assessment_intro,
+  grader_instructions, submissions_open,
+  COALESCE(is_site_default, false) AS is_site_default,
+  created_at, updated_at`;
 
 export type AssessmentLockSummary = {
   id: string;
@@ -86,6 +95,11 @@ export async function ensureTrainingSchema(pool: Pool): Promise<void> {
 
       await execIgnoreDuplicateColumn(
         pool,
+        `ALTER TABLE training_assessments ADD COLUMN is_site_default BOOLEAN NOT NULL DEFAULT FALSE`,
+      );
+
+      await execIgnoreDuplicateColumn(
+        pool,
         `ALTER TABLE foundry_submissions ADD COLUMN assessment_id UUID REFERENCES training_assessments(id) ON DELETE SET NULL`,
       );
 
@@ -123,6 +137,7 @@ function rowAssessment(row: Record<string, unknown>): TrainingAssessmentRow {
     grader_instructions: String(row.grader_instructions ?? ""),
     assessment_intro: String(row.assessment_intro ?? ""),
     submissions_open: readSubmissionsOpen(row),
+    is_site_default: row.is_site_default === true,
     created_at: row.created_at ? new Date(row.created_at as string).toISOString() : "",
     updated_at: row.updated_at ? new Date(row.updated_at as string).toISOString() : "",
   };
@@ -135,9 +150,7 @@ export async function pgAssessmentBySlug(
   const trimmed = slug.trim().toLowerCase();
   if (!trimmed) return null;
   const { rows } = await pool.query(
-    `SELECT id, facilitator_id, title, slug, subgroup_options,
-            min_prompt_chars, min_output_chars, assessment_intro,
-            grader_instructions, submissions_open, created_at, updated_at
+    `SELECT ${ASSESSMENT_SELECT}
      FROM training_assessments WHERE lower(slug) = lower($1) LIMIT 1`,
     [trimmed]
   );
@@ -150,11 +163,9 @@ export async function pgListAssessmentsForFacilitator(
   facilitatorId: string
 ): Promise<TrainingAssessmentRow[]> {
   const { rows } = await pool.query(
-    `SELECT id, facilitator_id, title, slug, subgroup_options,
-            min_prompt_chars, min_output_chars, assessment_intro,
-            grader_instructions, submissions_open, created_at, updated_at
+    `SELECT ${ASSESSMENT_SELECT}
      FROM training_assessments WHERE facilitator_id = $1::uuid
-     ORDER BY updated_at DESC`,
+     ORDER BY is_site_default DESC, updated_at DESC`,
     [facilitatorId]
   );
   return rows.map((r) => rowAssessment(r as Record<string, unknown>));
@@ -173,14 +184,31 @@ export async function pgInsertAssessment(
     grader_instructions: string;
   }
 ): Promise<TrainingAssessmentRow> {
+  const countRes = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM training_assessments WHERE facilitator_id = $1::uuid`,
+    [facilitatorId],
+  );
+  const isFirst =
+    Number((countRes.rows[0] as { n?: number })?.n ?? 0) === 0;
+  const siteDefaultRes = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM training_assessments WHERE is_site_default = true`,
+  );
+  const noSiteDefaultYet =
+    Number((siteDefaultRes.rows[0] as { n?: number })?.n ?? 0) === 0;
+  const makeSiteDefault = isFirst || noSiteDefaultYet;
+
+  if (makeSiteDefault) {
+    await pool.query(
+      `UPDATE training_assessments SET is_site_default = false WHERE is_site_default = true`,
+    );
+  }
+
   const { rows } = await pool.query(
     `INSERT INTO training_assessments
       (facilitator_id, title, slug, subgroup_options,
-       min_prompt_chars, min_output_chars, assessment_intro, grader_instructions)
-     VALUES ($1::uuid, $2, $3, $4::jsonb, $5, $6, $7, $8)
-     RETURNING id, facilitator_id, title, slug, subgroup_options,
-       min_prompt_chars, min_output_chars, assessment_intro,
-       grader_instructions, submissions_open, created_at, updated_at`,
+       min_prompt_chars, min_output_chars, assessment_intro, grader_instructions, is_site_default)
+     VALUES ($1::uuid, $2, $3, $4::jsonb, $5, $6, $7, $8, $9)
+     RETURNING ${ASSESSMENT_SELECT}`,
     [
       facilitatorId,
       patch.title.trim(),
@@ -190,6 +218,7 @@ export async function pgInsertAssessment(
       Math.max(0, patch.min_output_chars ?? 80),
       patch.assessment_intro ?? "",
       patch.grader_instructions,
+      makeSiteDefault,
     ]
   );
   return rowAssessment(rows[0] as Record<string, unknown>);
@@ -240,10 +269,7 @@ export async function pgUpdateAssessment(
 
   if (!fields.length) {
     const cur = await pool.query(
-      `SELECT id, facilitator_id, title, slug, subgroup_options,
-              min_prompt_chars, min_output_chars, assessment_intro,
-              grader_instructions, submissions_open, created_at, updated_at
-       FROM training_assessments WHERE id = $1::uuid`,
+      `SELECT ${ASSESSMENT_SELECT} FROM training_assessments WHERE id = $1::uuid`,
       [assessmentId]
     );
     return rowAssessment(cur.rows[0] as Record<string, unknown>);
@@ -258,13 +284,68 @@ export async function pgUpdateAssessment(
   );
 
   const { rows } = await pool.query(
-    `SELECT id, facilitator_id, title, slug, subgroup_options,
-            min_prompt_chars, min_output_chars, assessment_intro,
-            grader_instructions, submissions_open, created_at, updated_at
-     FROM training_assessments WHERE id = $1::uuid`,
+    `SELECT ${ASSESSMENT_SELECT} FROM training_assessments WHERE id = $1::uuid`,
     [assessmentId]
   );
   return rowAssessment(rows[0] as Record<string, unknown>);
+}
+
+/** Site index (/) and portal without ?assessment= use this row when set. */
+export async function pgGetSiteDefaultAssessment(
+  pool: Pool,
+): Promise<TrainingAssessmentRow | null> {
+  const { rows } = await pool.query(
+    `SELECT ${ASSESSMENT_SELECT}
+     FROM training_assessments WHERE is_site_default = true
+     ORDER BY updated_at DESC LIMIT 1`,
+  );
+  if (!rows.length) return null;
+  return rowAssessment(rows[0] as Record<string, unknown>);
+}
+
+export async function pgSetSiteDefaultAssessment(
+  pool: Pool,
+  facilitatorId: string,
+  assessmentId: string,
+): Promise<TrainingAssessmentRow | null> {
+  if (!looksLikeUuid(assessmentId)) return null;
+  const own = await pool.query(
+    `SELECT id FROM training_assessments WHERE id = $1::uuid AND facilitator_id = $2::uuid`,
+    [assessmentId.trim(), facilitatorId.trim()],
+  );
+  if (!own.rows.length) return null;
+  await pool.query(`UPDATE training_assessments SET is_site_default = false`);
+  await pool.query(
+    `UPDATE training_assessments SET is_site_default = true, updated_at = NOW() WHERE id = $1::uuid`,
+    [assessmentId.trim()],
+  );
+  const { rows } = await pool.query(
+    `SELECT ${ASSESSMENT_SELECT} FROM training_assessments WHERE id = $1::uuid`,
+    [assessmentId.trim()],
+  );
+  if (!rows.length) return null;
+  return rowAssessment(rows[0] as Record<string, unknown>);
+}
+
+/** Attach orphan legacy rows to this facilitator's site-default assessment. */
+export async function pgFacilitatorClaimLegacySubmissions(
+  pool: Pool,
+  facilitatorId: string,
+): Promise<{ moved: number; assessmentId: string | null }> {
+  const def = await pool.query(
+    `SELECT id FROM training_assessments
+     WHERE facilitator_id = $1::uuid AND is_site_default = true LIMIT 1`,
+    [facilitatorId.trim()],
+  );
+  if (!def.rows.length) {
+    return { moved: 0, assessmentId: null };
+  }
+  const aid = String((def.rows[0] as { id: string }).id);
+  const r = await pool.query(
+    `UPDATE foundry_submissions SET assessment_id = $1::uuid WHERE assessment_id IS NULL`,
+    [aid],
+  );
+  return { moved: r.rowCount ?? 0, assessmentId: aid };
 }
 
 export async function pgAdminListAssessmentLockSummaries(

@@ -2,6 +2,7 @@ import { facilitatorFromCookie } from "@/lib/training-session-cookie";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import {
   pgFacilitatorByEmail,
+  pgSetSiteDefaultAssessment,
   pgUpdateAssessment,
 } from "@/lib/training-pg";
 
@@ -16,6 +17,7 @@ type PatchBody = {
   assessmentIntro?: string;
   graderInstructions?: string;
   submissionsOpen?: boolean;
+  siteDefault?: boolean;
 };
 
 async function auth() {
@@ -68,6 +70,23 @@ export async function PATCH(
     patch.grader_instructions = body.graderInstructions.trim();
   if (body.submissionsOpen !== undefined)
     patch.submissions_open = Boolean(body.submissionsOpen);
+
+  if (body.siteDefault === true) {
+    const set = await pgSetSiteDefaultAssessment(
+      ctx.pool,
+      ctx.facilitatorId,
+      id,
+    );
+    if (!set) {
+      return Response.json({ error: "Assessment not found." }, { status: 404 });
+    }
+    return Response.json({
+      ok: true,
+      assessment: set,
+      studentUrl: `/foundry/day03?assessment=${encodeURIComponent(set.slug)}`,
+      siteRootUrl: "/",
+    });
+  }
 
   try {
     const next = await pgUpdateAssessment(ctx.pool, ctx.facilitatorId, id, patch);

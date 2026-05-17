@@ -13,7 +13,11 @@ import { clipFoundryBodiesForGroq } from "@/lib/foundry-grade-clip";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
 import { appendFoundrySubmission } from "@/lib/foundry-store";
-import { pgAssessmentBySlug } from "@/lib/training-pg";
+import {
+  pgAssessmentBySlug,
+  pgGetSiteDefaultAssessment,
+  type TrainingAssessmentRow,
+} from "@/lib/training-pg";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -55,8 +59,10 @@ export async function POST(req: NextRequest) {
     let assessmentId: string | null = null;
     let rubricPrompt: string;
 
+    const pool = getFoundryPgPool();
+    let facilitatorAssessment: TrainingAssessmentRow | null = null;
+
     if (slugRaw) {
-      const pool = getFoundryPgPool();
       if (!pool) {
         return Response.json(
           {
@@ -67,10 +73,17 @@ export async function POST(req: NextRequest) {
         );
       }
       await ensureFoundrySubmissionsSchema(pool);
-      const a = await pgAssessmentBySlug(pool, slugRaw);
-      if (!a) {
+      facilitatorAssessment = await pgAssessmentBySlug(pool, slugRaw);
+      if (!facilitatorAssessment) {
         return Response.json({ error: "Unknown assessment." }, { status: 404 });
       }
+    } else if (pool) {
+      await ensureFoundrySubmissionsSchema(pool);
+      facilitatorAssessment = await pgGetSiteDefaultAssessment(pool);
+    }
+
+    if (facilitatorAssessment) {
+      const a = facilitatorAssessment;
       if (!a.submissions_open) {
         return Response.json(
           {

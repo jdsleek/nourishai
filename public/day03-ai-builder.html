@@ -722,6 +722,7 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
 
     <div class="privacy-banner">
       <strong>Foundry portal.</strong> Submissions are graded automatically on the <strong>Qubators AI Foundry server</strong> when you click submit (same tab/session). Stored for instructor review (password-protected admin, not public). Paste only coursework you’re comfortable sharing for class.
+      <div id="portal-assessment-label" class="fhint" style="margin-top:10px;color:#bef264;font-family:JetBrains Mono,monospace;"></div>
     </div>
 
     <!-- FORM -->
@@ -838,13 +839,69 @@ document.addEventListener('keydown',e=>{
 });
 
 // ── PORTAL ──
-/** Same list as lib/foundry-subgroups.ts — used if GET /api/foundry/subgroups fails. */
+/** Same list as lib/foundry-subgroups.ts — used when no DB / default deck. */
 const FALLBACK_QAF_SUBGROUPS = [
   'Bethel','Carmel','Eden','Gilead','Goshen','Hebron','Israel','Zion','Other / not listed',
 ];
 
+const ASSESSMENT_SLUG = (typeof location !== 'undefined'
+  ? (new URLSearchParams(location.search).get('assessment') || '').trim()
+  : '');
+
+/** Server-driven min lengths (facilitator assessment or legacy defaults). */
+let CFG_MIN_PROMPT = 40;
+let CFG_MIN_OUTPUT = 80;
+let CURRENT_ASSESSMENT_TITLE = '';
+
+async function ensureSubgroupsLoaded(force){
+  const sel=document.getElementById('subGroup');
+  if(!sel) return;
+
+  const key = ASSESSMENT_SLUG || '__default__';
+  if(!force && sel.dataset.slugKey===key && sel.dataset.ready==='1') return;
+
+  sel.innerHTML='<option value="">Loading subgroups…</option>';
+  sel.dataset.ready='';
+
+  const fill=(list)=>{
+    sel.innerHTML='<option value="">Select subgroup…</option>';
+    list.forEach(s=>{
+      const o=document.createElement('option');
+      o.value=s;
+      o.textContent=s;
+      sel.appendChild(o);
+    });
+    sel.dataset.slugKey=key;
+    sel.dataset.ready='1';
+  };
+
+  try{
+    const q = ASSESSMENT_SLUG
+      ? ('?slug='+encodeURIComponent(ASSESSMENT_SLUG))
+      : '';
+    const r=await fetch('/api/foundry/assessment-config'+q);
+    const j=await r.json().catch(()=>({}));
+    CFG_MIN_PROMPT = typeof j.minPromptChars==='number' ? Math.max(0,j.minPromptChars):40;
+    CFG_MIN_OUTPUT = typeof j.minOutputChars==='number' ? Math.max(0,j.minOutputChars):80;
+    CURRENT_ASSESSMENT_TITLE = typeof j.title==='string'? j.title:'';
+    const banner=document.getElementById('portal-assessment-label');
+    if(banner){
+      banner.textContent = ASSESSMENT_SLUG
+        ? ('Assessment · '+CURRENT_ASSESSMENT_TITLE+' ('+ASSESSMENT_SLUG+')')
+        : 'Built-in Day 03 AI Builder deck';
+    }
+    const list=Array.isArray(j.subgroups)?j.subgroups:[];
+    if(list.length){
+      fill(list);
+      return;
+    }
+    fill(FALLBACK_QAF_SUBGROUPS);
+  }catch(_){
+    fill(FALLBACK_QAF_SUBGROUPS);
+  }
+}
 async function openPortal(){
-  await ensureSubgroupsLoaded(false);
+  await ensureSubgroupsLoaded(true);
   document.getElementById('portal').classList.add('open');
   document.getElementById('portal').scrollTop=0;
   document.getElementById('portal').setAttribute('aria-hidden','false');
@@ -870,36 +927,6 @@ function showErr(fieldId, errId){
   if(e)e.classList.add('on');
 }
 
-async function ensureSubgroupsLoaded(){
-  const sel=document.getElementById('subGroup');
-  if(sel.dataset.ready==='1')return;
-  sel.innerHTML='<option value="">Loading subgroups…</option>';
-
-  const fill = (list) => {
-    sel.innerHTML='<option value="">Select subgroup…</option>';
-    list.forEach(s=>{
-      const o=document.createElement('option');
-      o.value=s;
-      o.textContent=s;
-      sel.appendChild(o);
-    });
-    sel.dataset.ready='1';
-  };
-
-  try{
-    const r=await fetch('/api/foundry/subgroups');
-    const j=await r.json().catch(()=>({}));
-    const list=Array.isArray(j.subgroups)?j.subgroups:[];
-    if(list.length){
-      fill(list);
-      return;
-    }
-    fill(FALLBACK_QAF_SUBGROUPS);
-  }catch(_){
-    fill(FALLBACK_QAF_SUBGROUPS);
-  }
-}
-
 // ── GRADER (server-side Groq → POST /api/foundry/grade on AI Foundry) ──
 async function grade(){
   const name=document.getElementById('sName').value.trim();
@@ -911,8 +938,8 @@ async function grade(){
   let ok=true;
   if(!name){showErr('sName','err-name');ok=false;}
   if(!subgroup){showErr('subGroup','err-sub');ok=false;}
-  if(!prompt||prompt.length<40){showErr('aPrompt','err-prompt');ok=false;}
-  if(!output||output.length<80){showErr('aOutput','err-output');ok=false;}
+  if(!prompt||prompt.length<CFG_MIN_PROMPT){showErr('aPrompt','err-prompt');ok=false;}
+  if(!output||output.length<CFG_MIN_OUTPUT){showErr('aOutput','err-output');ok=false;}
   if(!ok)return;
 
   document.getElementById('subBtn').disabled=true;
@@ -920,10 +947,13 @@ async function grade(){
   document.getElementById('result').classList.remove('on');
 
   try{
+    const body = ASSESSMENT_SLUG
+      ? {name,subgroup,prompt,output,assessmentSlug:ASSESSMENT_SLUG}
+      : {name,subgroup,prompt,output};
     const res=await fetch('/api/foundry/grade',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({name,subgroup,prompt,output})
+      body:JSON.stringify(body)
     });
     const data=await res.json().catch(()=>({}));
     if(!res.ok){
@@ -986,6 +1016,9 @@ function resetForm(){
   document.getElementById('result').classList.remove('on');
   document.getElementById('portal').scrollTop=0;
 }
+
+// prefetch subgroup list (& assessment config when ?assessment= is present)
+void ensureSubgroupsLoaded(false);
 
 // init progress
 updateUI();

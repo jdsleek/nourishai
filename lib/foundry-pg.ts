@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { Pool as PgPool } from "pg";
 import type { FoundrySubmissionRecord } from "@/lib/foundry-store";
+import { ensureTrainingSchema } from "@/lib/training-pg";
 
 function sslOption(conn: string): boolean | { rejectUnauthorized: boolean } | undefined {
   if (process.env.PG_SSL_DISABLE === "1") return false;
@@ -36,9 +37,7 @@ export function getFoundryPgPool(): Pool | null {
 
 let schemaReady: Promise<void> | null = null;
 
-export async function ensureFoundrySubmissionsSchema(
-  pool: Pool
-): Promise<void> {
+export async function ensureFoundrySubmissionsSchema(pool: Pool): Promise<void> {
   if (!schemaReady) {
     schemaReady = pool
       .query(`
@@ -55,6 +54,10 @@ export async function ensureFoundrySubmissionsSchema(
         CREATE INDEX IF NOT EXISTS idx_foundry_submissions_submitted_at
           ON foundry_submissions (submitted_at DESC);
       `)
+      .then(async () => {
+        /** Add training_* tables & optional assessment FK — additive only */
+        await ensureTrainingSchema(pool);
+      })
       .then(() => undefined)
       .catch((e) => {
         schemaReady = null;
@@ -65,6 +68,7 @@ export async function ensureFoundrySubmissionsSchema(
 }
 
 function rowToRecord(row: Record<string, unknown>): FoundrySubmissionRecord {
+  const assessmentIdRaw = row.assessment_id;
   return {
     id: String(row.id),
     submittedAt: row.submitted_at
@@ -79,6 +83,14 @@ function rowToRecord(row: Record<string, unknown>): FoundrySubmissionRecord {
       typeof row.result === "string"
         ? (JSON.parse(row.result) as FoundrySubmissionRecord["result"])
         : (row.result as FoundrySubmissionRecord["result"]),
+    assessmentId:
+      assessmentIdRaw != null && String(assessmentIdRaw).length
+        ? String(assessmentIdRaw)
+        : null,
+    assessmentSlug:
+      row.assessment_slug != null ? String(row.assessment_slug) : null,
+    assessmentTitle:
+      row.assessment_title != null ? String(row.assessment_title) : null,
   };
 }
 
@@ -88,8 +100,8 @@ export async function pgInsertSubmission(
 ): Promise<void> {
   await client.query(
     `INSERT INTO foundry_submissions
-      (id, submitted_at, fellow_name, subgroup, ide, prompt, output, result)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+      (id, submitted_at, fellow_name, subgroup, ide, prompt, output, result, assessment_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
      ON CONFLICT (id) DO NOTHING`,
     [
       rec.id,
@@ -100,6 +112,7 @@ export async function pgInsertSubmission(
       rec.prompt,
       rec.output,
       JSON.stringify(rec.result),
+      rec.assessmentId ?? null,
     ]
   );
 }
@@ -108,9 +121,13 @@ export async function pgListSubmissionsNewestFirst(
   pool: Pool
 ): Promise<FoundrySubmissionRecord[]> {
   const { rows } = await pool.query(
-    `SELECT id, submitted_at, fellow_name, subgroup, ide, prompt, output, result
-     FROM foundry_submissions
-     ORDER BY submitted_at DESC`
+    `SELECT fs.id, fs.submitted_at, fs.fellow_name, fs.subgroup, fs.ide,
+            fs.prompt, fs.output, fs.result, fs.assessment_id,
+            ta.slug AS assessment_slug,
+            ta.title AS assessment_title
+     FROM foundry_submissions fs
+     LEFT JOIN training_assessments ta ON ta.id = fs.assessment_id
+     ORDER BY fs.submitted_at DESC`
   );
   return rows.map((r) => rowToRecord(r as Record<string, unknown>));
 }

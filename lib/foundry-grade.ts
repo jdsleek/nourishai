@@ -59,6 +59,62 @@ Return this exact JSON structure with no extra text:
 }`;
 }
 
+export type FacilitatorGradingBlock = {
+  assessmentTitle: string;
+  facilitatorInstructions: string;
+  facilitatorIntro?: string;
+};
+
+/** Same JSON contract as the Foundry baseline; facilitator-authored rubric prose. */
+export function buildAssessmentRubricPrompt(
+  cfg: FacilitatorGradingBlock,
+  name: string,
+  subgroup: string,
+  prompt: string,
+  output: string
+): string {
+  const intro = cfg.facilitatorIntro?.trim()
+    ? `${cfg.facilitatorIntro.trim()}\n\n`
+    : "";
+
+  const body =
+    cfg.facilitatorInstructions.trim() ||
+    "(No facilitator rubric text — award marks fairly across prompt quality vs architecture viability, 10+10.)";
+
+  return `You are the AI grading assistant for a facilitator-led training cohort.
+
+Assessment: ${cfg.assessmentTitle}
+
+${intro}FACILITATOR RUBRIC (primary grading authority — follow closely):
+${body}
+
+Submission to grade (return ONLY JSON per schema below — no markdown fences):
+
+LEARNER NAME: ${name}
+SUBGROUP: ${subgroup}
+
+ARCHITECTURE PROMPT:
+${prompt}
+
+ARCHITECT OUTPUT:
+${output}
+
+Use two scored categories only (still 20 total): prompt_quality (/10), architecture_viability (/10).
+Bands: GO 15–20, REVIEW 10–14, REBUILD 0–9.
+
+JSON shape:
+{
+  "total_score": <0-20 int>,
+  "grade": "<GO|REVIEW|REBUILD>",
+  "breakdown": {
+    "prompt_quality": { "score": <0-10>, "feedback": "<one sentence>" },
+    "architecture_viability": { "score": <0-10>, "feedback": "<one sentence>" }
+  },
+  "level_up_tip": "<one actionable tip>",
+  "verdict": "<2–3 sentences, use learner first name>"
+}`;
+}
+
 export function parseGraderJson(raw: string): Record<string, unknown> {
   let s = raw.replace(/\uFEFF/g, "").trim();
   s = s.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();

@@ -10,6 +10,9 @@ type Submission = {
   ide: string;
   prompt: string;
   output: string;
+  assessmentId?: string | null;
+  assessmentSlug?: string | null;
+  assessmentTitle?: string | null;
   result: {
     total_score: number;
     grade: string;
@@ -74,6 +77,11 @@ export default function FoundryAdminPage() {
   const [ideationLoading, setIdeationLoading] = useState(false);
   const [ideationErr, setIdeationErr] = useState<string | null>(null);
   const [ideationReloadKey, setIdeationReloadKey] = useState(0);
+  const [facEmail, setFacEmail] = useState("");
+  const [facPwd, setFacPwd] = useState("");
+  const [facDisplay, setFacDisplay] = useState("");
+  const [facBusy, setFacBusy] = useState(false);
+  const [facMsg, setFacMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!unlocked || section !== "ideation" || !password) return undefined;
@@ -114,6 +122,36 @@ export default function FoundryAdminPage() {
     })();
     return () => controller.abort();
   }, [unlocked, section, password, ideationReloadKey]);
+
+  const bootstrapFacilitator = useCallback(async () => {
+    setFacBusy(true);
+    setFacMsg(null);
+    try {
+      const res = await fetch("/api/foundry/admin/facilitators", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-foundry-admin-password": password,
+        },
+        body: JSON.stringify({
+          email: facEmail.trim(),
+          password: facPwd,
+          displayName: facDisplay.trim() || facEmail.trim(),
+        }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok)
+        throw new Error(data.error || res.statusText || "Create failed.");
+      setFacMsg("Facilitator created. They sign in at /training/facilitator/login.");
+      setFacPwd("");
+      setFacEmail("");
+      setFacDisplay("");
+    } catch (e) {
+      setFacMsg(e instanceof Error ? e.message : "Create failed.");
+    } finally {
+      setFacBusy(false);
+    }
+  }, [facDisplay, facEmail, facPwd, password]);
 
   const deleteOne = useCallback(
     async (pwd: string, submissionId: string) => {
@@ -178,13 +216,23 @@ export default function FoundryAdminPage() {
             Instructor view — Day 03 submissions & cohort ideation
           </h1>
           <p className="mt-2 max-w-xl text-sm text-slate-400">
-            Authorized staff only. Graded portal work and the QAF{" "}
-            <strong className="text-slate-200">product ideation registry</strong>{" "}
-            (no longer public — loaded here after unlock). Override password with{" "}
+            Organizer / admin inbox: submissions from learners on the portal (legacy
+            built-in rubric and facilitator-authored assessments) plus the cohort
+            ideation registry. Requires{" "}
+            <code className="rounded bg-white/10 px-1 py-0.5 font-mono text-xs">
+              DATABASE_URL
+            </code>
+            ,
+            {" "}
             <code className="rounded bg-white/10 px-1 py-0.5 font-mono text-xs">
               FOUNDRY_ADMIN_PASSWORD
+            </code>
+            ,
+            {" "}
+            <code className="rounded bg-white/10 px-1 py-0.5 font-mono text-xs">
+              FACILITATOR_SESSION_SECRET
             </code>{" "}
-            on Railway if needed.
+            for facilitator dashboards.
           </p>
         </header>
 
@@ -299,6 +347,65 @@ export default function FoundryAdminPage() {
               </div>
             </div>
 
+            {section === "submissions" ? (
+              <details className="mb-6 rounded-xl border border-emerald-500/25 bg-emerald-950/20 p-4 text-sm">
+                <summary className="cursor-pointer font-semibold text-emerald-200">
+                  Organizer: create facilitator account
+                </summary>
+                <p className="mt-2 text-slate-400">
+                  Sends credentials securely over HTTPS once. Requires Postgres on the
+                  host. Share{" "}
+                  <code className="rounded bg-white/10 px-1 font-mono text-xs">
+                    /training/facilitator/login
+                  </code>{" "}
+                  with trainers.
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label className="block text-xs text-slate-400">
+                    Email
+                    <input
+                      type="email"
+                      value={facEmail}
+                      onChange={(e) => setFacEmail(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
+                    />
+                  </label>
+                  <label className="block text-xs text-slate-400">
+                    Display name
+                    <input
+                      type="text"
+                      value={facDisplay}
+                      onChange={(e) => setFacDisplay(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
+                    />
+                  </label>
+                </div>
+                <label className="mt-3 block text-xs text-slate-400">
+                  Initial password (≥ 10 chars; facilitator changes later if you rotate)
+                  <input
+                    type="password"
+                    value={facPwd}
+                    onChange={(e) => setFacPwd(e.target.value)}
+                    autoComplete="new-password"
+                    className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={facBusy || !facEmail || facPwd.length < 10 || !password}
+                  onClick={() => void bootstrapFacilitator()}
+                  className="mt-4 rounded-lg bg-emerald-500 px-4 py-2 font-semibold text-[#08120c] disabled:opacity-45"
+                >
+                  {facBusy ? "Saving…" : "Create facilitator"}
+                </button>
+                {facMsg ? (
+                  <p className="mt-3 whitespace-pre-wrap text-xs text-emerald-200/90">
+                    {facMsg}
+                  </p>
+                ) : null}
+              </details>
+            ) : null}
+
             {error ? (
               <p className="mb-4 rounded-lg border border-red-500/30 bg-red-950/40 px-3 py-2 text-sm text-red-300">
                 {error}
@@ -326,6 +433,11 @@ export default function FoundryAdminPage() {
                             <time dateTime={s.submittedAt}>
                               {new Date(s.submittedAt).toLocaleString()}
                             </time>
+                          </p>
+                          <p className="mt-1 text-xs font-mono text-slate-500">
+                            {s.assessmentSlug
+                              ? `Assessment: ${s.assessmentTitle || s.assessmentSlug} · slug ${s.assessmentSlug}`
+                              : "Assessment: legacy built‑in Foundry / Day‑03 rubric"}
                           </p>
                         </div>
                         <div className="text-right">

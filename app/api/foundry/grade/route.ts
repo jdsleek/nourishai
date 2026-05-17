@@ -1,35 +1,33 @@
 import { NextRequest } from "next/server";
-import { getGroq, GROQ_MODEL } from "@/lib/groq";
 import {
+  gradeFailureLooksLikeTokenLimit,
+  runFoundryGradeWithFallbacks,
+} from "@/lib/foundry-grading-llm";
+import {
+  buildAssessmentRubricPrompt,
   buildFoundryRubricPrompt,
   normalizeGraderResult,
   parseGraderJson,
 } from "@/lib/foundry-grade";
 import { clipFoundryBodiesForGroq } from "@/lib/foundry-grade-clip";
+import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
 import { appendFoundrySubmission } from "@/lib/foundry-store";
+import { pgAssessmentBySlug } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
+
+const GRADE_MAX_TOKENS = 1400;
 
 type Body = {
   name?: string;
   subgroup?: string;
   prompt?: string;
   output?: string;
+  /** When set, loads facilitator rubric from Postgres and stores `assessment_id` on the row. */
+  assessmentSlug?: string;
 };
-
-function groqErrStatus(err: unknown): number | undefined {
-  if (typeof err !== "object" || err === null) return undefined;
-  const o = err as {
-    status?: number;
-    response?: { status?: number };
-  };
-  if (typeof o.status === "number") return o.status;
-  const r = o.response?.status;
-  if (typeof r === "number") return r;
-  return undefined;
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,6 +36,7 @@ export async function POST(req: NextRequest) {
     const subgroup = String(body.subgroup || "").trim();
     const prompt = String(body.prompt || "").trim();
     const output = String(body.output || "").trim();
+    const slugRaw = String(body.assessmentSlug || "").trim().toLowerCase();
 
     if (!name) {
       return Response.json(
@@ -45,78 +44,138 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    if (!subgroup || !QAF_COHORT_SUBGROUPS.includes(subgroup)) {
+    if (!subgroup) {
       return Response.json(
-        { error: "Select a valid subgroup from the list." },
-        { status: 400 },
-      );
-    }
-    if (prompt.length < 40) {
-      return Response.json(
-        { error: "Architecture prompt is too short." },
-        { status: 400 },
-      );
-    }
-    if (output.length < 80) {
-      return Response.json(
-        {
-          error:
-            "Architecture output is too short — include all key sections.",
-        },
+        { error: "Select a subgroup from the list." },
         { status: 400 },
       );
     }
 
     const clipped = clipFoundryBodiesForGroq(prompt, output);
-    const rubricPrompt = buildFoundryRubricPrompt(
-      name,
-      subgroup,
-      clipped.promptForModel,
-      clipped.outputForModel,
-    );
+    let assessmentId: string | null = null;
+    let rubricPrompt: string;
 
-    const groq = getGroq();
-    let res;
-    try {
-      res = await groq.chat.completions.create({
-        model: GROQ_MODEL,
-        temperature: 0,
-        max_tokens: 1400,
-        messages: [{ role: "user", content: rubricPrompt }],
-      });
-    } catch (groqErr: unknown) {
-      const status = groqErrStatus(groqErr);
-      console.error("[foundry/grade] Groq create failed", groqErr);
-
-      if (status === 413) {
+    if (slugRaw) {
+      const pool = getFoundryPgPool();
+      if (!pool) {
         return Response.json(
           {
             error:
-              "The grading service rejected this attempt because it was too large for the current AI quota (token limit). Shorten what you paste in the prompt and architecture output — keep headings and representative bullets — then submit again.",
-            code: "groq_prompt_tpm_exceeded",
+              "This assessment requires DATABASE_URL on the server so its rubric can be loaded.",
+          },
+          { status: 503 },
+        );
+      }
+      await ensureFoundrySubmissionsSchema(pool);
+      const a = await pgAssessmentBySlug(pool, slugRaw);
+      if (!a) {
+        return Response.json({ error: "Unknown assessment." }, { status: 404 });
+      }
+      const allow =
+        a.subgroup_options.length > 0 ? a.subgroup_options : [...QAF_COHORT_SUBGROUPS];
+      if (!allow.includes(subgroup)) {
+        return Response.json(
+          { error: "Select a valid subgroup for this assessment." },
+          { status: 400 },
+        );
+      }
+      const minP = Math.max(0, a.min_prompt_chars);
+      const minO = Math.max(0, a.min_output_chars);
+      if (prompt.length < minP) {
+        return Response.json(
+          {
+            error: `Architecture prompt is too short (need at least ${minP} characters).`,
+          },
+          { status: 400 },
+        );
+      }
+      if (output.length < minO) {
+        return Response.json(
+          {
+            error: `Architecture output is too short — include all key sections (need at least ${minO} characters).`,
+          },
+          { status: 400 },
+        );
+      }
+      assessmentId = a.id;
+      rubricPrompt = buildAssessmentRubricPrompt(
+        {
+          assessmentTitle: a.title,
+          facilitatorInstructions: a.grader_instructions,
+          facilitatorIntro: a.assessment_intro?.trim()
+            ? a.assessment_intro
+            : undefined,
+        },
+        name,
+        subgroup,
+        clipped.promptForModel,
+        clipped.outputForModel,
+      );
+    } else {
+      if (!QAF_COHORT_SUBGROUPS.includes(subgroup)) {
+        return Response.json(
+          { error: "Select a valid subgroup from the list." },
+          { status: 400 },
+        );
+      }
+      if (prompt.length < 40) {
+        return Response.json(
+          { error: "Architecture prompt is too short." },
+          { status: 400 },
+        );
+      }
+      if (output.length < 80) {
+        return Response.json(
+          {
+            error:
+              "Architecture output is too short — include all key sections.",
+          },
+          { status: 400 },
+        );
+      }
+      rubricPrompt = buildFoundryRubricPrompt(
+        name,
+        subgroup,
+        clipped.promptForModel,
+        clipped.outputForModel,
+      );
+    }
+
+    let graded: Awaited<ReturnType<typeof runFoundryGradeWithFallbacks>>;
+    try {
+      graded = await runFoundryGradeWithFallbacks({
+        userContent: rubricPrompt,
+        maxTokens: GRADE_MAX_TOKENS,
+      });
+    } catch (llmErr) {
+      const msg =
+        llmErr instanceof Error ? llmErr.message : "Grading model error.";
+      console.error("[foundry/grade] all providers failed", llmErr);
+
+      if (gradeFailureLooksLikeTokenLimit(msg)) {
+        return Response.json(
+          {
+            error:
+              "The grading services rejected this attempt because it was too large for available AI quotas or context limits (or rate limits piled up). Shorten what you paste in the prompt and architecture output — keep headings and representative bullets — then submit again.",
+            code: "grade_prompt_quota_exceeded",
             hint:
-              "If this persists, facilitators may lower paste length guidance, set env FOUNDRY_GRADE_MAX_OUTPUT_CHARS smaller, upgrade Groq, or switch GROQ_MODEL to a lighter model.",
+              "Facilitators can lower paste guidance, tighten FOUNDRY_GRADE_MAX_OUTPUT_CHARS / FOUNDRY_GRADE_MAX_PROMPT_CHARS, or use FOUNDRY_GRADING_PROVIDER_ORDER to prefer a larger-context model.",
+            detail: msg.slice(0, 1600),
           },
           { status: 503 },
         );
       }
 
-      throw groqErr;
+      return Response.json({ error: msg }, { status: 502 });
     }
 
-    const raw = res.choices[0]?.message?.content?.trim() || "";
-    if (!raw) {
-      return Response.json(
-        { error: "Empty response from grading model." },
-        { status: 502 },
-      );
-    }
-
+    const raw = graded.content;
     let parsed: Record<string, unknown>;
     try {
       parsed = parseGraderJson(raw);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Invalid JSON from model.";
+      const msg =
+        e instanceof Error ? e.message : "Invalid JSON from model.";
       console.error("[foundry/grade] parse error", raw.slice(0, 500));
       return Response.json(
         { error: msg, rawPreview: raw.slice(0, 400) },
@@ -133,6 +192,7 @@ export async function POST(req: NextRequest) {
       prompt,
       output,
       result,
+      assessmentId,
     };
 
     let persisted = false;
@@ -162,6 +222,9 @@ export async function POST(req: NextRequest) {
       result,
       persisted,
       gradedWithTruncatedExcerpt: clipped.truncated,
+      gradingProvider: graded.meta.provider,
+      gradingModel: graded.meta.model,
+      gradingFallbackTrail: graded.errors ?? null,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Grading failed.";

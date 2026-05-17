@@ -18,6 +18,10 @@ export type FoundrySubmissionRecord = {
   prompt: string;
   output: string;
   result: FoundryGradeResult;
+  /** Null → legacy built-in Foundry rubric */
+  assessmentId?: string | null;
+  assessmentSlug?: string | null;
+  assessmentTitle?: string | null;
 };
 
 const dataDir = path.join(process.cwd(), "data");

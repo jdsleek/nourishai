@@ -11,10 +11,12 @@
     "railway:set-groq": "node scripts/railway-set-groq.mjs",
     "foundry:import-jsonl": "node scripts/foundry-import-jsonl-to-pg.mjs",
     "foundry:smoke": "node scripts/foundry-smoke-test.mjs",
+    "foundry:smoke-providers": "node scripts/foundry-grading-providers-smoke.mjs",
     "foundry:smoke:full": "node scripts/foundry-smoke-test.mjs --api --grade",
     "foundry:smoke:railway-deploy": "node scripts/foundry-smoke-railway-deploy.mjs"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "groq-sdk": "^1.1.2",
     "next": "^14.2.15",
@@ -25,6 +27,7 @@
     "zustand": "^5.0.1"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.9.0",
     "@types/pg": "^8.20.0",
     "@types/react": "^18.3.12",

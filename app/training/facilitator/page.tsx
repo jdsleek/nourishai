@@ -17,6 +17,11 @@ import {
   portalFormFromTemplate,
   PORTAL_TEMPLATE_OPTIONS,
 } from "@/lib/foundry-portal-presets";
+import { DEFAULT_LEARNER_PROGRESS_CHECKLIST } from "@/lib/foundry-learner-checklist";
+
+function publishChecklistTemplate(): string {
+  return DEFAULT_LEARNER_PROGRESS_CHECKLIST.join("\n");
+}
 
 type FacTab = "overview" | "share" | "submissions" | "assessments";
 
@@ -117,7 +122,8 @@ export default function FacilitatorDashboard() {
   const [mp, setMp] = useState(40);
   const [mo, setMo] = useState(80);
   const [newLevelUpUrl, setNewLevelUpUrl] = useState("");
-  const [newStudentChecklistText, setNewStudentChecklistText] = useState("");
+  const [newStudentChecklistText, setNewStudentChecklistText] =
+    useState(publishChecklistTemplate);
   /** Inline edit desk + rubric for an existing assessment */
   const [editingDesk, setEditingDesk] = useState<{
     id: string;
@@ -1095,7 +1101,7 @@ export default function FacilitatorDashboard() {
                         setIntro("");
                         setGraderInstructions("");
                         setNewLevelUpUrl("");
-                        setNewStudentChecklistText("");
+                        setNewStudentChecklistText(publishChecklistTemplate());
                         const row = data.assessment;
                         if (row?.slug && row.title) {
                           setNewCourseShare({ slug: row.slug, title: row.title });
@@ -1135,6 +1141,71 @@ export default function FacilitatorDashboard() {
                     </label>
                   </div>
                   <label className="block text-xs text-slate-400">
+                    Subgroup list for the portal (comma or line · shown in learner dropdown)
+                    <textarea
+                      value={subOpts}
+                      onChange={(e) => setSubOpts(e.target.value)}
+                      rows={2}
+                      className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 font-mono text-[12px] text-slate-200"
+                      placeholder="Bethel, Carmel, Eden, ..."
+                    />
+                  </label>
+
+                  <div className="space-y-3 rounded-xl border border-cyan-500/25 bg-cyan-950/15 px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-300/95">
+                      Set at publish · class hub &amp; deck reminders
+                    </p>
+                    <p className="text-[11px] leading-snug text-slate-400">
+                      Edit this before you publish. These lines ship with the assessment; you can still change
+                      them later under Desk &amp; assignment.
+                    </p>
+                    <label className="block text-xs text-slate-300">
+                      Learner checklist · one line per bullet
+                      <textarea
+                        value={newStudentChecklistText}
+                        onChange={(e) => setNewStudentChecklistText(e.target.value)}
+                        rows={6}
+                        className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-[13px] leading-relaxed"
+                      />
+                    </label>
+                    <label className="block text-xs text-slate-400">
+                      Optional · “next step” link after grading (<code className="font-mono">https</code> only)
+                      <input
+                        type="url"
+                        value={newLevelUpUrl}
+                        onChange={(e) => setNewLevelUpUrl(e.target.value)}
+                        placeholder="https://..."
+                        className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 font-mono text-xs text-emerald-200"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="block text-xs text-slate-400">
+                      Minimum characters · pasted prompt box
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        value={mp}
+                        onChange={(e) => setMp(Math.max(0, Number(e.target.value) || 0))}
+                        className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 font-mono text-sm"
+                      />
+                    </label>
+                    <label className="block text-xs text-slate-400">
+                      Minimum characters in pasted AI-output box
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        value={mo}
+                        onChange={(e) => setMo(Math.max(0, Number(e.target.value) || 0))}
+                        className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 font-mono text-sm"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="block text-xs text-slate-400">
                     Class desk · learner-facing assignment brief (optional)
                     <textarea
                       value={intro}
@@ -1152,26 +1223,6 @@ export default function FacilitatorDashboard() {
                       required
                       rows={10}
                       className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 font-mono text-[13px]"
-                    />
-                  </label>
-                  <label className="block text-xs text-slate-400">
-                    Optional · “next step” link after grading (<code className="font-mono">https</code> only)
-                    <input
-                      type="url"
-                      value={newLevelUpUrl}
-                      onChange={(e) => setNewLevelUpUrl(e.target.value)}
-                      placeholder="https://..."
-                      className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 font-mono text-xs text-emerald-200"
-                    />
-                  </label>
-                  <label className="block text-xs text-slate-400">
-                    Optional · class hub checklist — one bullet per line
-                    <textarea
-                      value={newStudentChecklistText}
-                      onChange={(e) => setNewStudentChecklistText(e.target.value)}
-                      rows={5}
-                      className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-[13px] leading-relaxed"
-                      placeholder={`Use your facilitator's official /learn/… link.${"\n"}Subgroup must match roster.`}
                     />
                   </label>
                   <button

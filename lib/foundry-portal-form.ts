@@ -36,17 +36,19 @@ export const DEFAULT_PORTAL_FORM: PortalFormMerged = {
   },
   prompt: {
     label: "03 · Your architecture prompt",
-    hint: "Paste the exact prompt you sent. The Day 03 grader expects five labeled parts: Role, Task, Context, Constraints, Output Format (headings or bullet labels both count).",
+    hint:
+      "Paste the exact prompt you sent. The grader looks for five labeled sections: Role, Task, Context, Constraints, Output Format (headings or bullet labels both count).",
     placeholder:
-      "Role: You are a senior full-stack architect...\n\nTask: Design...\n\nContext: I am building... for...\n\nConstraints: ...\n\nOutput Format: Frontend Stack, Backend API, Database Schema, Data Flow (with headings).",
+      "Role: You are a senior full-stack architect for early-stage products in Nigeria.\n\nTask: Design a complete system for...\n\nContext: I am building... for... (audience, region, constraints on users)...\n\nConstraints: Free-tier only, must integrate with..., no paid X unless...\n\nOutput Format: Return sections: Frontend Stack, Backend API, Database Schema, Data Flow (with headings).",
     fieldError: "Paste your full prompt.",
   },
   output: {
     label: "04 · AI-generated architecture output",
-    hint: "Paste the model’s reply. Include Frontend, Backend/API, Database, and Data flow; longer excerpts usually score better than short vague blurbs.",
+    hint:
+      "Paste the model’s answer, at minimum the parts that cover Frontend, Backend/API, Database, and Data flow. Longer excerpts score more reliably than two vague sentences.",
     placeholder:
       "### Frontend Stack\n...\n\n### Backend API\n...\n\n### Database Schema\n...\n\n### Data Flow\n...",
-    fieldError: "Paste enough output for grader-required sections.",
+    fieldError: "Paste enough output for Frontend, Backend/API, Database, and Data flow.",
   },
 };
 

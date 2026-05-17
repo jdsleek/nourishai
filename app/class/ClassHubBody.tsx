@@ -285,24 +285,21 @@ export default function ClassHubBody({
           </p>
           {!courseSlug ? (
             <p className="mt-1 text-xs text-slate-500">
-              Pick your facilitator&apos;s link{" "}
-              <span className="font-mono text-slate-400">/learn/&lt;slug&gt;</span> — each cohort has its
-              own assignment deck and rubric, not the generic program hub alone.
+              Open the link your facilitator shared with you. Each class has its own instructions and
+              grading — this page is only a general entry point until you use that link.
             </p>
           ) : null}
           {courseSlug ? (
             <p className="mt-3 rounded-lg border border-cyan-500/25 bg-cyan-950/20 px-3 py-2 text-xs leading-relaxed text-cyan-100/95">
-              <strong className="text-white">This page is your cohort home — it does not auto-open the slides.</strong>{" "}
-              Scroll to <strong className="font-medium text-slate-200">Open slides &amp; submit portal</strong> when you
-              want the deck; that opens{" "}
-              <span className="font-mono text-slate-500">{learnerDeckPath(courseSlug)}</span> in the same tab
-              (different page, not a redirect from this URL).
+              <strong className="text-white">This page is your class home — the slides don&apos;t open by themselves.</strong>{" "}
+              When you&apos;re ready, scroll down and tap{" "}
+              <strong className="font-medium text-slate-200">Open slides &amp; submit portal</strong> to view the
+              lesson and hand in your work (same browser tab, next screen).
             </p>
           ) : null}
           <p className="mt-1 text-xs text-slate-500">
-            The <strong className="font-medium text-slate-400">assessment title</strong> on your hub (e.g.
-            what appears next to “Your course”) is set by your facilitator in their trainer console — not by
-            the shared slide deck alone.
+            The name shown for <strong className="font-medium text-slate-400">your course</strong> below comes
+            from your facilitator&apos;s setup — it may differ from wording on the shared lesson slides.
           </p>
           {hubUrl ? (
             <p className="mt-3 font-mono text-[10px] text-slate-600 break-all">
@@ -330,17 +327,17 @@ export default function ClassHubBody({
         ) : null}
 
         {liveOpen === null && !liveOpenErr ? (
-          <p className="text-xs text-slate-600">Loading open cohorts…</p>
+          <p className="text-xs text-slate-600">Loading open classes…</p>
         ) : null}
 
         {!courseSlug && liveOpen && liveOpen.length > 0 ? (
           <section className="rounded-2xl border border-emerald-500/25 bg-emerald-950/15 p-5">
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-300/85">
-              Open cohorts · accepting submissions
+              Classes accepting work
             </p>
             <p className="mt-2 text-sm text-slate-300">
-              Every live class hub in this program right now. Use the cohort your facilitator sent;
-              picking the wrong slug sends work to someone else&apos;s inbox.
+              These classes are accepting submissions right now. Open only the one your facilitator gave you —
+              choosing a different class can send your work to the wrong instructor.
             </p>
             <ul className="mt-4 grid gap-3 sm:grid-cols-2">
               {liveOpen.map((c) => {
@@ -380,17 +377,17 @@ export default function ClassHubBody({
         {catalog && courseSlug && catalog.courses.length > 1 ? (
           <section className="rounded-2xl border border-white/10 bg-[#0c1018] p-5">
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500">
-              Cohort picker
+              Choose your class
             </p>
             {catalog.facilitatorDisplayName ? (
               <p className="mt-2 text-xs text-slate-500">
-                Trainer ·{" "}
+                Instructor ·{" "}
                 <span className="text-slate-300">{catalog.facilitatorDisplayName}</span>
               </p>
             ) : null}
             <p className="mt-2 text-sm text-slate-300">
-              Your trainer assigned more than one course link. Tap the cohort you were told to join —
-              grading uses the slug on that hub, not whichever link you clicked first.
+              Your facilitator shared more than one class link. Open the class you were told to join —
+              grading is tied to that class, not whichever link you opened first.
             </p>
             <ul className="mt-4 grid gap-3 sm:grid-cols-2">
               {catalog.courses.map((c) => {

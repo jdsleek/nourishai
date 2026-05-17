@@ -11,7 +11,7 @@ const ITEMS: { id: AdminNavSection; label: string; hint: string }[] = [
   { id: "overview", label: "Overview", hint: "Cohort snapshot" },
   { id: "submissions", label: "All submissions", hint: "Cohort inbox" },
   { id: "facilitators", label: "Facilitators", hint: "Accounts & roster" },
-  { id: "assessments", label: "Assessments", hint: "Locks & legacy tools" },
+  { id: "assessments", label: "Assessments", hint: "Submit windows & links" },
   { id: "ideation", label: "Ideation registry", hint: "QAF CSV rebuild" },
 ];
 

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminNav, type AdminNavSection } from "@/components/foundry/AdminNav";
 import {
   DashboardStatCard,
-  DashboardStatGrid,
 } from "@/components/foundry/DashboardStatGrid";
 
 type Submission = {
@@ -92,9 +91,6 @@ function breakdownRows(
 
 type AdminSection = AdminNavSection;
 
-/** Must stay in sync with API `confirm` checker */
-const LEGACY_LINK_CONFIRM_PHRASE = "LINK_ALL_LEGACY_SUBMISSIONS";
-
 type FacAdminRow = {
   id: string;
   email: string;
@@ -140,11 +136,6 @@ export default function FoundryAdminPage() {
     {},
   );
   const [ownerMoveBusy, setOwnerMoveBusy] = useState<string | null>(null);
-  const [legacyCount, setLegacyCount] = useState<number | null>(null);
-  const [legacyTargetId, setLegacyTargetId] = useState("");
-  const [legacyMsg, setLegacyMsg] = useState<string | null>(null);
-  const [legacyBusy, setLegacyBusy] = useState(false);
-  const [legacyConfirm, setLegacyConfirm] = useState("");
   const [linkCopyMsg, setLinkCopyMsg] = useState<string | null>(null);
 
   const linkedSubmissionCount = useMemo(
@@ -179,19 +170,6 @@ export default function FoundryAdminPage() {
     },
     [],
   );
-
-  const loadLegacyStats = useCallback(async (pwd: string) => {
-    try {
-      const res = await fetch("/api/foundry/admin/submissions-link-legacy", {
-        headers: { "x-foundry-admin-password": pwd },
-      });
-      const data = (await res.json()) as { legacyCount?: number; error?: string };
-      if (!res.ok) throw new Error(data.error || "Could not load legacy stats.");
-      setLegacyCount(Number(data.legacyCount ?? 0));
-    } catch {
-      setLegacyCount(null);
-    }
-  }, []);
 
   const loadLocks = useCallback(async (pwd: string) => {
     setLocksLoading(true);
@@ -305,11 +283,6 @@ export default function FoundryAdminPage() {
     },
     [loadLocks, loadFacilitators],
   );
-
-  useEffect(() => {
-    if (!locks.length) return;
-    setLegacyTargetId((prev) => prev || locks[0]!.id);
-  }, [locks]);
 
   useEffect(() => {
     if (!unlocked || section !== "ideation" || !password) return undefined;
@@ -484,14 +457,13 @@ export default function FoundryAdminPage() {
       setUnlocked(true);
       void loadLocks(pwd);
       void loadFacilitators(pwd);
-      void loadLegacyStats(pwd);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed.");
       setUnlocked(false);
     } finally {
       setLoading(false);
     }
-  }, [loadLocks, loadFacilitators, loadLegacyStats]);
+  }, [loadLocks, loadFacilitators]);
 
   const deleteAssessmentRow = useCallback(
     async (pwd: string, row: AssessmentLockRow) => {
@@ -500,7 +472,7 @@ export default function FoundryAdminPage() {
         "",
         "Learner URLs for this slug stop working until someone publishes an assessment with the same slug.",
         "",
-        "Submissions tied to this course remain in the ledger but lose their assessment link (shown as unlinked — like legacy imports).",
+        "Submissions tied to this course stay in the ledger but lose their course link (submission rows keep a null assessment reference).",
         "",
         "This cannot be undone.",
       ].join("\n");
@@ -533,7 +505,7 @@ export default function FoundryAdminPage() {
           typeof data.submissionsUnlinked === "number" ? data.submissionsUnlinked : 0;
         if (n > 0) {
           window.alert(
-            `Assessment deleted · ${n} submission(s) are now unlinked (still visible in ledger).`,
+            `Assessment deleted · ${n} submission(s) remain in the ledger without a cohort link.`,
           );
         }
       } catch (e) {
@@ -543,70 +515,6 @@ export default function FoundryAdminPage() {
       }
     },
     [load],
-  );
-
-  const runLegacyDryRunOrLink = useCallback(
-    async (pwd: string, mode: "dry" | "commit") => {
-      if (!legacyTargetId) {
-        setLegacyMsg("Choose a facilitator assessment slug first.");
-        return;
-      }
-      setLegacyBusy(true);
-      setLegacyMsg(null);
-      try {
-        if (mode === "dry") {
-          const res = await fetch("/api/foundry/admin/submissions-link-legacy", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-foundry-admin-password": pwd,
-            },
-            body: JSON.stringify({
-              toAssessmentId: legacyTargetId,
-              dryRun: true,
-            }),
-          });
-          const data = (await res.json()) as {
-            wouldLink?: number;
-            error?: string;
-          };
-          if (!res.ok)
-            throw new Error(data.error || "Preview failed.");
-          setLegacyMsg(
-            `Dry run: ${data.wouldLink ?? 0} legacy row(s) would attach to selected assessment.`,
-          );
-          await loadLegacyStats(pwd);
-          return;
-        }
-        const res = await fetch("/api/foundry/admin/submissions-link-legacy", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-foundry-admin-password": pwd,
-          },
-          body: JSON.stringify({
-            toAssessmentId: legacyTargetId,
-            dryRun: false,
-            confirm: legacyConfirm.trim(),
-          }),
-        });
-        const data = (await res.json()) as {
-          moved?: number;
-          error?: string;
-        };
-        if (!res.ok) throw new Error(data.error || "Link failed.");
-        setLegacyMsg(
-          `Attached ${data.moved ?? 0} legacy cohort row(s); trainers who own this assessment inbox will see them after refresh.`,
-        );
-        await loadLegacyStats(pwd);
-        await load(pwd);
-      } catch (e) {
-        setLegacyMsg(e instanceof Error ? e.message : "Operation failed.");
-      } finally {
-        setLegacyBusy(false);
-      }
-    },
-    [legacyTargetId, legacyConfirm, loadLegacyStats, load],
   );
 
   return (
@@ -679,10 +587,6 @@ export default function FoundryAdminPage() {
                     setFacDirErr(null);
                     setMoveOwnerChoice({});
                     setUpdMsg(null);
-                    setLegacyCount(null);
-                    setLegacyTargetId("");
-                    setLegacyMsg(null);
-                    setLegacyConfirm("");
                     setPassword("");
                     setSection("overview");
                     setIdeationHtml(null);
@@ -710,7 +614,6 @@ export default function FoundryAdminPage() {
                       void load(password);
                       void loadLocks(password);
                       void loadFacilitators(password);
-                      void loadLegacyStats(password);
                     }}
                     className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-slate-200 hover:bg-white/5 disabled:opacity-50"
                   >
@@ -736,24 +639,13 @@ export default function FoundryAdminPage() {
               <div className="min-w-0 flex-1">
             {section === "overview" ? (
               <section className="mb-8 space-y-6">
-                <DashboardStatGrid>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   <DashboardStatCard
                     label="Total submissions"
                     value={subs.length}
                     hint={`${linkedSubmissionCount} linked to a facilitator course`}
                     tone="cyan"
                     onClick={() => setSection("submissions")}
-                  />
-                  <DashboardStatCard
-                    label="Unlinked (deck-only)"
-                    value={legacyCount ?? "—"}
-                    hint={
-                      (legacyCount ?? 0) > 0
-                        ? "Needs legacy link under Assessments"
-                        : "All rows tied to a course"
-                    }
-                    tone={(legacyCount ?? 0) > 0 ? "amber" : "emerald"}
-                    onClick={() => setSection("assessments")}
                   />
                   <DashboardStatCard
                     label="Facilitators"
@@ -769,12 +661,26 @@ export default function FoundryAdminPage() {
                     tone="slate"
                     onClick={() => setSection("assessments")}
                   />
-                </DashboardStatGrid>
+                </div>
                 <div className="rounded-xl border border-white/10 bg-[#111520] p-5 text-sm">
                   <p className="font-semibold text-white">Latest activity</p>
                   <p className="mt-2 text-slate-400">
                     Most recent submission:{" "}
                     <span className="text-slate-200">{latestSubmissionLabel}</span>
+                  </p>
+                  <p className="mt-3 text-xs leading-relaxed text-slate-500">
+                    <strong className="font-medium text-slate-400">Share with trainers:</strong> under{" "}
+                    <span className="text-slate-300">Assessments</span>, each row has{" "}
+                    <strong className="text-slate-300">Copy class hub URL</strong> and{" "}
+                    <strong className="text-slate-300">Copy deck URL</strong> for learners (
+                    <code className="rounded bg-white/10 px-1 font-mono text-[10px]">
+                      /learn/&lt;slug&gt;
+                    </code>{" "}
+                    and{" "}
+                    <code className="rounded bg-white/10 px-1 font-mono text-[10px]">
+                      /foundry/day03?assessment=&lt;slug&gt;
+                    </code>
+                    ).
                   </p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <button
@@ -786,20 +692,18 @@ export default function FoundryAdminPage() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => setSection("assessments")}
+                      className="rounded-lg border border-slate-400/35 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/5"
+                    >
+                      Assessments &amp; copy links
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setSection("facilitators")}
                       className="rounded-lg border border-orange-400/35 px-3 py-1.5 text-xs text-orange-100 hover:bg-orange-950/30"
                     >
                       Manage facilitators
                     </button>
-                    {(legacyCount ?? 0) > 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => setSection("assessments")}
-                        className="rounded-lg border border-amber-400/35 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-950/30"
-                      >
-                        Link {legacyCount} unlinked row(s)
-                      </button>
-                    ) : null}
                   </div>
                 </div>
               </section>
@@ -1021,7 +925,7 @@ export default function FoundryAdminPage() {
                         </div>
                         <div className="border-t border-red-500/10 pt-2 text-[11px] text-slate-500">
                           Organizer only: deleting drops the Postgres assignment row · frees slug ·
-                          submission ledger rows remain (unlinked).
+                          submission ledger rows remain (without a cohort link).
                         </div>
                       </li>
                     ))}
@@ -1031,279 +935,201 @@ export default function FoundryAdminPage() {
             ) : null}
 
             {section === "facilitators" ? (
-              <div className="mb-6 rounded-xl border border-cyan-500/25 bg-cyan-950/15 p-4 text-sm">
-                <p className="font-semibold text-cyan-200">
-                  Organizer: facilitator roster
-                </p>
-                <p className="mt-2 text-slate-400">
-                  Trainer accounts ({facilitators.length}). Use{" "}
-                  <strong className="text-slate-200">Ownership</strong> on each assignment
-                  in the <strong className="text-slate-200">Assessments</strong> tab to move
-                  sessions—or similar bundles—under one login without losing submission history
-                  (rows stay keyed by assessment id).
-                </p>
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void copyPublicTrainingUrl(
-                        "/training/facilitator/login",
-                        "facilitator sign-in URL",
-                      )
-                    }
-                    className="w-fit rounded-lg border border-cyan-400/40 bg-cyan-950/40 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-900/35"
-                  >
-                    Copy facilitator sign-in URL
-                  </button>
-                  <p className="max-w-xl text-[11px] text-slate-500">
-                    Learner-facing deck and class hub links: use{" "}
-                    <strong className="text-slate-400">Assessments</strong> — each course has{" "}
-                    <strong className="text-slate-400">Copy deck URL</strong> and{" "}
-                    <strong className="text-slate-400">Copy class hub URL</strong>.
+              <>
+                <div className="mb-6 rounded-xl border border-cyan-500/25 bg-cyan-950/15 p-4 text-sm">
+                  <p className="font-semibold text-cyan-200">
+                    Organizer: facilitator roster
                   </p>
-                </div>
-                {facDirErr ? (
-                  <p className="mt-2 text-sm text-red-400">{facDirErr}</p>
-                ) : null}
-                {facDirLoading ? (
-                  <p className="mt-3 text-xs text-slate-500">
-                    Loading facilitators…
+                  <p className="mt-2 text-slate-400">
+                    Trainer accounts ({facilitators.length}). Use{" "}
+                    <strong className="text-slate-200">Ownership</strong> on each assignment
+                    in the <strong className="text-slate-200">Assessments</strong> tab to move
+                    sessions—or similar bundles—under one login without losing submission history
+                    (rows stay keyed by assessment id).
                   </p>
-                ) : facilitators.length === 0 ? (
-                  <p className="mt-3 text-xs text-slate-500">
-                    No facilitator rows yet — create one below or run demo seed locally.
-                  </p>
-                ) : (
-                  <div className="mt-4 overflow-auto rounded-lg border border-white/10">
-                    <table className="w-full min-w-[480px] text-left text-xs">
-                      <thead>
-                        <tr className="border-b border-white/10 bg-black/25 text-[10px] uppercase tracking-wide text-slate-500">
-                          <th className="px-3 py-2 font-medium">Email</th>
-                          <th className="px-3 py-2 font-medium">Display</th>
-                          <th className="px-3 py-2 font-medium">Assessments</th>
-                          <th className="px-3 py-2 font-medium">Id</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {facilitators.map((f) => (
-                          <tr
-                            key={f.id}
-                            className="border-b border-white/5 last:border-b-0"
-                          >
-                            <td className="px-3 py-2 font-mono text-slate-200">{f.email}</td>
-                            <td className="px-3 py-2 text-slate-300">{f.displayName}</td>
-                            <td className="px-3 py-2 font-mono text-cyan-200/90">
-                              {f.assessmentCount}
-                            </td>
-                            <td className="break-all px-3 py-1.5 font-mono text-[10px] text-slate-600">
-                              {f.id}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void copyPublicTrainingUrl(
+                          "/training/facilitator/login",
+                          "facilitator sign-in URL",
+                        )
+                      }
+                      className="w-fit rounded-lg border border-cyan-400/40 bg-cyan-950/40 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-900/35"
+                    >
+                      Copy facilitator sign-in URL
+                    </button>
+                    <p className="max-w-xl text-[11px] text-slate-500">
+                      Learner-facing deck and class hub links: use{" "}
+                      <strong className="text-slate-400">Assessments</strong> — each course has{" "}
+                      <strong className="text-slate-400">Copy deck URL</strong> and{" "}
+                      <strong className="text-slate-400">Copy class hub URL</strong>.
+                    </p>
                   </div>
-                )}
-              </div>
-            ) : null}
-
-            {section === "assessments" ? (
-              <div className="mb-6 rounded-xl border border-rose-500/30 bg-rose-950/15 p-4 text-sm">
-                <p className="font-semibold text-rose-200">
-                  Organizer: cohort legacy submits → facilitator inbox
-                </p>
-                <p className="mt-2 text-xs text-slate-400">
-                  Bulk-attach learner rows that graded{" "}
-                  <strong className="text-slate-200">without</strong>{" "}
-                  <code className="rounded bg-white/10 px-1 font-mono text-[11px]">
-                    ?assessment=
-                  </code>{" "}
-                  (<code className="rounded bg-black/60 px-1 font-mono text-[11px]">assessment_id</code>
-                  {""} IS NULL). Trainers owning the selected slug inbox gain them instantly.
-                </p>
-                <p className="mt-3 font-mono text-xs text-slate-500">
-                  Rows pending link:{" "}
-                  <span className="text-white">
-                    {legacyCount === null ? "—" : legacyCount}
-                  </span>
-                </p>
-                <label className="mt-3 block text-[11px] text-slate-400">
-                  Target facilitator assessment
-                  <select
-                    className="mt-1 block w-full max-w-xl rounded-lg border border-white/15 bg-[#0c0e14] px-2 py-2 font-mono text-xs text-slate-100"
-                    value={legacyTargetId}
-                    disabled={locks.length === 0 || legacyBusy}
-                    onChange={(e) => setLegacyTargetId(e.target.value)}
-                  >
-                    {locks.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.title} · {l.slug} · {l.facilitatorEmail}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="mt-3 flex flex-wrap items-end gap-2">
-                  <button
-                    type="button"
-                    disabled={legacyBusy || !password || locks.length === 0}
-                    onClick={() => void runLegacyDryRunOrLink(password, "dry")}
-                    className="rounded-lg border border-rose-400/35 bg-rose-950/30 px-3 py-2 text-[11px] font-semibold text-rose-100 hover:bg-rose-900/30 disabled:opacity-40"
-                  >
-                    Preview (dry-run)
-                  </button>
-                  <label className="flex min-w-[180px] flex-1 flex-col text-[11px] text-slate-400">
-                    Type confirm phrase
+                  {facDirErr ? (
+                    <p className="mt-2 text-sm text-red-400">{facDirErr}</p>
+                  ) : null}
+                  {facDirLoading ? (
+                    <p className="mt-3 text-xs text-slate-500">
+                      Loading facilitators…
+                    </p>
+                  ) : facilitators.length === 0 ? (
+                    <p className="mt-3 text-xs text-slate-500">
+                      No facilitator rows yet — create one below or run demo seed locally.
+                    </p>
+                  ) : (
+                    <div className="mt-4 overflow-auto rounded-lg border border-white/10">
+                      <table className="w-full min-w-[480px] text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-white/10 bg-black/25 text-[10px] uppercase tracking-wide text-slate-500">
+                            <th className="px-3 py-2 font-medium">Email</th>
+                            <th className="px-3 py-2 font-medium">Display</th>
+                            <th className="px-3 py-2 font-medium">Assessments</th>
+                            <th className="px-3 py-2 font-medium">Id</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {facilitators.map((f) => (
+                            <tr
+                              key={f.id}
+                              className="border-b border-white/5 last:border-b-0"
+                            >
+                              <td className="px-3 py-2 font-mono text-slate-200">{f.email}</td>
+                              <td className="px-3 py-2 text-slate-300">{f.displayName}</td>
+                              <td className="px-3 py-2 font-mono text-cyan-200/90">
+                                {f.assessmentCount}
+                              </td>
+                              <td className="break-all px-3 py-1.5 font-mono text-[10px] text-slate-600">
+                                {f.id}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+                <details className="mb-6 rounded-xl border border-emerald-500/25 bg-emerald-950/20 p-4 text-sm">
+                  <summary className="cursor-pointer font-semibold text-emerald-200">
+                    Organizer: create facilitator account
+                  </summary>
+                  <p className="mt-2 text-slate-400">
+                    Sends credentials securely over HTTPS once. Requires Postgres on the
+                    host. If you get{" "}
+                    <span className="text-amber-200/90">&quot;already exists&quot;</span>, use{" "}
+                    <strong className="text-slate-200">Update existing facilitator credentials</strong>{" "}
+                    below instead. Share{" "}
+                    <code className="rounded bg-white/10 px-1 font-mono text-xs">
+                      /training/facilitator/login
+                    </code>{" "}
+                    with trainers.
+                  </p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <label className="block text-xs text-slate-400">
+                      Email
+                      <input
+                        type="email"
+                        value={facEmail}
+                        onChange={(e) => setFacEmail(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
+                      />
+                    </label>
+                    <label className="block text-xs text-slate-400">
+                      Display name
+                      <input
+                        type="text"
+                        value={facDisplay}
+                        onChange={(e) => setFacDisplay(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
+                      />
+                    </label>
+                  </div>
+                  <label className="mt-3 block text-xs text-slate-400">
+                    Initial password (≥ 10 chars; facilitator changes later if you rotate)
                     <input
-                      value={legacyConfirm}
-                      onChange={(e) => setLegacyConfirm(e.target.value)}
-                      placeholder={LEGACY_LINK_CONFIRM_PHRASE}
-                      disabled={legacyBusy}
-                      autoComplete="off"
-                      className="mt-1 rounded-lg border border-white/15 bg-[#0c0e14] px-2 py-2 font-mono text-[10px] text-white"
+                      type="password"
+                      value={facPwd}
+                      onChange={(e) => setFacPwd(e.target.value)}
+                      autoComplete="new-password"
+                      className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
                     />
                   </label>
                   <button
                     type="button"
-                    disabled={
-                      legacyBusy ||
-                      !password ||
-                      legacyConfirm.trim() !== LEGACY_LINK_CONFIRM_PHRASE
-                    }
-                    onClick={() => void runLegacyDryRunOrLink(password, "commit")}
-                    className="rounded-lg bg-rose-500 px-3 py-2 text-[11px] font-semibold text-[#1c0510] disabled:opacity-40"
+                    disabled={facBusy || !facEmail || facPwd.length < 10 || !password}
+                    onClick={() => void bootstrapFacilitator()}
+                    className="mt-4 rounded-lg bg-emerald-500 px-4 py-2 font-semibold text-[#08120c] disabled:opacity-45"
                   >
-                    Link legacy rows
+                    {facBusy ? "Saving…" : "Create facilitator"}
                   </button>
-                </div>
-                {legacyMsg ? (
-                  <p className="mt-3 whitespace-pre-wrap text-xs text-rose-200/85">{legacyMsg}</p>
-                ) : null}
-              </div>
-            ) : null}
-
-            {section === "facilitators" ? (
-              <details className="mb-6 rounded-xl border border-emerald-500/25 bg-emerald-950/20 p-4 text-sm">
-                <summary className="cursor-pointer font-semibold text-emerald-200">
-                  Organizer: create facilitator account
-                </summary>
-                <p className="mt-2 text-slate-400">
-                  Sends credentials securely over HTTPS once. Requires Postgres on the
-                  host. If you get{" "}
-                  <span className="text-amber-200/90">&quot;already exists&quot;</span>, use{" "}
-                  <strong className="text-slate-200">Update existing facilitator credentials</strong>{" "}
-                  below instead. Share{" "}
-                  <code className="rounded bg-white/10 px-1 font-mono text-xs">
-                    /training/facilitator/login
-                  </code>{" "}
-                  with trainers.
-                </p>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <label className="block text-xs text-slate-400">
-                    Email
+                  {facMsg ? (
+                    <p className="mt-3 whitespace-pre-wrap text-xs text-emerald-200/90">
+                      {facMsg}
+                    </p>
+                  ) : null}
+                </details>
+                <details className="mb-6 rounded-xl border border-sky-500/25 bg-sky-950/15 p-4 text-sm">
+                  <summary className="cursor-pointer font-semibold text-sky-200">
+                    Organizer: update existing facilitator credentials
+                  </summary>
+                  <p className="mt-2 text-slate-400">
+                    Use this when the facilitator row already exists (e.g. you hit “already
+                    exists” during create). Set a password you control; never reuse personal
+                    passwords that also protect other accounts.
+                  </p>
+                  <label className="mt-4 block text-xs text-slate-400">
+                    Facilitator email
                     <input
                       type="email"
-                      value={facEmail}
-                      onChange={(e) => setFacEmail(e.target.value)}
+                      value={updEmail}
+                      onChange={(e) => setUpdEmail(e.target.value)}
                       className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
                     />
                   </label>
-                  <label className="block text-xs text-slate-400">
-                    Display name
+                  <label className="mt-3 block text-xs text-slate-400">
+                    New password (≥10 chars — leave blank to skip if you only change display)
+                    <input
+                      type="password"
+                      value={updPwd}
+                      onChange={(e) => setUpdPwd(e.target.value)}
+                      autoComplete="new-password"
+                      className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
+                    />
+                  </label>
+                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-slate-400">
+                    <input
+                      type="checkbox"
+                      checked={updApplyDisplay}
+                      onChange={(e) => setUpdApplyDisplay(e.target.checked)}
+                      className="shrink-0"
+                    />
+                    <span>Update display name (below)</span>
+                  </label>
+                  {updApplyDisplay ? (
                     <input
                       type="text"
-                      value={facDisplay}
-                      onChange={(e) => setFacDisplay(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
+                      value={updDisplay}
+                      onChange={(e) => setUpdDisplay(e.target.value)}
+                      placeholder="Display name shown in roster"
+                      className="mt-2 block w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
                     />
-                  </label>
-                </div>
-                <label className="mt-3 block text-xs text-slate-400">
-                  Initial password (≥ 10 chars; facilitator changes later if you rotate)
-                  <input
-                    type="password"
-                    value={facPwd}
-                    onChange={(e) => setFacPwd(e.target.value)}
-                    autoComplete="new-password"
-                    className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
-                  />
-                </label>
-                <button
-                  type="button"
-                  disabled={facBusy || !facEmail || facPwd.length < 10 || !password}
-                  onClick={() => void bootstrapFacilitator()}
-                  className="mt-4 rounded-lg bg-emerald-500 px-4 py-2 font-semibold text-[#08120c] disabled:opacity-45"
-                >
-                  {facBusy ? "Saving…" : "Create facilitator"}
-                </button>
-                {facMsg ? (
-                  <p className="mt-3 whitespace-pre-wrap text-xs text-emerald-200/90">
-                    {facMsg}
-                  </p>
-                ) : null}
-              </details>
-            ) : null}
-
-            {section === "facilitators" ? (
-              <details className="mb-6 rounded-xl border border-sky-500/25 bg-sky-950/15 p-4 text-sm">
-                <summary className="cursor-pointer font-semibold text-sky-200">
-                  Organizer: update existing facilitator credentials
-                </summary>
-                <p className="mt-2 text-slate-400">
-                  Use this when the facilitator row already exists (e.g. you hit “already
-                  exists” during create). Set a password you control; never reuse personal
-                  passwords that also protect other accounts.
-                </p>
-                <label className="mt-4 block text-xs text-slate-400">
-                  Facilitator email
-                  <input
-                    type="email"
-                    value={updEmail}
-                    onChange={(e) => setUpdEmail(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
-                  />
-                </label>
-                <label className="mt-3 block text-xs text-slate-400">
-                  New password (≥10 chars — leave blank to skip if you only change display)
-                  <input
-                    type="password"
-                    value={updPwd}
-                    onChange={(e) => setUpdPwd(e.target.value)}
-                    autoComplete="new-password"
-                    className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
-                  />
-                </label>
-                <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-slate-400">
-                  <input
-                    type="checkbox"
-                    checked={updApplyDisplay}
-                    onChange={(e) => setUpdApplyDisplay(e.target.checked)}
-                    className="shrink-0"
-                  />
-                  <span>Update display name (below)</span>
-                </label>
-                {updApplyDisplay ? (
-                  <input
-                    type="text"
-                    value={updDisplay}
-                    onChange={(e) => setUpdDisplay(e.target.value)}
-                    placeholder="Display name shown in roster"
-                    className="mt-2 block w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
-                  />
-                ) : null}
-                <button
-                  type="button"
-                  disabled={updBusy || !password || !updEmail.trim()}
-                  onClick={() => void patchFacilitatorCreds()}
-                  className="mt-4 rounded-lg border border-sky-400/50 bg-sky-600 px-4 py-2 font-semibold text-[#081218] hover:bg-sky-500 disabled:opacity-45"
-                >
-                  {updBusy ? "Saving…" : "Apply update"}
-                </button>
-                {updMsg ? (
-                  <p className="mt-3 whitespace-pre-wrap text-xs text-sky-100/85">
-                    {updMsg}
-                  </p>
-                ) : null}
-              </details>
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={updBusy || !password || !updEmail.trim()}
+                    onClick={() => void patchFacilitatorCreds()}
+                    className="mt-4 rounded-lg border border-sky-400/50 bg-sky-600 px-4 py-2 font-semibold text-[#081218] hover:bg-sky-500 disabled:opacity-45"
+                  >
+                    {updBusy ? "Saving…" : "Apply update"}
+                  </button>
+                  {updMsg ? (
+                    <p className="mt-3 whitespace-pre-wrap text-xs text-sky-100/85">
+                      {updMsg}
+                    </p>
+                  ) : null}
+                </details>
+              </>
             ) : null}
 
             {error ? (

@@ -472,9 +472,9 @@ export default function ClassHubBody({
                   their trainer console — it is separate from the shared Day&nbsp;03 slides.
                 </p>
               ) : null}
-              {hub.facilitatorEmail ? (
+              {facilitatorLabel ? (
                 <p className="mt-1 text-xs text-slate-400">
-                  Grading inbox · {hub.facilitatorEmail}
+                  Facilitator · {facilitatorLabel}
                 </p>
               ) : null}
               {!courseSlug && hub.mode === "builtin" ? (

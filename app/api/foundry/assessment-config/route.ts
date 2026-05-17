@@ -42,11 +42,16 @@ export async function GET(req: NextRequest) {
   const fac = await pgFacilitatorById(pool, a.facilitator_id);
   const facilitatorEmail =
     typeof fac?.email === "string" && fac.email.trim().length > 0 ? fac.email.trim() : null;
+  const facilitatorDisplayName =
+    typeof fac?.display_name === "string" && fac.display_name.trim().length > 0
+      ? fac.display_name.trim()
+      : null;
 
   return Response.json({
     slug: a.slug,
     title: a.title,
     facilitatorEmail,
+    facilitatorDisplayName,
     intro: a.assessment_intro,
     subgroups,
     minPromptChars: Math.max(0, a.min_prompt_chars),

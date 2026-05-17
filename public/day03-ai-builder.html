@@ -1061,6 +1061,17 @@ function escapeHtml(s){
     .replace(/"/g,'&quot;');
 }
 
+function facilitatorPortalSuffix(cfg){
+  const dn=typeof cfg.facilitatorDisplayName==='string'?cfg.facilitatorDisplayName.trim():'';
+  if(dn) return ' · Facilitator: '+dn;
+  const em=typeof cfg.facilitatorEmail==='string'?cfg.facilitatorEmail.trim():'';
+  if(em){
+    const local=em.split('@')[0]||em;
+    return ' · Facilitator: '+local;
+  }
+  return '';
+}
+
 function syncFacilitatorDesk(){
   const wrap=document.getElementById('facilitator-desk-banner');
   const bodyEl=document.getElementById('facilitator-desk-body');
@@ -1296,10 +1307,7 @@ async function ensureSubgroupsLoaded(force){
       CURRENT_ASSESSMENT_INTRO = '';
       const banner=document.getElementById('portal-assessment-label');
       if(banner){
-        const fac = typeof j.facilitatorEmail === 'string' && j.facilitatorEmail.trim()
-          ? (' · Grading inbox: '+j.facilitatorEmail.trim())
-          : '';
-        banner.textContent='Assessment · could not load config ('+ASSESSMENT_SLUG+')'+fac;
+        banner.textContent='Assessment · could not load config ('+ASSESSMENT_SLUG+')'+facilitatorPortalSuffix(j);
       }
       applySubmissionLockUI();
       applyCohortDeckPresentation();
@@ -1318,9 +1326,7 @@ async function ensureSubgroupsLoaded(force){
     CURRENT_ASSESSMENT_INTRO = typeof j.intro==='string' ? j.intro : '';
     const banner=document.getElementById('portal-assessment-label');
     if(banner){
-      const fac = typeof j.facilitatorEmail === 'string' && j.facilitatorEmail.trim()
-        ? (' · Grading inbox: '+j.facilitatorEmail.trim())
-        : '';
+      const fac=facilitatorPortalSuffix(j);
       if(ASSESSMENT_SLUG){
         banner.textContent = 'Assessment · '+CURRENT_ASSESSMENT_TITLE+' ('+ASSESSMENT_SLUG+')'+fac;
       }else if(SITE_DEFAULT_MODE){

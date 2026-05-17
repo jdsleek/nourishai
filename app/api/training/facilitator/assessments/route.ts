@@ -45,6 +45,8 @@ export async function GET() {
       minPromptChars: a.min_prompt_chars,
       minOutputChars: a.min_output_chars,
       submissionsOpen: a.submissions_open,
+      assessmentIntro: a.assessment_intro ?? "",
+      graderInstructions: a.grader_instructions ?? "",
       studentUrlHint: `/foundry/day03?assessment=${encodeURIComponent(a.slug)}`,
       classHubPath: `/learn/${encodeURIComponent(a.slug)}`,
     })),

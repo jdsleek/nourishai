@@ -131,6 +131,106 @@ async function ensureSchema(pool) {
   `).catch(() => undefined);
 }
 
+const DEMO_DESK_ASSESSMENT_SLUG =
+  process.env.DEMO_DESK_ASSESSMENT_SLUG?.trim().toLowerCase().replace(/[^a-z0-9-]/g, "") ||
+  "demo-foundry-desk";
+
+async function upsertDemoAssessment(pool, facilitatorId) {
+  const subgroupList = [
+    "Bethel",
+    "Carmel",
+    "Eden",
+    "Gilead",
+    "Goshen",
+    "Hebron",
+    "Israel",
+    "Zion",
+    "Other / not listed",
+  ];
+
+  const assessmentIntro =
+    process.env.DEMO_DESK_CLASS_TEXT?.trim() ||
+    [
+      "Demo class desk (sample cohort)",
+      "",
+      'This banner is saved in Postgres as your facilitator “class desk.” Learners at your deck URL see it above the shared Qubators Day 03 slides.',
+      "",
+      "Today:",
+      "• Paste a five‑pillar architecture prompt (Role, Task, Context, Constraints, Format) verbatim.",
+      "• Paste model output where Frontend, Backend/API, Database, and Data flow are all visible.",
+      "• Subgroup must match your ideation intake form.",
+    ].join("\n");
+
+  const graderInstructions =
+    process.env.DEMO_DESK_GRADER_INSTRUCTIONS?.trim() ||
+    [
+      "Follow standard Day 03 buckets (prompt_quality /10, architecture_viability /10) but:",
+      "",
+      '- cap architecture_viability at 6/10 if Frontend, Backend/API, Database, or Data flow is missing or waffle‑only;',
+      '- name which section failed in breakdown feedback;',
+      "- keep JSON-only response contract identical to baseline Foundry grader.",
+    ].join("\n");
+
+  try {
+    const title =
+      process.env.DEMO_DESK_TITLE?.trim() || "Demo class desk · sample cohort";
+
+    const { rows } = await pool.query(
+      `SELECT id, facilitator_id::text AS fid FROM training_assessments
+       WHERE lower(slug) = lower($1) LIMIT 1`,
+      [DEMO_DESK_ASSESSMENT_SLUG],
+    );
+
+    if (rows.length) {
+      const owner = rows[0].fid;
+      if (owner !== facilitatorId) {
+        console.warn(
+          `[demo-facilitator] Slug '${DEMO_DESK_ASSESSMENT_SLUG}' belongs to another facilitator — skipping demo desk seed.`,
+        );
+        return;
+      }
+      await pool.query(
+        `UPDATE training_assessments SET title = $2, subgroup_options = $3::jsonb,
+            min_prompt_chars = 40, min_output_chars = 80,
+            assessment_intro = $4, grader_instructions = $5,
+            submissions_open = TRUE, updated_at = NOW()
+         WHERE id = $1::uuid`,
+        [
+          rows[0].id,
+          title,
+          JSON.stringify(subgroupList),
+          assessmentIntro,
+          graderInstructions,
+        ],
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO training_assessments (
+           facilitator_id, title, slug, subgroup_options,
+           min_prompt_chars, min_output_chars, assessment_intro, grader_instructions, submissions_open
+         ) VALUES ($1, $2, $3, $4::jsonb, 40, 80, $5, $6, TRUE)`,
+        [
+          facilitatorId,
+          title,
+          DEMO_DESK_ASSESSMENT_SLUG,
+          JSON.stringify(subgroupList),
+          assessmentIntro,
+          graderInstructions,
+        ],
+      );
+    }
+
+    console.log("[demo-facilitator] Sample class desk assessment ready:");
+    console.log(`  Deck URL · /foundry/day03?assessment=${encodeURIComponent(DEMO_DESK_ASSESSMENT_SLUG)}`);
+    console.log(`  Hub URL  · /learn/${encodeURIComponent(DEMO_DESK_ASSESSMENT_SLUG)}`);
+  } catch (e) {
+    console.warn(
+      "[demo-facilitator] Could not upsert demo assessment (non-fatal):",
+      e instanceof Error ? e.message : e,
+    );
+  }
+}
+
 async function main() {
   loadProjectEnv();
 
@@ -183,6 +283,8 @@ async function main() {
 
     const r = rows[0];
     const usingEnvPwd = Boolean(process.env.DEMO_FACILITATOR_PASSWORD?.trim());
+    await upsertDemoAssessment(pool, r.id);
+
     console.log("");
     console.log("[demo-facilitator] OK — facilitator row upserted in THIS database.");
     console.log(

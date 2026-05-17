@@ -111,7 +111,12 @@ async function main() {
     const r = await fetchWithTimeout(`${BASE}/foundry/day03`);
     assert(r.ok, `status ${r.status}`);
     const t = await r.text();
-    assert(/assessment/i.test(t) && /URLSearchParams/.test(t), "missing deck script");
+    assert(
+      /assessment/i.test(t) &&
+        /URLSearchParams/.test(t) &&
+        /facilitator-desk-banner/i.test(t),
+      "missing deck script or class desk mount",
+    );
   });
 
   await check("GET /foundry/day03?assessment=e2e-fake-slug (HTML still serves)", async () => {

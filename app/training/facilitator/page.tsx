@@ -16,6 +16,8 @@ type Assessment = {
   subgroupOptions: string[];
   minPromptChars: number;
   minOutputChars: number;
+  assessmentIntro: string;
+  graderInstructions: string;
   studentUrlHint: string;
   submissionsOpen: boolean;
 };
@@ -88,6 +90,13 @@ export default function FacilitatorDashboard() {
   const [graderInstructions, setGraderInstructions] = useState("");
   const [mp, setMp] = useState(40);
   const [mo, setMo] = useState(80);
+  /** Inline edit desk + rubric for an existing assessment */
+  const [editingDesk, setEditingDesk] = useState<{
+    id: string;
+    intro: string;
+    grader: string;
+  } | null>(null);
+  const [deskSaveBusy, setDeskSaveBusy] = useState(false);
 
   const primaryAssessment = useMemo(() => assessments[0] ?? null, [assessments]);
   const canClaimLegacy = assessments.length > 0;
@@ -119,6 +128,8 @@ export default function FacilitatorDashboard() {
         subgroupOptions: Array.isArray(x.subgroupOptions) ? x.subgroupOptions.map(String) : [],
         minPromptChars: Number(x.minPromptChars ?? 40),
         minOutputChars: Number(x.minOutputChars ?? 80),
+        assessmentIntro: String(x.assessmentIntro ?? ""),
+        graderInstructions: String(x.graderInstructions ?? ""),
         studentUrlHint: String(x.studentUrlHint ?? ""),
         submissionsOpen: x.submissionsOpen !== false,
       })),
@@ -180,6 +191,34 @@ export default function FacilitatorDashboard() {
     },
     [load],
   );
+
+  const saveDeskAndRubric = useCallback(async () => {
+    if (!editingDesk) return;
+    setDeskSaveBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(
+        `/api/training/facilitator/assessments/${encodeURIComponent(editingDesk.id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            assessmentIntro: editingDesk.intro,
+            graderInstructions: editingDesk.grader.trim(),
+          }),
+        },
+      );
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error || "Could not save.");
+      setEditingDesk(null);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Save failed.");
+    } finally {
+      setDeskSaveBusy(false);
+    }
+  }, [editingDesk, load]);
 
   const copyText = useCallback(async (text: string, label: string) => {
     try {
@@ -392,15 +431,17 @@ export default function FacilitatorDashboard() {
               <div className="rounded-2xl border border-cyan-500/30 bg-cyan-950/20 p-5">
                 <h2 className="text-lg font-semibold text-cyan-100">Class deck &amp; portal</h2>
                 <p className="mt-2 text-sm text-slate-300">
-                  The public home page (
-                  <code className="rounded bg-black/40 px-1 font-mono text-xs">/</code>) loads the{" "}
-                  <strong className="text-white">shared program deck only</strong> — grading there
-                  uses the legacy built-in rubric unless students add{" "}
+                  Slide HTML is shared Qubators Day&nbsp;03 for everyone — your coursework differs by{" "}
+                  <strong className="text-white">grading rubric</strong>,{" "}
+                  <strong className="text-white">subgroups</strong>, and the optional{" "}
+                  <strong className="text-white">class desk</strong> block you publish under{" "}
+                  <strong>Assessments</strong>. The public home page (
+                  <code className="rounded bg-black/40 px-1 font-mono text-xs">/</code>) loads the deck
+                  with the legacy built-in rubric unless students append{" "}
                   <code className="rounded bg-black/40 px-1 font-mono text-xs">
                     ?assessment=their-slug
-                  </code>{" "}
-                  to the URL. Always send your cohort explicit links:
-                  hub{" "}
+                  </code>
+                  . Send explicit links — hub{" "}
                   <code className="rounded bg-black/40 px-1 font-mono text-xs">
                     /learn/your-course
                   </code>{" "}
@@ -582,8 +623,36 @@ export default function FacilitatorDashboard() {
                           <div>
                             <p className="font-semibold text-white">{a.title}</p>
                             <p className="mt-1 font-mono text-xs text-emerald-300">{a.slug}</p>
+                            {a.assessmentIntro.trim() ? (
+                              <p className="mt-2 text-xs text-cyan-200/85">
+                                Class desk filled — learners see it on the Day 03 slide deck with this
+                                link.
+                              </p>
+                            ) : (
+                              <p className="mt-2 text-xs text-slate-500">
+                                No class desk yet — add text so your cohort sees their assignment at
+                                the top of the deck (not only the generic Qubators slides).
+                              </p>
+                            )}
                           </div>
                           <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              className="rounded border border-cyan-500/35 px-2 py-1 text-[10px] text-cyan-100"
+                              onClick={() =>
+                                setEditingDesk((cur) =>
+                                  cur?.id === a.id
+                                    ? null
+                                    : {
+                                        id: a.id,
+                                        intro: a.assessmentIntro,
+                                        grader: a.graderInstructions,
+                                      },
+                                )
+                              }
+                            >
+                              {editingDesk?.id === a.id ? "Close editor" : "Desk & assignment"}
+                            </button>
                             <button
                               type="button"
                               className="rounded bg-orange-500/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#140802]"
@@ -618,6 +687,58 @@ export default function FacilitatorDashboard() {
                             </button>
                           </div>
                         </div>
+                        {editingDesk?.id === a.id ? (
+                          <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+                            <label className="block text-xs text-slate-400">
+                              Class desk · what learners see on the slide deck before your portal
+                              (optional)
+                              <textarea
+                                value={editingDesk.intro}
+                                onChange={(e) =>
+                                  setEditingDesk((d) =>
+                                    d ? { ...d, intro: e.target.value } : null,
+                                  )
+                                }
+                                rows={8}
+                                className="mt-1 w-full rounded-lg border border-white/15 bg-[#07080d] px-3 py-2 font-sans text-[13px] leading-relaxed text-slate-100"
+                                placeholder="Today’s objectives, readings, Slack link, or document summary — plain text."
+                              />
+                            </label>
+                            <label className="block text-xs text-slate-400">
+                              Rubric · grading instructions (required for published courses)
+                              <textarea
+                                value={editingDesk.grader}
+                                onChange={(e) =>
+                                  setEditingDesk((d) =>
+                                    d ? { ...d, grader: e.target.value } : null,
+                                  )
+                                }
+                                rows={12}
+                                className="mt-1 w-full rounded-lg border border-white/15 bg-[#07080d] px-3 py-2 font-mono text-[12px] text-slate-100"
+                              />
+                            </label>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                disabled={
+                                  deskSaveBusy || editingDesk.grader.trim().length < 20
+                                }
+                                onClick={() => void saveDeskAndRubric()}
+                                className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-[#08120c] disabled:opacity-50"
+                              >
+                                {deskSaveBusy ? "Saving…" : "Save desk + rubric"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={deskSaveBusy}
+                                onClick={() => setEditingDesk(null)}
+                                className="rounded-lg border border-white/20 px-4 py-2 text-sm"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
@@ -700,6 +821,16 @@ export default function FacilitatorDashboard() {
                       />
                     </label>
                   </div>
+                  <label className="block text-xs text-slate-400">
+                    Class desk · learner-facing assignment brief (optional)
+                    <textarea
+                      value={intro}
+                      onChange={(e) => setIntro(e.target.value)}
+                      rows={6}
+                      placeholder="What you paste here appears at the top of the shared Day 03 slides for your course URL, and is sent to the grader together with rubric instructions. Use plain text: objectives, readings, cohort links."
+                      className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-[13px] leading-relaxed"
+                    />
+                  </label>
                   <label className="block text-xs text-slate-400">
                     Rubric / grading instructions (required)
                     <textarea

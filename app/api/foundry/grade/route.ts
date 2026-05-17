@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
         return Response.json(
           {
             error:
-              "This assessment requires DATABASE_URL on the server so its rubric can be loaded.",
+              "This assessment is not available right now. Try again later or contact your facilitator.",
           },
           { status: 503 },
         );

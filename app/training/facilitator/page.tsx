@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  DashboardStatCard,
+  DashboardStatGrid,
+} from "@/components/foundry/DashboardStatGrid";
 
-type FacTab = "share" | "submissions" | "assessments";
+type FacTab = "overview" | "share" | "submissions" | "assessments";
 
 type Assessment = {
   id: string;
@@ -40,6 +44,7 @@ type Stats = {
 };
 
 const TAB_LABELS: { id: FacTab; label: string }[] = [
+  { id: "overview", label: "Overview" },
   { id: "share", label: "Share with class" },
   { id: "submissions", label: "Submissions" },
   { id: "assessments", label: "Assessments" },
@@ -52,7 +57,7 @@ function originUrl(path: string) {
 
 export default function FacilitatorDashboard() {
   const router = useRouter();
-  const [tab, setTab] = useState<FacTab>("share");
+  const [tab, setTab] = useState<FacTab>("overview");
   const [me, setMe] = useState<{ email: string; displayName: string } | null>(null);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [subs, setSubs] = useState<Submission[]>([]);
@@ -83,6 +88,10 @@ export default function FacilitatorDashboard() {
     [assessments, markedSiteDefault],
   );
   const canClaimLegacy = assessments.length > 0;
+  const openAssessmentCount = useMemo(
+    () => assessments.filter((a) => a.submissionsOpen).length,
+    [assessments],
+  );
 
   const load = useCallback(async () => {
     setErr(null);
@@ -283,6 +292,86 @@ export default function FacilitatorDashboard() {
             </p>
           ) : null}
 
+          {tab === "overview" ? (
+            <section className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Your course at a glance</h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Submissions and class links for your facilitator account only.
+                </p>
+              </div>
+              <DashboardStatGrid>
+                <DashboardStatCard
+                  label="In your inbox"
+                  value={stats?.submissionCount ?? subs.length}
+                  hint="Graded work tied to your assessments"
+                  tone="cyan"
+                  onClick={() => setTab("submissions")}
+                />
+                <DashboardStatCard
+                  label="Assessments"
+                  value={stats?.assessmentCount ?? assessments.length}
+                  hint={`${openAssessmentCount} open for new submits`}
+                  tone="slate"
+                  onClick={() => setTab("assessments")}
+                />
+                <DashboardStatCard
+                  label="Pending attach"
+                  value={stats?.orphanLegacyCount ?? 0}
+                  hint={
+                    (stats?.orphanLegacyCount ?? 0) > 0
+                      ? "Class deck grades not in your inbox yet"
+                      : "All class work linked"
+                  }
+                  tone={(stats?.orphanLegacyCount ?? 0) > 0 ? "amber" : "emerald"}
+                  onClick={() => setTab("share")}
+                />
+                <DashboardStatCard
+                  label="Site default"
+                  value={
+                    markedSiteDefault
+                      ? markedSiteDefault.slug
+                      : primaryAssessment
+                        ? "Not set"
+                        : "—"
+                  }
+                  hint={
+                    markedSiteDefault
+                      ? markedSiteDefault.title
+                      : "Home deck URL routes here when set"
+                  }
+                  tone={markedSiteDefault ? "emerald" : "amber"}
+                  onClick={() => setTab("assessments")}
+                />
+              </DashboardStatGrid>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTab("share")}
+                  className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-[#041018] hover:bg-cyan-500"
+                >
+                  Share class URL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("submissions")}
+                  className="rounded-lg border border-white/20 px-4 py-2 text-sm text-slate-200 hover:bg-white/5"
+                >
+                  View submissions
+                </button>
+                {(stats?.orphanLegacyCount ?? 0) > 0 && canClaimLegacy ? (
+                  <button
+                    type="button"
+                    onClick={() => setTab("share")}
+                    className="rounded-lg border border-amber-400/40 px-4 py-2 text-sm text-amber-100 hover:bg-amber-950/30"
+                  >
+                    Attach {stats!.orphanLegacyCount} pending
+                  </button>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+
           {tab === "share" ? (
             <section className="space-y-4">
               <div className="rounded-2xl border border-cyan-500/30 bg-cyan-950/20 p-5">
@@ -354,11 +443,8 @@ export default function FacilitatorDashboard() {
                         This account has <strong>no assessments yet</strong>, so there is
                         nowhere to attach these rows. Create one under{" "}
                         <strong>Assessments</strong>, or ask the organizer to assign an
-                        existing course (e.g. sprint-architecture) to your email in{" "}
-                        <code className="rounded bg-black/40 px-1 font-mono text-[11px]">
-                          /foundry/admin
-                        </code>
-                        .
+                        existing course (e.g. sprint-architecture) assigned to your email
+                        by your program organizer.
                       </p>
                       <button
                         type="button"

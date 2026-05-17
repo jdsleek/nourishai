@@ -1,12 +1,14 @@
 "use client";
 
 export type AdminNavSection =
+  | "overview"
   | "submissions"
   | "facilitators"
   | "assessments"
   | "ideation";
 
 const ITEMS: { id: AdminNavSection; label: string; hint: string }[] = [
+  { id: "overview", label: "Overview", hint: "Cohort snapshot" },
   { id: "submissions", label: "All submissions", hint: "Cohort inbox" },
   { id: "facilitators", label: "Facilitators", hint: "Accounts & roster" },
   { id: "assessments", label: "Assessments", hint: "Locks & legacy tools" },

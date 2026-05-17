@@ -13,7 +13,10 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   const pool = getFoundryPgPool();
   if (!pool) {
-    return Response.json({ error: "DATABASE_URL missing." }, { status: 503 });
+    return Response.json(
+      { error: "Sign-in is temporarily unavailable. Contact your program organizer." },
+      { status: 503 },
+    );
   }
 
   await ensureFoundrySubmissionsSchema(pool);

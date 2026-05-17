@@ -128,7 +128,7 @@ export default function ClassWorkbookPage() {
           </a>
         </p>
         <p className="mt-2 max-w-xl text-xs text-stone-500 dark:text-stone-500">
-          The cohort-wide <strong className="text-stone-600 dark:text-stone-400">product ideation</strong> summaries are instructor-only (<code className="rounded bg-stone-200/80 px-1 py-0.5 dark:bg-stone-800">/foundry/admin</code> — password protected) so fellows don&apos;t see each other&apos;s ideas.
+          The cohort-wide <strong className="text-stone-600 dark:text-stone-400">product ideation</strong> summaries are for facilitators and organizers only so fellows don&apos;t see each other&apos;s ideas.
         </p>
       </div>
 

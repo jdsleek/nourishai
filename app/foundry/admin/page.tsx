@@ -1,7 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminNav, type AdminNavSection } from "@/components/foundry/AdminNav";
+import {
+  DashboardStatCard,
+  DashboardStatGrid,
+} from "@/components/foundry/DashboardStatGrid";
 
 type Submission = {
   id: string;
@@ -92,7 +96,7 @@ export default function FoundryAdminPage() {
   const [subs, setSubs] = useState<Submission[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [section, setSection] = useState<AdminSection>("submissions");
+  const [section, setSection] = useState<AdminSection>("overview");
   const [ideationHtml, setIdeationHtml] = useState<string | null>(null);
   const [ideationLoading, setIdeationLoading] = useState(false);
   const [ideationErr, setIdeationErr] = useState<string | null>(null);
@@ -124,6 +128,25 @@ export default function FoundryAdminPage() {
   const [legacyMsg, setLegacyMsg] = useState<string | null>(null);
   const [legacyBusy, setLegacyBusy] = useState(false);
   const [legacyConfirm, setLegacyConfirm] = useState("");
+
+  const linkedSubmissionCount = useMemo(
+    () => subs.filter((s) => s.assessmentSlug || s.assessmentId).length,
+    [subs],
+  );
+  const openAssessmentCount = useMemo(
+    () => locks.filter((l) => l.submissionsOpen).length,
+    [locks],
+  );
+  const latestSubmissionLabel = useMemo(() => {
+    if (!subs.length) return "—";
+    const latest = subs.reduce((a, b) =>
+      new Date(a.submittedAt) > new Date(b.submittedAt) ? a : b,
+    );
+    return new Date(latest.submittedAt).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  }, [subs]);
 
   const loadLegacyStats = useCallback(async (pwd: string) => {
     try {
@@ -509,27 +532,10 @@ export default function FoundryAdminPage() {
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-cyan-400">
             Qubators AI Foundry
           </p>
-          <h1 className="mt-2 text-2xl font-bold text-white">
-            Instructor view — Day 03 submissions & cohort ideation
-          </h1>
+          <h1 className="mt-2 text-2xl font-bold text-white">Organizer console</h1>
           <p className="mt-2 max-w-xl text-sm text-slate-400">
-            Organizer / admin inbox: submissions from learners on the portal (legacy
-            built-in rubric and facilitator-authored assessments) plus the cohort
-            ideation registry. Requires{" "}
-            <code className="rounded bg-white/10 px-1 py-0.5 font-mono text-xs">
-              DATABASE_URL
-            </code>
-            ,
-            {" "}
-            <code className="rounded bg-white/10 px-1 py-0.5 font-mono text-xs">
-              FOUNDRY_ADMIN_PASSWORD
-            </code>
-            ,
-            {" "}
-            <code className="rounded bg-white/10 px-1 py-0.5 font-mono text-xs">
-              FACILITATOR_SESSION_SECRET
-            </code>{" "}
-            for facilitator dashboards.
+            Cohort submissions, facilitator accounts, assessment controls, and the
+            private ideation registry. Sign in with your organizer password.
           </p>
         </header>
 
@@ -542,7 +548,7 @@ export default function FoundryAdminPage() {
             }}
           >
             <label className="block text-sm font-medium text-slate-300">
-              Admin password
+              Organizer password
             </label>
             <input
               type="password"
@@ -568,13 +574,15 @@ export default function FoundryAdminPage() {
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
               <div className="flex flex-wrap items-center gap-4">
                 <p className="font-mono text-sm text-cyan-300">
-                  {section === "submissions"
-                    ? `${subs.length} submission${subs.length === 1 ? "" : "s"}`
-                    : section === "facilitators"
-                      ? `${facilitators.length} facilitator${facilitators.length === 1 ? "" : "s"}`
-                      : section === "assessments"
-                        ? `${locks.length} assessment${locks.length === 1 ? "" : "s"}`
-                        : "Ideation registry"}
+                  {section === "overview"
+                    ? "Cohort snapshot"
+                    : section === "submissions"
+                      ? `${subs.length} submission${subs.length === 1 ? "" : "s"}`
+                      : section === "facilitators"
+                        ? `${facilitators.length} facilitator${facilitators.length === 1 ? "" : "s"}`
+                        : section === "assessments"
+                          ? `${locks.length} assessment${locks.length === 1 ? "" : "s"}`
+                          : "Ideation registry"}
                 </p>
                 <button
                   type="button"
@@ -592,7 +600,7 @@ export default function FoundryAdminPage() {
                     setLegacyMsg(null);
                     setLegacyConfirm("");
                     setPassword("");
-                    setSection("submissions");
+                    setSection("overview");
                     setIdeationHtml(null);
                     setIdeationErr(null);
                   }}
@@ -635,6 +643,77 @@ export default function FoundryAdminPage() {
                 facilitatorCount={facilitators.length}
               />
               <div className="min-w-0 flex-1">
+            {section === "overview" ? (
+              <section className="mb-8 space-y-6">
+                <DashboardStatGrid>
+                  <DashboardStatCard
+                    label="Total submissions"
+                    value={subs.length}
+                    hint={`${linkedSubmissionCount} linked to a facilitator course`}
+                    tone="cyan"
+                    onClick={() => setSection("submissions")}
+                  />
+                  <DashboardStatCard
+                    label="Unlinked (deck-only)"
+                    value={legacyCount ?? "—"}
+                    hint={
+                      (legacyCount ?? 0) > 0
+                        ? "Needs legacy link under Assessments"
+                        : "All rows tied to a course"
+                    }
+                    tone={(legacyCount ?? 0) > 0 ? "amber" : "emerald"}
+                    onClick={() => setSection("assessments")}
+                  />
+                  <DashboardStatCard
+                    label="Facilitators"
+                    value={facilitators.length}
+                    hint="Trainer accounts"
+                    tone="orange"
+                    onClick={() => setSection("facilitators")}
+                  />
+                  <DashboardStatCard
+                    label="Assessments"
+                    value={locks.length}
+                    hint={`${openAssessmentCount} accepting new submits`}
+                    tone="slate"
+                    onClick={() => setSection("assessments")}
+                  />
+                </DashboardStatGrid>
+                <div className="rounded-xl border border-white/10 bg-[#111520] p-5 text-sm">
+                  <p className="font-semibold text-white">Latest activity</p>
+                  <p className="mt-2 text-slate-400">
+                    Most recent submission:{" "}
+                    <span className="text-slate-200">{latestSubmissionLabel}</span>
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSection("submissions")}
+                      className="rounded-lg border border-cyan-400/35 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-950/40"
+                    >
+                      Review submissions
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSection("facilitators")}
+                      className="rounded-lg border border-orange-400/35 px-3 py-1.5 text-xs text-orange-100 hover:bg-orange-950/30"
+                    >
+                      Manage facilitators
+                    </button>
+                    {(legacyCount ?? 0) > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setSection("assessments")}
+                        className="rounded-lg border border-amber-400/35 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-950/30"
+                      >
+                        Link {legacyCount} unlinked row(s)
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
             {section === "assessments" ? (
               <div className="mb-6 rounded-xl border border-amber-500/25 bg-amber-950/10 p-4 text-sm">
                 <p className="font-semibold text-amber-200">
@@ -658,8 +737,7 @@ export default function FoundryAdminPage() {
                   </p>
                 ) : locks.length === 0 ? (
                   <p className="mt-3 text-xs text-slate-500">
-                    No facilitator-created assessments yet (or Postgres not configured —
-                    DATABASE_URL required).
+                    No facilitator-created assessments yet.
                   </p>
                 ) : (
                   <ul className="mt-4 space-y-3">

@@ -986,6 +986,16 @@ function setProgressA11y(){
   bar.setAttribute('aria-valuenow',String(cur+1));
   bar.setAttribute('aria-valuemax',String(TOTAL));
 }
+/** Slides shown in lesson deck only (avoid matching unrelated `.slide` if markup grows). */
+function getDeckSlideEls(){
+  return document.querySelectorAll('.deck > .slide[data-slide]');
+}
+
+/** Mirrors applyCohortDeckPresentation — two-step deck hides slides 1–5 via CSS when slug + loaded config succeeded. */
+function isFacilitatorCohortDeckMode(){
+  return !!(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK);
+}
+
 // ── DOTS ──
 const dotsEl = document.getElementById('dots');
 for(let i=0;i<TOTAL;i++){
@@ -999,17 +1009,34 @@ for(let i=0;i<TOTAL;i++){
 }
 
 function visibleSlideIndices(){
-  if(document.body.classList.contains('cohort-assessment-deck')) return [0,6];
-  const out=[];
-  for(let i=0;i<TOTAL;i++) out.push(i);
+  var cohort=document.body.classList.contains('cohort-assessment-deck');
+  /** If URL has a facilitator slug and config succeeded, cohort mode hides slides 1–5 — keep navigation in sync even if JS state is stale. */
+  if(cohort||isFacilitatorCohortDeckMode())
+    return [0, 6];
+  var out=[];
+  for(var si=0;si<TOTAL;si++) out.push(si);
   return out;
 }
 
+function reconcileDeckSlideClasses(){
+  var slides=getDeckSlideEls();
+  if(!slides.length) return;
+  for(var j=0;j<slides.length;j++){
+    slides[j].classList.toggle('active',j===cur);
+    slides[j].classList.remove('exit');
+  }
+}
+
 function updateUI(){
+  const visRaw=visibleSlideIndices();
+  if(visRaw.indexOf(cur)<0){
+    cur=visRaw.length?visRaw[0]:0;
+    reconcileDeckSlideClasses();
+  }
   const vis=visibleSlideIndices();
   const pos=Math.max(0,vis.indexOf(cur));
   const displayTotal=vis.length;
-  const displayNum=pos+1;
+  const displayNum=pos>=0?pos+1:1;
   document.querySelectorAll('.dot-pip').forEach((d,i)=>{
     const show=vis.includes(i);
     d.style.display=show?'':'none';
@@ -1023,24 +1050,42 @@ function updateUI(){
 }
 
 function goTo(n){
-  const slides=document.querySelectorAll('.slide');
-  slides[cur].classList.remove('active');
-  slides[cur].classList.add('exit');
-  const prev=cur;
-  cur=n;
-  setTimeout(()=>slides[prev].classList.remove('exit'),500);
+  const slides=getDeckSlideEls();
+  const target=typeof n === 'number' && Number.isFinite(n) ? Math.floor(n) : 0;
+  if(!slides.length||target < 0 || target>=slides.length) return;
+  if(typeof cur === 'number' && cur>=0 && cur<slides.length){
+    slides[cur].classList.remove('active');
+    slides[cur].classList.add('exit');
+  }
+  const prev=(typeof cur==='number'&&cur>=0)?cur:0;
+  cur=target;
+  setTimeout(()=>{
+    try{slides[prev] && slides[prev].classList.remove('exit')}catch(__){/**/}
+  },500);
   slides[cur].classList.add('active');
   updateUI();
 }
 
 function nextSlide(){
   const vis=visibleSlideIndices();
-  const i=vis.indexOf(cur);
+  var i=vis.indexOf(cur);
+  if(i<0){
+    cur=vis.length?vis[0]:0;
+    reconcileDeckSlideClasses();
+    updateUI();
+    return;
+  }
   if(i>=0&&i<vis.length-1) goTo(vis[i+1]);
 }
 function prevSlide(){
   const vis=visibleSlideIndices();
-  const i=vis.indexOf(cur);
+  var i=vis.indexOf(cur);
+  if(i<0){
+    cur=vis.length?vis[0]:0;
+    reconcileDeckSlideClasses();
+    updateUI();
+    return;
+  }
   if(i>0) goTo(vis[i-1]);
 }
 
@@ -1408,8 +1453,7 @@ function applyCohortDeckPresentation(){
     const logor=document.querySelector('.chrome-top .logo');
     if(logor) logor.innerHTML='<strong>QUBATORS</strong> AI FOUNDRY · DAY 03';
     syncFacilitatorDesk();
-    return;
-  }
+  }else{
   const wrap=document.getElementById('facilitator-desk-banner');
   if(wrap) wrap.hidden=true;
   const slide0=document.querySelector('.slide[data-slide="0"]');
@@ -1451,8 +1495,13 @@ function applyCohortDeckPresentation(){
     const btnLast=document.getElementById('btnLastGrade');
     if(btnLast) btnLast.style.display=lastGradeForCurrentAssessment()?'':'none';
   }
-  const vis=visibleSlideIndices();
-  if(!vis.includes(cur)) goTo(0);
+  }
+
+  var visFinish=visibleSlideIndices();
+  if(visFinish.indexOf(cur)<0){
+    cur=visFinish.length?visFinish[0]:0;
+  }
+  reconcileDeckSlideClasses();
   updateUI();
 }
 

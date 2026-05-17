@@ -37,8 +37,11 @@ export function clearPersistedLearnerCourseSlug(): void {
   }
 }
 
+/** Slides + portal for a facilitator assessment (unique path per cohort; query form still supported). */
 export function learnerDeckPath(slug: string): string {
-  return `/foundry/day03?assessment=${encodeURIComponent(slug)}`;
+  const s = normalizeLearnerCourseSlug(slug);
+  if (!s) return "/foundry/day03";
+  return `/foundry/deck/${encodeURIComponent(s)}`;
 }
 
 export function learnerClassHubPath(slug: string): string {

@@ -1,4 +1,5 @@
 import { facilitatorFromCookie } from "@/lib/training-session-cookie";
+import { learnerDeckPath } from "@/lib/foundry-learner-course";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import { pgFacilitatorByEmail, pgUpdateAssessment } from "@/lib/training-pg";
 
@@ -74,7 +75,7 @@ export async function PATCH(
     return Response.json({
       ok: true,
       assessment: next,
-      studentUrl: `/foundry/day03?assessment=${encodeURIComponent(next.slug)}`,
+      studentUrl: learnerDeckPath(next.slug),
       classHubPath: `/learn/${encodeURIComponent(next.slug)}`,
     });
   } catch (e) {

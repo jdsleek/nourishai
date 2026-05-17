@@ -10,6 +10,7 @@ import {
   parseGraderJson,
 } from "@/lib/foundry-grade";
 import { clipFoundryBodiesForGroq } from "@/lib/foundry-grade-clip";
+import { insertFoundryLlmUsageEvent } from "@/lib/foundry-llm-usage";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
 import { appendFoundrySubmission } from "@/lib/foundry-store";
@@ -233,6 +234,23 @@ export async function POST(req: NextRequest) {
 
     if (!persisted) {
       console.error("[foundry/grade] all persist attempts failed");
+    }
+
+    if (pool) {
+      try {
+        await insertFoundryLlmUsageEvent(pool, {
+          source: "grading",
+          provider: graded.meta.provider,
+          model: graded.meta.model,
+          promptTokens: graded.meta.usage.promptTokens,
+          completionTokens: graded.meta.usage.completionTokens,
+          totalTokens: graded.meta.usage.totalTokens,
+          submissionId: saved?.id ?? null,
+          estimated: false,
+        });
+      } catch (usageErr) {
+        console.error("[foundry/grade] metering insert failed", usageErr);
+      }
     }
 
     return Response.json({

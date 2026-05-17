@@ -561,8 +561,15 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
 <script>
 (function hubLinkFromQuery(){
  try{
- var p=new URLSearchParams(location.search);
- var slug=(String(p.get('assessment')||'').trim().toLowerCase().replace(/[^a-z0-9-]/g,''));
+ var slug=String(new URLSearchParams(location.search).get('assessment')||'').trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
+ if(slug.length<3){
+   var path0=String(location.pathname||'').replace(/\/$/,'')||'';
+   var mm=path0.match(/^\/foundry\/deck\/([^/]+)$/);
+   if(mm){
+     try{ slug=decodeURIComponent(mm[1]||''); }catch(__){ slug=mm[1]||''; }
+     slug=String(slug).trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
+   }
+ }
  if(slug.length<3) return;
  var a=document.getElementById('deckClassHubLink');
  if(!a) return;
@@ -938,15 +945,32 @@ const FOUNDRY_COURSE_SLUG_KEY = 'foundry.courseSlug.v1';
 
 function resolveAssessmentSlug(){
   if(typeof location==='undefined') return '';
-  const raw = (new URLSearchParams(location.search).get('assessment')||'').trim().toLowerCase();
-  let slug = raw.replace(/[^a-z0-9-]/g,'');
-  if(slug && slug.length>=3){
+  let slug='';
+  const qRaw=(new URLSearchParams(location.search).get('assessment')||'').trim().toLowerCase();
+  slug=qRaw.replace(/[^a-z0-9-]/g,'');
+  if(!slug||slug.length<3){
+    const pathClean=(location.pathname||'').replace(/\/$/,'')||'';
+    const m=pathClean.match(/^\/foundry\/deck\/([^/]+)$/);
+    if(m){
+      try{ slug=decodeURIComponent(m[1]||''); }catch(__){ slug=m[1]||''; }
+      slug=String(slug).trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
+    }
+  }
+  if(slug&&slug.length>=3){
     try{ sessionStorage.setItem(FOUNDRY_COURSE_SLUG_KEY, slug); }catch(_){}
-    const params=new URLSearchParams(location.search);
-    if(params.get('assessment')!==slug){
-      params.set('assessment',slug);
-      const q=params.toString();
-      history.replaceState(null,'',location.pathname+(q?('?'+q):''));
+    const deckPath='/foundry/deck/'+encodeURIComponent(slug);
+    const pathNow=(location.pathname||'').replace(/\/$/,'')||'';
+    if(pathNow.startsWith('/foundry/deck/')){
+      if(pathNow!==deckPath){
+        history.replaceState(null,'',deckPath+(location.search||''));
+      }
+    }else{
+      const params=new URLSearchParams(location.search);
+      if(params.get('assessment')!==slug){
+        params.set('assessment',slug);
+        const q=params.toString();
+        history.replaceState(null,'',location.pathname+(q?('?'+q):''));
+      }
     }
     return slug;
   }

@@ -360,7 +360,7 @@ async function main() {
     console.log("[create-test-assessment] Learner URLs:");
     console.log(`  Class hub · ${originHint}/learn/${encodeURIComponent(slug)}`);
     console.log(
-      `  Slides / portal · ${originHint}/foundry/day03?assessment=${encodeURIComponent(slug)}`,
+      `  Slides / portal · ${originHint}/foundry/deck/${encodeURIComponent(slug)} (legacy ?assessment= on /foundry/day03 still works)`,
     );
     console.log("");
     console.log(`Facilitator: ${fac.rows[0].email} (${fac.rows[0].display_name || "no display name"})`);

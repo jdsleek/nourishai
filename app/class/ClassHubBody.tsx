@@ -290,7 +290,7 @@ export default function ClassHubBody({
               <strong className="text-white">This page is your cohort home — it does not auto-open the slides.</strong>{" "}
               Scroll to <strong className="font-medium text-slate-200">Open slides &amp; submit portal</strong> when you
               want the deck; that opens{" "}
-              <span className="font-mono text-slate-500">/foundry/day03?assessment={courseSlug}</span> in the same tab
+              <span className="font-mono text-slate-500">{learnerDeckPath(courseSlug)}</span> in the same tab
               (different page, not a redirect from this URL).
             </p>
           ) : null}

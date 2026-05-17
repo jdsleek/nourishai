@@ -119,6 +119,18 @@ async function main() {
     );
   });
 
+  await check("GET /foundry/deck/e2e-fake-slug (cohort-specific deck URL)", async () => {
+    const r = await fetchWithTimeout(
+      `${BASE}/foundry/deck/e2e-fake-slug-not-real`,
+    );
+    assert(r.ok, `status ${r.status}`);
+    const t = await r.text();
+    assert(
+      /\/foundry\/deck\//i.test(t) && /facilitator-desk-banner/i.test(t),
+      "missing deck HTML or cohort path hooks",
+    );
+  });
+
   await check("GET /foundry/day03?assessment=e2e-fake-slug (HTML still serves)", async () => {
     const r = await fetchWithTimeout(
       `${BASE}/foundry/day03?assessment=e2e-fake-slug-not-real`,

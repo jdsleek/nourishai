@@ -5,6 +5,8 @@ import { AdminNav, type AdminNavSection } from "@/components/foundry/AdminNav";
 import {
   DashboardStatCard,
 } from "@/components/foundry/DashboardStatGrid";
+import { learnerDeckPath } from "@/lib/foundry-learner-course";
+import type { FoundryLlmUsageTotals } from "@/lib/foundry-llm-usage";
 
 type Submission = {
   id: string;
@@ -43,12 +45,17 @@ const BREAKDOWN_LABELS: Record<string, string> = {
 };
 
 /** Same learner URLs as facilitator “Share” — admin can copy full absolute links. */
-function facilitatorLearnerDeckPath(slug: string) {
-  return `/foundry/day03?assessment=${encodeURIComponent(slug)}`;
-}
-
 function facilitatorClassHubPath(slug: string) {
   return `/learn/${encodeURIComponent(slug)}`;
+}
+
+function fmtUsdRef(n: number) {
+  if (!Number.isFinite(n)) return "$0.0000";
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 4,
+  }).format(n);
 }
 
 function adminOriginAbs(path: string) {
@@ -137,6 +144,10 @@ export default function FoundryAdminPage() {
   );
   const [ownerMoveBusy, setOwnerMoveBusy] = useState<string | null>(null);
   const [linkCopyMsg, setLinkCopyMsg] = useState<string | null>(null);
+  const [llmTotals, setLlmTotals] = useState<FoundryLlmUsageTotals | null>(
+    null,
+  );
+  const [llmTotalsErr, setLlmTotalsErr] = useState<string | null>(null);
 
   const linkedSubmissionCount = useMemo(
     () => subs.filter((s) => s.assessmentSlug || s.assessmentId).length,
@@ -442,10 +453,17 @@ export default function FoundryAdminPage() {
   const load = useCallback(async (pwd: string) => {
     setLoading(true);
     setError(null);
+    setLlmTotalsErr(null);
     try {
-      const res = await fetch("/api/foundry/admin/submissions", {
-        headers: { "x-foundry-admin-password": pwd },
-      });
+      const headers = { "x-foundry-admin-password": pwd };
+      const [res, usageRes] = await Promise.all([
+        fetch("/api/foundry/admin/submissions", {
+          headers,
+        }),
+        fetch("/api/foundry/admin/llm-usage", {
+          headers,
+        }),
+      ]);
       const data = (await res.json()) as {
         submissions?: Submission[];
         error?: string;
@@ -454,12 +472,32 @@ export default function FoundryAdminPage() {
         throw new Error(data.error || "Could not load submissions.");
       }
       setSubs(data.submissions || []);
+
+      const uj = (await usageRes.json()) as {
+        stats?: FoundryLlmUsageTotals | null;
+        error?: string;
+      };
+      if (usageRes.ok) {
+        setLlmTotals(uj.stats ?? null);
+        setLlmTotalsErr(null);
+      } else {
+        setLlmTotals(uj.stats ?? null);
+        setLlmTotalsErr(
+          uj.error ||
+            (usageRes.status === 503
+              ? "DATABASE_URL not set — grading token totals unavailable."
+              : "Could not load LLM totals."),
+        );
+      }
+
       setUnlocked(true);
       void loadLocks(pwd);
       void loadFacilitators(pwd);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed.");
       setUnlocked(false);
+      setLlmTotals(null);
+      setLlmTotalsErr(null);
     } finally {
       setLoading(false);
     }
@@ -662,6 +700,46 @@ export default function FoundryAdminPage() {
                     onClick={() => setSection("assessments")}
                   />
                 </div>
+
+                {llmTotalsErr ? (
+                  <p className="rounded-lg border border-amber-500/30 bg-amber-950/25 px-3 py-2 text-xs text-amber-100">
+                    LLM totals: {llmTotalsErr}
+                  </p>
+                ) : null}
+
+                {llmTotals ? (
+                  <div className="space-y-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <DashboardStatCard
+                        label="Grading tokens (all time)"
+                        value={llmTotals.combined.totalTokens.toLocaleString()}
+                        hint={`Metered ${llmTotals.metered.totalTokens.toLocaleString()} (${llmTotals.metered.gradingCalls} grades) · reconstructed ${llmTotals.reconstructed.totalTokens.toLocaleString()} (${llmTotals.reconstructed.gradingCalls} rows, pre-counter heuristics)`}
+                        tone="emerald"
+                      />
+                      <DashboardStatCard
+                        label="Anthropic-ref cost (≈)"
+                        value={fmtUsdRef(
+                          llmTotals.combined.anthropicEquivalentUsd,
+                        )}
+                        hint={`Metered ${fmtUsdRef(llmTotals.metered.anthropicEquivalentUsd)} + reconstructed ${fmtUsdRef(llmTotals.reconstructed.anthropicEquivalentUsd)} · $${llmTotals.anthropicInputUsdPerMTok}/M in · $${llmTotals.anthropicOutputUsdPerMTok}/M out`}
+                        tone="amber"
+                      />
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-slate-500">
+                      {llmTotals.anthropicPricingLabel}. Live grading uses Groq / OpenRouter / NVIDIA;
+                      the dollar line is Sonnet-tier Anthropic list-price equivalent for budgeting. Env:{" "}
+                      <code className="rounded bg-black/30 px-1 font-mono text-[10px]">
+                        FOUNDRY_ANTHROPIC_REF_INPUT_PER_MTOK_USD
+                      </code>{" "}
+                      /{" "}
+                      <code className="rounded bg-black/30 px-1 font-mono text-[10px]">
+                        FOUNDRY_ANTHROPIC_REF_OUTPUT_PER_MTOK_USD
+                      </code>
+                      .
+                    </p>
+                  </div>
+                ) : null}
+
                 <div className="rounded-xl border border-white/10 bg-[#111520] p-5 text-sm">
                   <p className="font-semibold text-white">Latest activity</p>
                   <p className="mt-2 text-slate-400">
@@ -678,8 +756,13 @@ export default function FoundryAdminPage() {
                     </code>{" "}
                     and{" "}
                     <code className="rounded bg-white/10 px-1 font-mono text-[10px]">
-                      /foundry/day03?assessment=&lt;slug&gt;
+                      /foundry/deck/&lt;slug&gt;
                     </code>
+                    ; legacy{" "}
+                    <code className="rounded bg-white/10 px-1 font-mono text-[10px]">
+                      /foundry/day03?assessment=&lt;slug&gt;
+                    </code>{" "}
+                    still works
                     ).
                   </p>
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -721,6 +804,10 @@ export default function FoundryAdminPage() {
                     /learn/[course-slug]
                   </code>
                   ,{" "}
+                  <code className="rounded bg-white/10 px-1 font-mono text-xs">
+                    /foundry/deck/[slug]
+                  </code>
+                  , or legacy{" "}
                   <code className="rounded bg-white/10 px-1 font-mono text-xs">
                     ?assessment=slug
                   </code>
@@ -848,7 +935,7 @@ export default function FoundryAdminPage() {
                               className="rounded-md bg-orange-500 px-2.5 py-1 text-[11px] font-semibold text-[#140802] hover:bg-orange-400"
                               onClick={() =>
                                 void copyPublicTrainingUrl(
-                                  facilitatorLearnerDeckPath(a.slug),
+                                  learnerDeckPath(a.slug),
                                   `"${a.slug}" deck URL`,
                                 )
                               }

@@ -6,7 +6,7 @@ This document merges the conversation into an implementable shape, critiques wea
 
 | Role | Responsibilities |
 |------|------------------|
-| **Student** | In a subgroup for cohort labelling only. Opens **`/learn/<slug>`** or **`/foundry/day03?assessment=<slug>`** for a facilitator-specific rubric. Plain **`/`** or **`/foundry/day03`** (no slug) uses the legacy built-in grading path only — not a facilitator's custom rubric. |
+| **Student** | In a subgroup for cohort labelling only. Opens **`/learn/<slug>`** or **`/foundry/deck/<slug>`** (legacy **`/foundry/day03?assessment=<slug>`**) for a facilitator-specific rubric. Plain **`/`** or **`/foundry/day03`** (no slug) uses the legacy built-in grading path only — not a facilitator's custom rubric. |
 | **Facilitator (4–5)** | Signs in **with email + password**. Creates/edits **assessments** (title, slug, subgroup list, min lengths, facilitator-written **grading instructions** driving the AI grader). **Opens or closes new submissions per assessment.** Sees submissions for **their** assessments only. |
 | **Organizer (admin)** | Uses existing **admin password header** unchanged. **Sees everything** — submissions, ideation registry, facilitator roster (+ assessment counts), create trainers, credential rotation when a row exists, reassign **`training_assessments.facilitator_id`** (UI/API/CLI), **global assessment lock toggles**. Does **not** own rubric wording (facilitators do). |
 
@@ -82,7 +82,7 @@ Other clipping / admin envs: **`food-app/.env.example`**.
 1. Set `FACILITATOR_SESSION_SECRET` on Railway.
 2. Organizer → `POST /api/foundry/admin/facilitators` with admin header — body `{ email, password, displayName }` (**use HTTPS-only** — password crosses wire once).
 3. Facilitator visits `/training/facilitator/login`, sets session, creates assessment with unique **slug**.
-4. Share student link: **`/foundry/day03?assessment=<slug>`** (bookmark / LMS).
+4. Share student link: **`/foundry/deck/<slug>`** (bookmark / LMS; legacy **`?assessment=`** on `/foundry/day03` still works).
 5. Submissions tagged with `assessment_id`; organizer admin lists all incl. slug/title columns.
 6. **Close / reopen learner submits** — organizer **`/foundry/admin`** (“Assignment submission window”), or facilitator **`/training/facilitator`** on each assessment card **Close** / **Re-open** (`submissions_open` in Postgres).
 7. **Trainer directory** — same admin page renders every row in **`training_facilitators`** plus how many **`training_assessments`** reference it APIs: **`GET /api/foundry/admin/facilitators`**.
@@ -132,7 +132,7 @@ npm run dev
 - Organizer: `/foundry/admin`
 - Facilitator: `/training/facilitator/login`
 - Student legacy (built-in deck): `/foundry/day03`
-- Student **recommended** (explicit course): **`/foundry/day03?assessment=<slug>`**
+- Student **recommended** (explicit course): **`/foundry/deck/<slug>`** (or legacy **`/foundry/day03?assessment=<slug>`**)
 - Student **hub** (path-based slug): **`/learn/<slug>`** (recommended for chats that trim query strings) — same cohort binding as **`/class?course=<slug>`**
 - The **`is_site_default`** column remains in Postgres for backwards compatibility but is **not used by the app router** anymore; organizers can run **`npm run training:clear-site-defaults`** once on Railway to persist `FALSE` everywhere.
 
@@ -185,7 +185,7 @@ End-to-end grading (LLM) and cookie-based facilitator sessions still need manual
 | Organizer assessment lock API | GET/PATCH [`/api/foundry/admin/assessment-locks`](../app/api/foundry/admin/assessment-locks/route.ts) |
 | Configurable grading prompt shell | [`lib/foundry-grade.ts`](../lib/foundry-grade.ts) (`buildAssessmentRubricPrompt`) + [`app/api/foundry/grade/route.ts`](../app/api/foundry/grade/route.ts) |
 | Public subgroup/min-length manifest | [`app/api/foundry/assessment-config/route.ts`](../app/api/foundry/assessment-config/route.ts) |
-| Learner deck `?assessment=` hook | [`public/day03-ai-builder.html`](../public/day03-ai-builder.html) |
+| Learner deck cohort hook (`/foundry/deck/<slug>` or `?assessment=`) | [`public/day03-ai-builder.html`](../public/day03-ai-builder.html) · [`app/foundry/deck/[slug]/route.ts`](../app/foundry/deck/[slug]/route.ts) |
 | Organizer facilitator bootstrap UI + API | [`app/foundry/admin/page.tsx`](../app/foundry/admin/page.tsx) · POST [`/api/foundry/admin/facilitators`](../app/api/foundry/admin/facilitators/route.ts) |
 | Facilitator console | [`app/training/facilitator/page.tsx`](../app/training/facilitator/page.tsx) · login [`app/training/facilitator/login/page.tsx`](../app/training/facilitator/login/page.tsx) |
 | Demo DB seed (`DATABASE_URL`) | [`scripts/demo-facilitator-seed.mjs`](../scripts/demo-facilitator-seed.mjs) · `npm run facilitator:demo-seed` |

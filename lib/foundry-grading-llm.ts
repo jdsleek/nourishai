@@ -8,9 +8,18 @@
 import Groq from "groq-sdk";
 import { getGroq, GROQ_MODEL } from "@/lib/groq";
 
+export type FoundryGradeTokenMeter = {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  /** When the provider omitted billing counts (~4 chars per token heuristic). */
+  inferred: boolean;
+};
+
 export type GradingProviderMeta = {
   provider: "groq" | "openrouter" | "nvidia";
   model: string;
+  usage: FoundryGradeTokenMeter;
 };
 
 type ChatResp = {
@@ -18,6 +27,10 @@ type ChatResp = {
   content?: string;
   status: number;
   bodyPreview?: string;
+  /** From OpenAI-compatible `usage`, when present */
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
 };
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -45,6 +58,44 @@ function scrubForLogSnippet(s: string, maxLen: number): string {
   const t = s.replace(/\s+/g, " ").trim();
   if (t.length <= maxLen) return t;
   return `${t.slice(0, maxLen)}…`;
+}
+
+function normalizeTokenCount(n: unknown): number {
+  const v = typeof n === "number" ? n : Number.parseInt(String(n ?? ""), 10);
+  if (!Number.isFinite(v) || v < 0) return 0;
+  return Math.round(v);
+}
+
+function buildTokenMeter(
+  apiPrompt: unknown,
+  apiCompletion: unknown,
+  apiTotal: unknown,
+  userContent: string,
+  assistantContent: string,
+): FoundryGradeTokenMeter {
+  let promptTokens = normalizeTokenCount(apiPrompt);
+  let completionTokens = normalizeTokenCount(apiCompletion);
+  let totalTokens = normalizeTokenCount(apiTotal);
+  let inferred = false;
+
+  if (!promptTokens) {
+    promptTokens = Math.max(1, Math.ceil(userContent.length / 4));
+    inferred = true;
+  }
+  if (!completionTokens) {
+    completionTokens = Math.max(1, Math.ceil(String(assistantContent).length / 4));
+    inferred = true;
+  }
+  const sumPc = promptTokens + completionTokens;
+  if ((!totalTokens || totalTokens < sumPc) && promptTokens && completionTokens) {
+    totalTokens = Math.max(sumPc, totalTokens || 0);
+  }
+  if (!totalTokens) {
+    totalTokens = sumPc;
+    inferred = true;
+  }
+
+  return { promptTokens, completionTokens, totalTokens, inferred };
 }
 
 function groqErrStatus(err: unknown): number | undefined {
@@ -128,11 +179,24 @@ async function chatOpenAiCompatibleOnce(params: {
   try {
     const json = JSON.parse(text) as {
       choices?: { message?: { content?: string } }[];
+      usage?: {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+      };
     };
     const content = json?.choices?.[0]?.message?.content?.trim() ?? "";
     if (!content)
       return { ok: false, status: res.status, bodyPreview: "(empty assistant)" };
-    return { ok: true, status: res.status, content };
+    const u = json.usage;
+    return {
+      ok: true,
+      status: res.status,
+      content,
+      promptTokens: normalizeTokenCount(u?.prompt_tokens),
+      completionTokens: normalizeTokenCount(u?.completion_tokens),
+      totalTokens: normalizeTokenCount(u?.total_tokens),
+    };
   } catch {
     return { ok: false, status: res.status, bodyPreview: text.slice(0, 200) };
   }
@@ -244,6 +308,23 @@ async function groqGrade(
       });
       const raw = res.choices[0]?.message?.content?.trim() || "";
       if (raw) {
+        const u =
+          (
+            res as unknown as {
+              usage?: {
+                prompt_tokens?: number;
+                completion_tokens?: number;
+                total_tokens?: number;
+              };
+            }
+          ).usage ?? {};
+        const usage = buildTokenMeter(
+          u.prompt_tokens,
+          u.completion_tokens,
+          u.total_tokens,
+          userContent,
+          raw,
+        );
         if (a > 0) {
           console.info(
             "[foundry/grader]",
@@ -255,7 +336,10 @@ async function groqGrade(
             })
           );
         }
-        return { content: raw, meta: { provider: "groq", model: GROQ_MODEL } };
+        return {
+          content: raw,
+          meta: { provider: "groq", model: GROQ_MODEL, usage },
+        };
       }
 
       const willRetry = a < maxAttempts - 1;
@@ -338,7 +422,14 @@ async function openRouterGrade(
       `OpenRouter failed (${r.status}): ${r.bodyPreview ?? "unknown"}`
     );
 
-  return { content: r.content, meta: { provider: "openrouter", model } };
+  const usage = buildTokenMeter(
+    r.promptTokens,
+    r.completionTokens,
+    r.totalTokens,
+    userContent,
+    r.content,
+  );
+  return { content: r.content, meta: { provider: "openrouter", model, usage } };
 }
 
 async function nvidiaGrade(
@@ -365,7 +456,14 @@ async function nvidiaGrade(
       `NVIDIA failed (${r.status}): ${r.bodyPreview ?? "unknown"}`
     );
 
-  return { content: r.content, meta: { provider: "nvidia", model } };
+  const usage = buildTokenMeter(
+    r.promptTokens,
+    r.completionTokens,
+    r.totalTokens,
+    userContent,
+    r.content,
+  );
+  return { content: r.content, meta: { provider: "nvidia", model, usage } };
 }
 
 /** Heuristic when every provider failed due to oversized prompts / quotas. */

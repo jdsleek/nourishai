@@ -1,4 +1,5 @@
 import { facilitatorFromCookie } from "@/lib/training-session-cookie";
+import { learnerDeckPath } from "@/lib/foundry-learner-course";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import {
   pgFacilitatorByEmail,
@@ -47,10 +48,10 @@ export async function GET() {
       submissionsOpen: a.submissions_open,
       assessmentIntro: a.assessment_intro ?? "",
       graderInstructions: a.grader_instructions ?? "",
-      studentUrlHint: `/foundry/day03?assessment=${encodeURIComponent(a.slug)}`,
+      studentUrlHint: learnerDeckPath(a.slug),
       classHubPath: `/learn/${encodeURIComponent(a.slug)}`,
     })),
-    studentDeckBasePath: "/foundry/day03",
+    studentDeckBasePath: "/foundry/deck",
   });
 }
 
@@ -83,7 +84,7 @@ export async function POST(req: Request) {
     return Response.json(
       {
         error:
-          'Slug required (letters, numbers, hyphen). Used in learner URL "?assessment=your-slug".',
+          "Slug required (letters, numbers, hyphen). Appears as /foundry/deck/your-slug (legacy ?assessment= still works).",
       },
       { status: 400 },
     );
@@ -103,7 +104,7 @@ export async function POST(req: Request) {
     return Response.json({
       ok: true,
       assessment: row,
-      studentUrl: `/foundry/day03?assessment=${encodeURIComponent(row.slug)}`,
+      studentUrl: learnerDeckPath(row.slug),
       classHubPath: `/learn/${encodeURIComponent(row.slug)}`,
     });
   } catch (e) {

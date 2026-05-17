@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { Pool as PgPool } from "pg";
 import type { FoundrySubmissionRecord } from "@/lib/foundry-store";
+import { ensureFoundryLlmUsageSchema } from "@/lib/foundry-llm-usage";
 import { ensureTrainingSchema } from "@/lib/training-pg";
 
 function sslOption(conn: string): boolean | { rejectUnauthorized: boolean } | undefined {
@@ -57,6 +58,7 @@ export async function ensureFoundrySubmissionsSchema(pool: Pool): Promise<void> 
       .then(async () => {
         /** Add training_* tables & optional assessment FK — additive only */
         await ensureTrainingSchema(pool);
+        await ensureFoundryLlmUsageSchema(pool);
       })
       .then(() => undefined)
       .catch((e) => {

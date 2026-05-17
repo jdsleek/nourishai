@@ -6,6 +6,7 @@ import {
   DashboardStatCard,
   DashboardStatGrid,
 } from "@/components/foundry/DashboardStatGrid";
+import { learnerDeckPath } from "@/lib/foundry-learner-course";
 
 type FacTab = "overview" | "share" | "submissions" | "assessments";
 
@@ -52,11 +53,6 @@ const TAB_LABELS: { id: FacTab; label: string }[] = [
 function originUrl(path: string) {
   if (typeof window === "undefined") return path;
   return `${window.location.origin}${path}`;
-}
-
-/** Learner-facing deck URL — loads the facilitator rubric (chat apps rarely strip `/foundry/...`). */
-function learnerDeckPath(slug: string) {
-  return `/foundry/day03?assessment=${encodeURIComponent(slug)}`;
 }
 
 function facilitatorClassHubPath(slug: string) {
@@ -452,18 +448,22 @@ export default function FacilitatorDashboard() {
                   <strong className="text-white">class desk</strong> block you publish under{" "}
                   <strong>Assessments</strong>. The public home page (
                   <code className="rounded bg-black/40 px-1 font-mono text-xs">/</code>) loads the deck
-                  with the legacy built-in rubric unless students append{" "}
+                  with the legacy built-in rubric unless students use{" "}
+                  <code className="rounded bg-black/40 px-1 font-mono text-xs">
+                    /foundry/deck/their-course
+                  </code>{" "}
+                  (or legacy{" "}
                   <code className="rounded bg-black/40 px-1 font-mono text-xs">
                     ?assessment=their-slug
                   </code>
-                  . Send explicit links — hub{" "}
+                  ). Send explicit links — hub{" "}
                   <code className="rounded bg-black/40 px-1 font-mono text-xs">
                     /learn/your-course
                   </code>{" "}
                   or{" "}
                   <code className="rounded bg-black/40 px-1 font-mono text-xs">/class?course=…</code>
-                  , or slides with{" "}
-                  <code className="rounded bg-black/40 px-1 font-mono text-xs">?assessment=…</code>.
+                  , or slides at{" "}
+                  <code className="rounded bg-black/40 px-1 font-mono text-xs">/foundry/deck/your-course</code>.
                 </p>
                 {primaryAssessment ? (
                   <div className="mt-4 space-y-3">
@@ -622,18 +622,20 @@ export default function FacilitatorDashboard() {
                 <div className="rounded-xl border border-white/10 bg-[#111520] p-6 text-sm text-slate-400">
                   <p>No submissions in your course inbox yet.</p>
                   <p className="mt-2">
-                    Share links from <strong>Share with class</strong>, or learners can paste{" "}
-                    <code className="font-mono">?assessment=</code>
-                    {""} into the deck URL if needed.
+                    Share links from <strong>Share with class</strong>, or learners should open{" "}
+                    <code className="font-mono">/foundry/deck/your-course</code>{" "}
+                    (legacy{" "}
+                    <code className="font-mono">/foundry/day03?assessment=…</code>
+                    {""} works too).
                   </p>
                 </div>
               ) : !filteredSubs.length ? (
                 <div className="rounded-xl border border-amber-500/25 bg-amber-950/20 p-4 text-sm text-amber-100/95">
                   No submissions for{" "}
                   <code className="font-mono text-amber-200">{subsFilterSlug}</code>. Pick another
-                  filter or remind students their link must include{" "}
-                  <code className="font-mono">&amp;assessment={subsFilterSlug}</code>{" "}
-                  (or send the hub URL for that slug).
+                  filter or remind students their slide link should include{" "}
+                  <code className="font-mono text-amber-200">{learnerDeckPath(subsFilterSlug)}</code>
+                  {""} or <code className="font-mono">?assessment={subsFilterSlug}</code>.
                 </div>
               ) : (
                 <ul className="space-y-2">

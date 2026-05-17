@@ -221,7 +221,7 @@ async function upsertDemoAssessment(pool, facilitatorId) {
     }
 
     console.log("[demo-facilitator] Sample class desk assessment ready:");
-    console.log(`  Deck URL · /foundry/day03?assessment=${encodeURIComponent(DEMO_DESK_ASSESSMENT_SLUG)}`);
+    console.log(`  Deck URL · /foundry/deck/${encodeURIComponent(DEMO_DESK_ASSESSMENT_SLUG)}`);
     console.log(`  Hub URL  · /learn/${encodeURIComponent(DEMO_DESK_ASSESSMENT_SLUG)}`);
   } catch (e) {
     console.warn(

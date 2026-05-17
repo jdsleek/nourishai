@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { learnerDeckPath } from "@/lib/foundry-learner-course";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
 import { pgAssessmentBySlug, pgFacilitatorById } from "@/lib/training-pg";
@@ -6,10 +7,10 @@ import { pgAssessmentBySlug, pgFacilitatorById } from "@/lib/training-pg";
 export const runtime = "nodejs";
 
 function deckWithAssessment(slug: string): string {
-  return `/foundry/day03?assessment=${encodeURIComponent(slug.trim().toLowerCase())}`;
+  return learnerDeckPath(slug.trim().toLowerCase());
 }
 
-/** Public learner hub — always returns a canonical deck path where ?assessment= is preserved by the Route Handler (no fragile root rewrite). */
+/** Public learner hub — returns a cohort-specific deck path (`/foundry/deck/<slug>`) plus legacy `/foundry/day03` when unset. */
 export async function GET(req: NextRequest) {
   const pool = getFoundryPgPool();
   const workbookPath = "/class-workbook";

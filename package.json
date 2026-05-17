@@ -17,6 +17,7 @@
     "foundry:smoke:railway-deploy": "node scripts/foundry-smoke-railway-deploy.mjs",
     "facilitator:demo-seed": "node scripts/demo-facilitator-seed.mjs",
     "facilitator:create-test-assessment": "node scripts/training-create-test-assessment.mjs",
+    "facilitator:create-test-assessment:railway": "node scripts/training-create-test-assessment.mjs --railway-db",
     "facilitator:reassign-assessments": "node scripts/reassign-assessment-ownership.mjs",
     "e2e:verify": "node scripts/e2e-verify-training-platform.mjs",
     "e2e:verify:full": "node scripts/e2e-with-local-server.mjs",

@@ -9,6 +9,13 @@
  *   TEST_ASSESSMENT_TITLE="Foundry test cohort" \
  *   node scripts/training-create-test-assessment.mjs
  *
+ * Prefer production Postgres hosted on Railway (ignores DATABASE_URL):
+ *
+ *   node scripts/training-create-test-assessment.mjs --railway-db
+ *
+ * Expects `RAILWAY_TOKEN` + `RAILWAY_PROJECT_ID` in the environment or in
+ * `../vault/.env` (credentials only merged when using --railway-db).
+ *
  * Does not change facilitator password. Idempotent for same email+slug.
  */
 
@@ -16,6 +23,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import pg from "pg";
+import { resolveRailwayRenderedDatabaseUrl } from "./lib/railway-gql-vars.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
@@ -40,6 +48,35 @@ function parseEnvLines(text) {
   return obj;
 }
 
+/** Supabase pooler URLs (`*.pooler.supabase.com`) often use `postgres.<projectRef>` login; migrate to direct `db.<ref>.postgres` hostname for CLI scripts when pooler rejects the tenant. */
+function normalizeDatabaseUrl(raw) {
+  const s =
+    typeof raw === "string" ? raw.trim() : String(raw ?? "").trim();
+  if (!s) return "";
+  try {
+    const normalized = s.replace(/^postgres(ql)?:\/\//i, "http://");
+    const u = new URL(normalized);
+    const userDec = decodeURIComponent((u.username || "").replace(/\+/g, "%20"));
+    const passDec = decodeURIComponent((u.password || "").replace(/\+/g, "%20"));
+    const m = /^postgres\.([^:]+)$/i.exec(userDec);
+    if (
+      !m ||
+      !/\.pooler\.supabase\.com$/i.test(u.hostname || "")
+    ) {
+      return s;
+    }
+    const ref = m[1];
+    const qp = new URLSearchParams(
+      String(u.search || "").replace(/^\?/, ""),
+    );
+    if (!qp.has("sslmode")) qp.set("sslmode", "require");
+    const path = u.pathname && u.pathname !== "" ? u.pathname : "/postgres";
+    return `postgresql://postgres:${encodeURIComponent(passDec)}@db.${ref}.supabase.co:5432${path}?${qp.toString()}`;
+  } catch {
+    return s;
+  }
+}
+
 function loadProjectEnv() {
   const fragments = [];
   for (const name of [".env", ".env.local"]) {
@@ -54,13 +91,40 @@ function loadProjectEnv() {
   }
 }
 
+/** Merge Railway API fields from ../vault/.env when flags need them */
+function hydrateRailwayCredsFromVault() {
+  const p = path.join(ROOT, "..", "vault", ".env");
+  if (!fs.existsSync(p)) return;
+  let parsed = {};
+  try {
+    parsed = parseEnvLines(fs.readFileSync(p, "utf8"));
+  } catch {
+    return;
+  }
+  for (const key of [
+    "RAILWAY_TOKEN",
+    "RAILWAY_PROJECT_ID",
+    "NOURISHAI_RAILWAY_PROJECT_ID",
+  ]) {
+    const raw = parsed[key];
+    const v =
+      typeof raw === "string" ? raw.trim() : String(raw ?? "").trim();
+    if (!v) continue;
+    const cur = process.env[key];
+    const curTrim = typeof cur === "string" ? cur.trim() : "";
+    if (!curTrim) process.env[key] = v;
+  }
+}
+
 function ssl(conn) {
   if (process.env.PG_SSL_DISABLE === "1") return false;
-  if (/\?.*sslmode=require/i.test(conn))
-    return { rejectUnauthorized: false };
-  if (process.env.RAILWAY_ENVIRONMENT || /\.railway\.app/i.test(conn))
-    return { rejectUnauthorized: false };
-  return undefined;
+  // Operational script: permissive TLS for Railway proxies / managed Postgres (matches common deploy setups).
+  if (
+    /\b(?:localhost|127\.0\.0\.1)\b(?=[:/?]|$)/i.test(conn.replace(/postgres(ql)?:\/\//i, ""))
+  ) {
+    return undefined;
+  }
+  return { rejectUnauthorized: false };
 }
 
 async function execIgnoreDuplicateColumn(pool, sql) {
@@ -124,10 +188,49 @@ function sanitizeSlug(raw) {
 async function main() {
   loadProjectEnv();
 
-  const conn = process.env.DATABASE_URL?.trim();
+  const useRailway = process.argv.includes("--railway-db");
+  let connRaw = "";
+  if (useRailway) {
+    hydrateRailwayCredsFromVault();
+    const tok = process.env.RAILWAY_TOKEN?.trim();
+    const pid =
+      process.env.NOURISHAI_RAILWAY_PROJECT_ID?.trim() ||
+      process.env.RAILWAY_PROJECT_ID?.trim();
+    if (!tok || !pid) {
+      console.error(
+        "[create-test-assessment] --railway-db needs RAILWAY_TOKEN and NOURISHAI_RAILWAY_PROJECT_ID (or RAILWAY_PROJECT_ID pointing at nourishai Postgres + app). Prefer NOURISHAI_RAILWAY_PROJECT_ID in vault for the nourishai Railway project.",
+      );
+      process.exitCode = 1;
+      return;
+    }
+    try {
+      connRaw = await resolveRailwayRenderedDatabaseUrl({
+        token: tok,
+        projectId: pid,
+      });
+      console.log(
+        "[create-test-assessment] Using DATABASE_URL rendered from Railway (not printed).",
+      );
+    } catch (e) {
+      console.error(
+        `[create-test-assessment] Railway URL resolve failed: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+  } else {
+    connRaw =
+      typeof process.env.DATABASE_URL === "string"
+        ? process.env.DATABASE_URL.trim()
+        : "";
+  }
+
+  const conn = normalizeDatabaseUrl(connRaw);
   if (!conn) {
     console.error(
-      "[create-test-assessment] Set DATABASE_URL (e.g. railway run … from food-app/).",
+      "[create-test-assessment] Missing database URL — pass --railway-db (Railway vars) or set DATABASE_URL.",
     );
     process.exitCode = 1;
     return;
@@ -252,7 +355,7 @@ async function main() {
 
     const originHint =
       process.env.PUBLIC_BASE_URL?.replace(/\/$/, "") ||
-      "(your deployed origin — e.g. https://….up.railway.app)";
+      "https://aibuilders.up.railway.app";
     console.log("");
     console.log("[create-test-assessment] Learner URLs:");
     console.log(`  Class hub · ${originHint}/learn/${encodeURIComponent(slug)}`);

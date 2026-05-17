@@ -45,9 +45,8 @@ export async function GET() {
       minPromptChars: a.min_prompt_chars,
       minOutputChars: a.min_output_chars,
       submissionsOpen: a.submissions_open,
-      isSiteDefault: a.is_site_default,
       studentUrlHint: `/foundry/day03?assessment=${encodeURIComponent(a.slug)}`,
-      siteRootUrl: "/",
+      classHubPath: `/learn/${encodeURIComponent(a.slug)}`,
     })),
     studentDeckBasePath: "/foundry/day03",
   });
@@ -103,6 +102,7 @@ export async function POST(req: Request) {
       ok: true,
       assessment: row,
       studentUrl: `/foundry/day03?assessment=${encodeURIComponent(row.slug)}`,
+      classHubPath: `/learn/${encodeURIComponent(row.slug)}`,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Create failed.";

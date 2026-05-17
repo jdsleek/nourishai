@@ -6,7 +6,7 @@ This document merges the conversation into an implementable shape, critiques wea
 
 | Role | Responsibilities |
 |------|------------------|
-| **Student** | In a subgroup for cohort labelling only. Opens the slide deck (`/foundry/day03`). Submits architecture prompt/output. Graded against **the assessment tied to `?assessment=<slug>`** (or legacy default when omitted). |
+| **Student** | In a subgroup for cohort labelling only. Opens **`/learn/<slug>`** or **`/foundry/day03?assessment=<slug>`** for a facilitator-specific rubric. Plain **`/`** or **`/foundry/day03`** (no slug) uses the legacy built-in grading path only — not a facilitator's custom rubric. |
 | **Facilitator (4–5)** | Signs in **with email + password**. Creates/edits **assessments** (title, slug, subgroup list, min lengths, facilitator-written **grading instructions** driving the AI grader). **Opens or closes new submissions per assessment.** Sees submissions for **their** assessments only. |
 | **Organizer (admin)** | Uses existing **admin password header** unchanged. **Sees everything** — submissions, ideation registry, facilitator roster (+ assessment counts), create trainers, credential rotation when a row exists, reassign **`training_assessments.facilitator_id`** (UI/API/CLI), **global assessment lock toggles**. Does **not** own rubric wording (facilitators do). |
 
@@ -132,8 +132,9 @@ npm run dev
 - Organizer: `/foundry/admin`
 - Facilitator: `/training/facilitator/login`
 - Student legacy (built-in deck): `/foundry/day03`
-- Student **recommended** (explicit course): **`/foundry/day03?assessment=<slug>`** — survives chat previews and avoids wrong facilitator inbox when multiple ministries share one app.
-- Student **hub** (one link for slides + status): **`/class?course=<slug>`**
+- Student **recommended** (explicit course): **`/foundry/day03?assessment=<slug>`**
+- Student **hub** (path-based slug): **`/learn/<slug>`** (recommended for chats that trim query strings) — same cohort binding as **`/class?course=<slug>`**
+- The **`is_site_default`** column remains in Postgres for backwards compatibility but is **not used by the app router** anymore; organizers can run **`npm run training:clear-site-defaults`** once on Railway to persist `FALSE` everywhere.
 
 ### Production data protection & continuity (high trust)
 
@@ -149,7 +150,7 @@ pg_dump "$DATABASE_URL" -Fc -f "foundry-training-$(date +%F).dump"
 Encrypt the file at rest off-site.
 
 3. **Post-deploy sanity** — `SELECT COUNT(*) FROM foundry_submissions;` unchanged after deploy apart from legitimate new submits; monitor first hour after rollout.
-4. **Site default semantics** — only **one** row may be `training_assessments.is_site_default` at a time globally. Ministries with **multiple concurrent cohort facilitators** should share **explicit** **`?assessment=`** / **`?course=`** links with fellows; reserving `/` for a neutral org default is deliberate but must be coordinated centrally.
+4. **No shared facilitator rubric on `/`** — **`/`** rewrites to the Day 03 HTML deck but submissions without **`?assessment=`** grade with the legacy built-in prompt; each cohort facilitator shares **`/learn/<slug>`** or **`?assessment=`** links instead.
 
 
 Smoke: `npm run foundry:smoke` (DB + optional API) and `npm run foundry:smoke-providers` (one tiny hit per LLM key).
@@ -188,6 +189,8 @@ End-to-end grading (LLM) and cookie-based facilitator sessions still need manual
 | Organizer facilitator bootstrap UI + API | [`app/foundry/admin/page.tsx`](../app/foundry/admin/page.tsx) · POST [`/api/foundry/admin/facilitators`](../app/api/foundry/admin/facilitators/route.ts) |
 | Facilitator console | [`app/training/facilitator/page.tsx`](../app/training/facilitator/page.tsx) · login [`app/training/facilitator/login/page.tsx`](../app/training/facilitator/login/page.tsx) |
 | Demo DB seed (`DATABASE_URL`) | [`scripts/demo-facilitator-seed.mjs`](../scripts/demo-facilitator-seed.mjs) · `npm run facilitator:demo-seed` |
+| Clear unused `is_site_default` Postgres flags after deploy | [`scripts/training-clear-site-default-flags.mjs`](../scripts/training-clear-site-default-flags.mjs) · `npm run training:clear-site-defaults` (`FACILITATOR_VERIFY_EMAIL` optional for a listing) |
+| Path-based learner hub | [`app/learn/[slug]/page.tsx`](../app/learn/[slug]/page.tsx) |
 | Railway one-shot facilitator bootstrap | [`scripts/railway-bootstrap-training.mjs`](../scripts/railway-bootstrap-training.mjs) · `npm run railway:bootstrap-training` (needs `RAILWAY_TOKEN`) |
 
 ## Known limitations (MVP)

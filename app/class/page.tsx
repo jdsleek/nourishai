@@ -1,15 +1,12 @@
 import ClassHubBody from "./ClassHubBody";
+import { parseCourseSlugParam } from "@/lib/course-slug";
 
-function parseCourseSlug(
+function parseCourseFromSearch(
   raw: string | string[] | undefined,
 ): string | null {
-  if (typeof raw === "string") {
-    const s = raw.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
-    return s.length >= 3 ? s : null;
-  }
+  if (typeof raw === "string") return parseCourseSlugParam(raw);
   if (Array.isArray(raw) && typeof raw[0] === "string") {
-    const s = raw[0].trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
-    return s.length >= 3 ? s : null;
+    return parseCourseSlugParam(raw[0]);
   }
   return null;
 }
@@ -20,7 +17,7 @@ export default function ClassHubPage({
 }: {
   searchParams: { course?: string | string[] | undefined };
 }) {
-  const courseSlug = parseCourseSlug(searchParams.course);
+  const courseSlug = parseCourseFromSearch(searchParams.course);
 
   return <ClassHubBody courseSlug={courseSlug} />;
 }

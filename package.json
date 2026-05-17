@@ -18,7 +18,8 @@
     "facilitator:demo-seed": "node scripts/demo-facilitator-seed.mjs",
     "facilitator:reassign-assessments": "node scripts/reassign-assessment-ownership.mjs",
     "e2e:verify": "node scripts/e2e-verify-training-platform.mjs",
-    "e2e:verify:full": "node scripts/e2e-with-local-server.mjs"
+    "e2e:verify:full": "node scripts/e2e-with-local-server.mjs",
+    "training:clear-site-defaults": "node scripts/training-clear-site-default-flags.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

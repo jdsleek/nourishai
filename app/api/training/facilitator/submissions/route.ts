@@ -4,7 +4,6 @@ import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-
 import {
   pgCountSubmissionsLegacyNoAssessment,
   pgFacilitatorByEmail,
-  pgGetSiteDefaultAssessment,
   pgListAssessmentsForFacilitator,
 } from "@/lib/training-pg";
 
@@ -27,7 +26,6 @@ export async function GET() {
 
   const mine = await pgListAssessmentsForFacilitator(pool, ses.fid);
   const allow = new Set(mine.map((a) => a.id));
-  const siteDefault = await pgGetSiteDefaultAssessment(pool);
   const orphanLegacyCount = await pgCountSubmissionsLegacyNoAssessment(pool);
 
   const all = await readFoundrySubmissionsNewestFirst();
@@ -42,9 +40,6 @@ export async function GET() {
       submissionCount: submissions.length,
       assessmentCount: mine.length,
       orphanLegacyCount,
-      siteDefaultAssessmentId: siteDefault?.id ?? null,
-      siteDefaultSlug: siteDefault?.slug ?? null,
-      siteDefaultTitle: siteDefault?.title ?? null,
     },
   });
 }

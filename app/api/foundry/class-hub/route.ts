@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
-import { pgAssessmentBySlug, pgGetSiteDefaultAssessment } from "@/lib/training-pg";
+import { pgAssessmentBySlug } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
 
@@ -72,33 +72,14 @@ export async function GET(req: NextRequest) {
       subgroups,
       minPromptChars: Math.max(0, a.min_prompt_chars),
       minOutputChars: Math.max(0, a.min_output_chars),
-      siteDefaultActive: a.is_site_default,
+      siteDefaultActive: false,
       mode: "course" as const,
     });
   }
 
-  const site = await pgGetSiteDefaultAssessment(pool);
-  if (!site) {
-    return Response.json({
-      ...baseFallback,
-      mode: "builtin" as const,
-    });
-  }
-
-  const subgroups =
-    site.subgroup_options.length > 0 ? site.subgroup_options : [...QAF_COHORT_SUBGROUPS];
-
+  /** No ministry-wide hub binding — share /learn/[slug], /class?course=, or ?assessment= on the deck. */
   return Response.json({
-    programName: "Qubators AI Foundry",
-    deckHref: deckWithAssessment(site.slug),
-    workbookPath,
-    assessmentSlug: site.slug,
-    assessmentTitle: site.title,
-    submissionsOpen: site.submissions_open,
-    subgroups,
-    minPromptChars: Math.max(0, site.min_prompt_chars),
-    minOutputChars: Math.max(0, site.min_output_chars),
-    siteDefaultActive: true,
-    mode: "site-default" as const,
+    ...baseFallback,
+    mode: "builtin" as const,
   });
 }

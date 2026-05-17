@@ -888,7 +888,7 @@ let CFG_MIN_OUTPUT = 80;
 let CURRENT_ASSESSMENT_TITLE = '';
 /** Facilitator assessments can be closed to block repeat submissions server-side too. */
 let CFG_SUBMISSIONS_OPEN = true;
-/** Home deck using facilitator site-default course (no ?assessment= in URL). */
+/** When the deck has no ?assessment=, the server returns legacy built‑in subgroup limits (global site‑default grading was removed). */
 let SITE_DEFAULT_MODE = false;
 const STUDENT_STORE_KEY = 'foundry.student.v1';
 function readStudentStore(){

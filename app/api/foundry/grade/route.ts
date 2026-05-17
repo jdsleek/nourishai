@@ -13,11 +13,7 @@ import { clipFoundryBodiesForGroq } from "@/lib/foundry-grade-clip";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
 import { appendFoundrySubmission } from "@/lib/foundry-store";
-import {
-  pgAssessmentBySlug,
-  pgGetSiteDefaultAssessment,
-  type TrainingAssessmentRow,
-} from "@/lib/training-pg";
+import { pgAssessmentBySlug, type TrainingAssessmentRow } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -77,9 +73,6 @@ export async function POST(req: NextRequest) {
       if (!facilitatorAssessment) {
         return Response.json({ error: "Unknown assessment." }, { status: 404 });
       }
-    } else if (pool) {
-      await ensureFoundrySubmissionsSchema(pool);
-      facilitatorAssessment = await pgGetSiteDefaultAssessment(pool);
     }
 
     if (facilitatorAssessment) {

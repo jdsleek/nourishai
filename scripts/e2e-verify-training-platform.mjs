@@ -138,6 +138,15 @@ async function main() {
     assert(r.ok, `status ${r.status}`);
   });
 
+  await check("GET /learn/fake-e2e-slug-zz999 (path-based learner hub)", async () => {
+    const r = await fetchWithTimeout(`${BASE}/learn/fake-e2e-slug-zz999`, {
+      headers: { Accept: "text/html" },
+    });
+    assert(r.ok, `status ${r.status}`);
+    const t = await r.text();
+    assert(/Class hub|class hub/i.test(t), "missing Class hub title");
+  });
+
   await check("GET /training/facilitator/login", async () => {
     const r = await fetchWithTimeout(`${BASE}/training/facilitator/login`);
     assert(r.ok, `status ${r.status}`);

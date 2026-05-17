@@ -43,6 +43,20 @@ const BREAKDOWN_LABELS: Record<string, string> = {
   environment_setup: "Environment setup (legacy rubric)",
 };
 
+/** Same learner URLs as facilitator “Share” — admin can copy full absolute links. */
+function facilitatorLearnerDeckPath(slug: string) {
+  return `/foundry/day03?assessment=${encodeURIComponent(slug)}`;
+}
+
+function facilitatorClassHubPath(slug: string) {
+  return `/learn/${encodeURIComponent(slug)}`;
+}
+
+function adminOriginAbs(path: string) {
+  if (typeof window === "undefined") return path;
+  return `${window.location.origin}${path}`;
+}
+
 type AssessmentLockRow = {
   id: string;
   slug: string;
@@ -128,6 +142,7 @@ export default function FoundryAdminPage() {
   const [legacyMsg, setLegacyMsg] = useState<string | null>(null);
   const [legacyBusy, setLegacyBusy] = useState(false);
   const [legacyConfirm, setLegacyConfirm] = useState("");
+  const [linkCopyMsg, setLinkCopyMsg] = useState<string | null>(null);
 
   const linkedSubmissionCount = useMemo(
     () => subs.filter((s) => s.assessmentSlug || s.assessmentId).length,
@@ -147,6 +162,20 @@ export default function FoundryAdminPage() {
       timeStyle: "short",
     });
   }, [subs]);
+
+  const copyPublicTrainingUrl = useCallback(
+    async (relativePath: string, label: string) => {
+      try {
+        await navigator.clipboard.writeText(adminOriginAbs(relativePath));
+        setLinkCopyMsg(`Copied ${label}`);
+        window.setTimeout(() => setLinkCopyMsg(null), 2200);
+      } catch {
+        setLinkCopyMsg("Copy failed — select text manually.");
+        window.setTimeout(() => setLinkCopyMsg(null), 3200);
+      }
+    },
+    [],
+  );
 
   const loadLegacyStats = useCallback(async (pwd: string) => {
     try {
@@ -603,6 +632,7 @@ export default function FoundryAdminPage() {
                     setSection("overview");
                     setIdeationHtml(null);
                     setIdeationErr(null);
+                    setLinkCopyMsg(null);
                   }}
                   className="text-sm text-slate-400 underline hover:text-white"
                 >
@@ -634,6 +664,12 @@ export default function FoundryAdminPage() {
                 )}
               </div>
             </div>
+
+            {linkCopyMsg ? (
+              <p className="mb-4 rounded-lg border border-cyan-500/30 bg-cyan-950/25 px-3 py-2 text-xs text-cyan-100">
+                {linkCopyMsg}
+              </p>
+            ) : null}
 
             <div className="flex flex-col gap-6 lg:flex-row">
               <AdminNav
@@ -723,6 +759,10 @@ export default function FoundryAdminPage() {
                   Closing an assignment stops <strong className="text-slate-200">new</strong>{" "}
                   submissions for that learner link (
                   <code className="rounded bg-white/10 px-1 font-mono text-xs">
+                    /learn/[course-slug]
+                  </code>
+                  ,{" "}
+                  <code className="rounded bg-white/10 px-1 font-mono text-xs">
                     ?assessment=slug
                   </code>
                   ). Existing rows in this list stay. Built-in legacy Day 03 deck (no slug) is{" "}
@@ -805,6 +845,37 @@ export default function FoundryAdminPage() {
                           </button>
                           </div>
                         </div>
+                        <div className="rounded-lg border border-orange-500/25 bg-orange-950/15 px-3 py-2.5">
+                          <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-orange-200/90">
+                            Copy facilitator learner links ({a.facilitatorEmail})
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              className="rounded-md bg-orange-500 px-2.5 py-1 text-[11px] font-semibold text-[#140802] hover:bg-orange-400"
+                              onClick={() =>
+                                void copyPublicTrainingUrl(
+                                  facilitatorLearnerDeckPath(a.slug),
+                                  `"${a.slug}" deck URL`,
+                                )
+                              }
+                            >
+                              Copy deck URL
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded-md border border-emerald-400/40 px-2.5 py-1 text-[11px] font-semibold text-emerald-100 hover:bg-emerald-950/40"
+                              onClick={() =>
+                                void copyPublicTrainingUrl(
+                                  facilitatorClassHubPath(a.slug),
+                                  `"${a.slug}" class hub URL`,
+                                )
+                              }
+                            >
+                              Copy class hub URL
+                            </button>
+                          </div>
+                        </div>
                         <div className="flex flex-col gap-2 border-t border-white/10 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
                           <span className="shrink-0 text-xs uppercase tracking-wide text-slate-500">
                             Ownership
@@ -872,9 +943,30 @@ export default function FoundryAdminPage() {
                 <p className="mt-2 text-slate-400">
                   Trainer accounts ({facilitators.length}). Use{" "}
                   <strong className="text-slate-200">Ownership</strong> on each assignment
-                  in the <strong className="text-slate-200">Assessments</strong> tab to move SIEST — or similar — bundles under one login without losing
-                  submission history (rows stay keyed by assessment id).
+                  in the <strong className="text-slate-200">Assessments</strong> tab to move
+                  sessions—or similar bundles—under one login without losing submission history
+                  (rows stay keyed by assessment id).
                 </p>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void copyPublicTrainingUrl(
+                        "/training/facilitator/login",
+                        "facilitator sign-in URL",
+                      )
+                    }
+                    className="w-fit rounded-lg border border-cyan-400/40 bg-cyan-950/40 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-900/35"
+                  >
+                    Copy facilitator sign-in URL
+                  </button>
+                  <p className="max-w-xl text-[11px] text-slate-500">
+                    Learner-facing deck and class hub links: use{" "}
+                    <strong className="text-slate-400">Assessments</strong> — each course has{" "}
+                    <strong className="text-slate-400">Copy deck URL</strong> and{" "}
+                    <strong className="text-slate-400">Copy class hub URL</strong>.
+                  </p>
+                </div>
                 {facDirErr ? (
                   <p className="mt-2 text-sm text-red-400">{facDirErr}</p>
                 ) : null}

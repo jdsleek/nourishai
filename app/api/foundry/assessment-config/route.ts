@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
-import { pgAssessmentBySlug, pgGetSiteDefaultAssessment } from "@/lib/training-pg";
+import { pgAssessmentBySlug } from "@/lib/training-pg";
 import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
 
 export const runtime = "nodejs";
@@ -8,28 +8,8 @@ export const runtime = "nodejs";
 /** Public endpoint for learner deck — subgroup list & min lengths for an assessment */
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get("slug")?.trim();
-  const pool = getFoundryPgPool();
 
   if (!slug) {
-    if (pool) {
-      await ensureFoundrySubmissionsSchema(pool);
-      const site = await pgGetSiteDefaultAssessment(pool);
-      if (site) {
-        const subgroups =
-          site.subgroup_options.length > 0
-            ? site.subgroup_options
-            : [...QAF_COHORT_SUBGROUPS];
-        return Response.json({
-          slug: site.slug,
-          title: site.title,
-          subgroups,
-          minPromptChars: Math.max(0, site.min_prompt_chars),
-          minOutputChars: Math.max(0, site.min_output_chars),
-          submissionsOpen: site.submissions_open,
-          siteDefault: true,
-        });
-      }
-    }
     return Response.json(
       {
         slug: "",
@@ -44,6 +24,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  const pool = getFoundryPgPool();
   if (!pool) {
     return Response.json({ error: "Service unavailable." }, { status: 503 });
   }

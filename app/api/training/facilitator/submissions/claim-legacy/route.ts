@@ -8,7 +8,7 @@ import {
 
 export const runtime = "nodejs";
 
-/** One-click: attach all legacy (no assessment FK) rows to your site-default course. */
+/** One-click: attach all legacy (no assessment FK) rows to this facilitator's most recently updated assessment. */
 export async function POST() {
   const ses = facilitatorFromCookie();
   if (!ses) return Response.json({ error: "Unauthorized." }, { status: 401 });
@@ -22,8 +22,7 @@ export async function POST() {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
 
   const before = await pgCountSubmissionsLegacyNoAssessment(pool);
-  const { moved, assessmentId, siteDefaultWasAutoSet } =
-    await pgFacilitatorClaimLegacySubmissions(pool, fac.id);
+  const { moved, assessmentId } = await pgFacilitatorClaimLegacySubmissions(pool, fac.id);
 
   if (!assessmentId) {
     return Response.json(
@@ -40,7 +39,6 @@ export async function POST() {
     moved,
     orphanBefore: before,
     assessmentId,
-    siteDefaultWasAutoSet: siteDefaultWasAutoSet === true,
   });
 }
 

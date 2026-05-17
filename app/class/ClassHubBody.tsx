@@ -11,7 +11,7 @@ type HubConfig = {
   assessmentTitle: string | null;
   submissionsOpen: boolean;
   siteDefaultActive: boolean;
-  mode?: "builtin" | "course" | "site-default";
+  mode?: "builtin" | "course";
 };
 
 type SavedGrade = {
@@ -42,9 +42,12 @@ function readStore(): { lastGrade?: SavedGrade } {
 
 export default function ClassHubBody({
   courseSlug,
+  canonicalHubPath,
 }: {
-  /** From ?course=facilitator-slug — ties this page to THAT assessment only */
+  /** From ?course=facilitator-slug or /learn/[slug] — THAT assessment only */
   courseSlug: string | null;
+  /** Stable share path (preferred over ?course); e.g. /learn/my-course-slug */
+  canonicalHubPath?: string | null;
 }) {
   const [hub, setHub] = useState<HubConfig | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -57,7 +60,10 @@ export default function ClassHubBody({
 
   const hubUrl =
     typeof window !== "undefined" && courseSlug
-      ? `${window.location.origin}/class?course=${encodeURIComponent(courseSlug)}`
+      ? `${window.location.origin}${
+          canonicalHubPath ??
+          `/class?course=${encodeURIComponent(courseSlug)}`
+        }`
       : null;
 
   const loadHub = useCallback(async () => {
@@ -75,7 +81,7 @@ export default function ClassHubBody({
       if (data.error === "DATABASE_UNAVAILABLE") {
         setHubLoadFailed(
           data.message ||
-            "Course links need the deployed site with Postgres. Plain local npm dev without DATABASE_URL cannot load ?course links.",
+            "Course links need the deployed site with Postgres. Plain local npm dev without DATABASE_URL cannot load course-specific (/learn/… or ?course=) links.",
         );
         setHub(null);
         return;
@@ -159,9 +165,10 @@ export default function ClassHubBody({
           <div className="rounded-lg border border-amber-500/30 bg-amber-950/25 px-4 py-3 text-sm text-amber-100">
             <p>{hubLoadFailed}</p>
             <p className="mt-2 text-xs text-amber-200/85">
-              Use the exact link from your facilitator (must include{" "}
-              <code className="rounded bg-black/30 px-1">?course=…</code> on the hub, or{" "}
-              <code className="rounded bg-black/30 px-1">?assessment=…</code> on the slides).
+              Use the exact link from your facilitator: hub path{" "}
+              <code className="rounded bg-black/30 px-1 font-mono">/learn/your-course-slug</code>{" "}
+              or <code className="rounded bg-black/30 px-1 font-mono">/class?course=…</code>, or slides
+              with <code className="rounded bg-black/30 px-1 font-mono">?assessment=…</code>.
             </p>
           </div>
         ) : null}
@@ -184,12 +191,14 @@ export default function ClassHubBody({
                   Slug · {hub.assessmentSlug}
                 </p>
               ) : null}
-              {!courseSlug && hub.mode === "site-default" ? (
+              {!courseSlug && hub.mode === "builtin" ? (
                 <p className="mt-2 text-xs text-amber-200/90">
-                  This page uses your program&apos;s <strong>single</strong> home-deck course.
-                  If you are not in this cohort, use the facilitator link that includes{" "}
-                  <code className="rounded bg-black/40 px-1 font-mono">?course=</code>{" "}
-                  instead.
+                  This generic hub loads the shared program deck (no facilitator rubric tied here).
+                  For your facilitator&apos;s course, open their link —{" "}
+                  <code className="rounded bg-black/40 px-1 font-mono">/learn/your-course</code>,{" "}
+                  <code className="rounded bg-black/40 px-1 font-mono">/class?course=…</code>, or
+                  slides with{" "}
+                  <code className="rounded bg-black/40 px-1 font-mono">?assessment=…</code>.
                 </p>
               ) : null}
               <p className="mt-3 text-sm">
@@ -219,11 +228,27 @@ export default function ClassHubBody({
             </div>
 
             <p className="text-xs text-slate-500">
-              Link opens{" "}
-              <code className="rounded bg-white/10 px-1 font-mono text-[11px]">
-                {hub.deckHref}
-              </code>{" "}
-              so your course rubric stays attached even if chats shorten links.
+              {courseSlug ? (
+                <>
+                  Link opens{" "}
+                  <code className="rounded bg-white/10 px-1 font-mono text-[11px]">
+                    {hub.deckHref}
+                  </code>{" "}
+                  so your facilitator&apos;s rubric stays attached even if chats shorten links.
+                </>
+              ) : (
+                <>
+                  Opens the shared deck at{" "}
+                  <code className="rounded bg-white/10 px-1 font-mono text-[11px]">
+                    {hub.deckHref}
+                  </code>
+                  — add{" "}
+                  <code className="rounded bg-white/10 px-1 font-mono text-[11px]">
+                    ?assessment=your-course
+                  </code>{" "}
+                  for a facilitator rubric, or ask for a full class link.
+                </>
+              )}
             </p>
           </div>
         ) : null}
@@ -300,6 +325,5 @@ export default function ClassHubBody({
 
 function siteDefaultBanner(hub: HubConfig): string {
   if (hub.mode === "builtin") return "Program deck";
-  if (hub.mode === "site-default") return "Home-deck course (organizer)";
   return "This week";
 }

@@ -18,7 +18,6 @@ type Assessment = {
   minOutputChars: number;
   studentUrlHint: string;
   submissionsOpen: boolean;
-  isSiteDefault: boolean;
 };
 
 type Submission = {
@@ -39,8 +38,6 @@ type Stats = {
   submissionCount: number;
   assessmentCount: number;
   orphanLegacyCount: number;
-  siteDefaultSlug: string | null;
-  siteDefaultTitle: string | null;
 };
 
 const TAB_LABELS: { id: FacTab; label: string }[] = [
@@ -61,7 +58,7 @@ function learnerDeckPath(slug: string) {
 }
 
 function facilitatorClassHubPath(slug: string) {
-  return `/class?course=${encodeURIComponent(slug)}`;
+  return `/learn/${encodeURIComponent(slug)}`;
 }
 
 export default function FacilitatorDashboard() {
@@ -92,14 +89,7 @@ export default function FacilitatorDashboard() {
   const [mp, setMp] = useState(40);
   const [mo, setMo] = useState(80);
 
-  const markedSiteDefault = useMemo(
-    () => assessments.find((a) => a.isSiteDefault) ?? null,
-    [assessments],
-  );
-  const primaryAssessment = useMemo(
-    () => markedSiteDefault ?? assessments[0] ?? null,
-    [assessments, markedSiteDefault],
-  );
+  const primaryAssessment = useMemo(() => assessments[0] ?? null, [assessments]);
   const canClaimLegacy = assessments.length > 0;
   const openAssessmentCount = useMemo(
     () => assessments.filter((a) => a.submissionsOpen).length,
@@ -120,7 +110,7 @@ export default function FacilitatorDashboard() {
     const a = await fetch("/api/training/facilitator/assessments", { credentials: "include" });
     const aj = await a.json();
     if (!a.ok) throw new Error(aj.error || "Could not load assessments.");
-    const raw = (aj.assessments ?? []) as Partial<Assessment & { isSiteDefault?: boolean }>[];
+    const raw = (aj.assessments ?? []) as Partial<Assessment>[];
     setAssessments(
       raw.map((x) => ({
         id: String(x.id),
@@ -131,7 +121,6 @@ export default function FacilitatorDashboard() {
         minOutputChars: Number(x.minOutputChars ?? 80),
         studentUrlHint: String(x.studentUrlHint ?? ""),
         submissionsOpen: x.submissionsOpen !== false,
-        isSiteDefault: x.isSiteDefault === true,
       })),
     );
 
@@ -154,15 +143,9 @@ export default function FacilitatorDashboard() {
       const data = (await res.json()) as {
         error?: string;
         moved?: number;
-        siteDefaultWasAutoSet?: boolean;
       };
       if (!res.ok) throw new Error(data.error || "Claim failed.");
-      const extra = data.siteDefaultWasAutoSet
-        ? " Your most recent assessment was set as the site default (class deck)."
-        : "";
-      setClaimMsg(
-        `Attached ${data.moved ?? 0} prior class submission(s) to your course inbox.${extra}`,
-      );
+      setClaimMsg(`Attached ${data.moved ?? 0} prior class submission(s) to your course inbox.`);
       await load();
       setTab("submissions");
     } catch (e) {
@@ -171,32 +154,6 @@ export default function FacilitatorDashboard() {
       setClaimBusy(false);
     }
   }, [load]);
-
-  const setSiteDefault = useCallback(
-    async (id: string) => {
-      setLockBusy(id);
-      setErr(null);
-      try {
-        const res = await fetch(
-          `/api/training/facilitator/assessments/${encodeURIComponent(id)}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ siteDefault: true }),
-          },
-        );
-        const data = (await res.json()) as { error?: string };
-        if (!res.ok) throw new Error(data.error || "Could not set site default.");
-        await load();
-      } catch (e) {
-        setErr(e instanceof Error ? e.message : "Update failed.");
-      } finally {
-        setLockBusy(null);
-      }
-    },
-    [load],
-  );
 
   const setAssessmentOpens = useCallback(
     async (id: string, open: boolean) => {
@@ -310,8 +267,8 @@ export default function FacilitatorDashboard() {
               <p className="font-semibold text-emerald-100">Course published</p>
               <p className="mt-2 text-slate-300">
                 <strong>{newCourseShare.title}</strong> ({newCourseShare.slug}) — send fellows the
-                links below so they attach to{" "}
-                <strong className="text-white">your</strong> inbox, not the org-wide home deck only.
+                links below — each uses{" "}
+                <strong className="text-white">your</strong> facilitator rubric and inbox.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
@@ -384,21 +341,15 @@ export default function FacilitatorDashboard() {
                   onClick={() => setTab("share")}
                 />
                 <DashboardStatCard
-                  label="Site default"
-                  value={
-                    markedSiteDefault
-                      ? markedSiteDefault.slug
-                      : primaryAssessment
-                        ? "Not set"
-                        : "—"
-                  }
+                  label="Primary course"
+                  value={primaryAssessment ? primaryAssessment.slug : "—"}
                   hint={
-                    markedSiteDefault
-                      ? markedSiteDefault.title
-                      : "Home deck URL routes here when set"
+                    primaryAssessment
+                      ? "Most recently updated assessment (copy links below)"
+                      : "Create one under Assessments"
                   }
-                  tone={markedSiteDefault ? "emerald" : "amber"}
-                  onClick={() => setTab("assessments")}
+                  tone="slate"
+                  onClick={() => setTab("share")}
                 />
               </DashboardStatGrid>
               <div className="flex flex-wrap gap-2">
@@ -441,41 +392,33 @@ export default function FacilitatorDashboard() {
               <div className="rounded-2xl border border-cyan-500/30 bg-cyan-950/20 p-5">
                 <h2 className="text-lg font-semibold text-cyan-100">Class deck &amp; portal</h2>
                 <p className="mt-2 text-sm text-slate-300">
-                  Fellows must open a link that includes your course slug{" "}
+                  The public home page (
+                  <code className="rounded bg-black/40 px-1 font-mono text-xs">/</code>) loads the{" "}
+                  <strong className="text-white">shared program deck only</strong> — grading there
+                  uses the legacy built-in rubric unless students add{" "}
                   <code className="rounded bg-black/40 px-1 font-mono text-xs">
-                    ?assessment=…
-                  </code>
-                  {" "}
-                  (slides) or{" "}
+                    ?assessment=their-slug
+                  </code>{" "}
+                  to the URL. Always send your cohort explicit links:
+                  hub{" "}
                   <code className="rounded bg-black/40 px-1 font-mono text-xs">
-                    ?course=…
-                  </code>
-                  {" "}
-                  on the hub. Sending only the naked home URL (
-                  <code className="rounded bg-black/40 px-1 font-mono text-xs">/</code>) attaches
-                  submits to whoever holds the ministry&apos;s <strong>one</strong> site-default
-                  course — not yours — unless organizers put you there.
+                    /learn/your-course
+                  </code>{" "}
+                  or{" "}
+                  <code className="rounded bg-black/40 px-1 font-mono text-xs">/class?course=…</code>
+                  , or slides with{" "}
+                  <code className="rounded bg-black/40 px-1 font-mono text-xs">?assessment=…</code>.
                 </p>
                 {primaryAssessment ? (
                   <div className="mt-4 space-y-3">
                     <p className="font-mono text-xs text-emerald-300">
-                      {markedSiteDefault ? "Site default" : "Sharing"}:{" "}
+                      Featured (most recently edited):{" "}
                       <strong>{primaryAssessment.title}</strong> ({primaryAssessment.slug})
                     </p>
-                    {!markedSiteDefault ? (
-                      <p className="text-xs text-amber-200/90">
-                        This course isn&apos;t the org-wide home default yet. Always share{" "}
-                        <strong>deck</strong> or <strong>class hub</strong> links below until an
-                        organizer sets site default — if applicable.
-                      </p>
-                    ) : (
-                      <p className="text-xs text-emerald-200/85">
-                        You are currently the ministry site-default:{" "}
-                        <code className="rounded bg-black/50 px-1 font-mono">/</code>
-                        {""} grades also land here. Otherwise still share explicit links below for
-                        reliability.
-                      </p>
-                    )}
+                    <p className="text-xs text-slate-400">
+                      Every assessment has its own copy buttons under{" "}
+                      <strong>Assessments</strong> — use those when you run multiple cohort courses.
+                    </p>
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                       <button
                         type="button"
@@ -499,15 +442,7 @@ export default function FacilitatorDashboard() {
                         }
                         className="rounded-lg border border-emerald-400/40 px-4 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-950/30"
                       >
-                        Copy class hub (with ?course=)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void copyText(originUrl("/"), "home deck URL")}
-                        disabled={!markedSiteDefault}
-                        className="rounded-lg border border-white/20 px-4 py-2 text-sm text-slate-300 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-35"
-                      >
-                        Copy home URL (/) — site default only
+                        Copy class hub (path link)
                       </button>
                     </div>
                     <p className="text-xs text-slate-500">
@@ -517,8 +452,8 @@ export default function FacilitatorDashboard() {
                   </div>
                 ) : (
                   <p className="mt-3 text-sm text-amber-200/90">
-                    Publish an assessment under <strong>Assessments</strong>, then click{" "}
-                    <strong>Use as site default</strong> so the home page counts as your course.
+                    Publish an assessment under <strong>Assessments</strong>, then copy deck and hub
+                    links from there or below.
                   </p>
                 )}
                 {copyMsg ? <p className="mt-2 text-xs text-cyan-200/80">{copyMsg}</p> : null}
@@ -531,7 +466,8 @@ export default function FacilitatorDashboard() {
                   </h3>
                   <p className="mt-2 text-sm text-slate-300">
                     These were graded on the deck before they were linked to your facilitator course.
-                    One click attaches them to your <strong>site default</strong> assessment.
+                    One click attaches them to your{" "}
+                    <strong>most recently updated course</strong> inbox.
                   </p>
                   {!canClaimLegacy ? (
                     <div className="mt-4 space-y-3">
@@ -559,9 +495,7 @@ export default function FacilitatorDashboard() {
                     >
                       {claimBusy
                         ? "Working…"
-                        : markedSiteDefault
-                          ? "Attach class submissions to my course"
-                          : "Set site default & attach class submissions"}
+                        : "Attach orphaned class submissions"}
                     </button>
                   )}
                   {claimMsg ? (
@@ -600,8 +534,9 @@ export default function FacilitatorDashboard() {
                 <div className="rounded-xl border border-white/10 bg-[#111520] p-6 text-sm text-slate-400">
                   <p>No submissions in your course inbox yet.</p>
                   <p className="mt-2">
-                    Share the class URL from <strong>Share with class</strong>, or attach prior work
-                    if students already submitted on the home deck.
+                    Share links from <strong>Share with class</strong>, or learners can paste{" "}
+                    <code className="font-mono">?assessment=</code>
+                    {""} into the deck URL if needed.
                   </p>
                 </div>
               ) : (
@@ -647,11 +582,6 @@ export default function FacilitatorDashboard() {
                           <div>
                             <p className="font-semibold text-white">{a.title}</p>
                             <p className="mt-1 font-mono text-xs text-emerald-300">{a.slug}</p>
-                            {a.isSiteDefault ? (
-                              <span className="mt-2 inline-block rounded bg-cyan-500/20 px-2 py-0.5 font-mono text-[10px] text-cyan-200">
-                                Site default (home URL)
-                              </span>
-                            ) : null}
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <button
@@ -678,16 +608,6 @@ export default function FacilitatorDashboard() {
                             >
                               Copy hub
                             </button>
-                            {!a.isSiteDefault ? (
-                              <button
-                                type="button"
-                                disabled={lockBusy === a.id}
-                                onClick={() => void setSiteDefault(a.id)}
-                                className="rounded border border-cyan-400/40 px-2 py-1 text-[11px] text-cyan-100"
-                              >
-                                Use as site default
-                              </button>
-                            ) : null}
                             <button
                               type="button"
                               disabled={lockBusy === a.id}

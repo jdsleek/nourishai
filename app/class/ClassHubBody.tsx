@@ -36,6 +36,22 @@ type SavedGrade = {
 
 const STORE_KEY = "foundry.student.v1";
 
+/** Same shell as the default &quot;Program deck&quot; card — facilitator picks reuse this look. */
+const HUB_PRIMARY_SECTION =
+  "rounded-2xl border border-cyan-500/25 bg-cyan-950/20 p-5 shadow-lg shadow-black/25";
+const HUB_CARD_KICKER =
+  "font-mono text-[10px] uppercase tracking-[0.22em] text-cyan-300/85";
+
+/** Clickable class tiles on /class browse list — matches primary hub card framing. */
+function classBrowseTileClassSelected(here: boolean): string {
+  return [
+    "flex min-h-[6.75rem] w-full flex-col rounded-2xl border p-5 text-left shadow-md shadow-black/20 transition-colors",
+    here
+      ? "border-cyan-400/50 bg-cyan-950/35 ring-2 ring-cyan-400/35"
+      : "border-cyan-500/30 bg-cyan-950/20 hover:bg-cyan-950/35",
+  ].join(" ");
+}
+
 function readStore(): { lastGrade?: SavedGrade } {
   try {
     return JSON.parse(
@@ -326,98 +342,53 @@ export default function ClassHubBody({
           </p>
         ) : null}
 
-        {liveOpen === null && !liveOpenErr ? (
-          <p className="text-xs text-slate-600">Loading open classes…</p>
-        ) : null}
-
-        {!courseSlug && liveOpen && liveOpen.length > 0 ? (
-          <section className="rounded-2xl border border-emerald-500/25 bg-emerald-950/15 p-5">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-300/85">
-              Classes accepting work
-            </p>
-            <p className="mt-2 text-sm text-slate-300">
-              These classes are accepting submissions right now. Open only the one your facilitator gave you —
-              choosing a different class can send your work to the wrong instructor.
-            </p>
-            <ul className="mt-4 grid gap-3 sm:grid-cols-2">
-              {liveOpen.map((c) => {
-                const here =
-                  !!courseSlug && courseSlug.toLowerCase() === c.slug.toLowerCase();
-                return (
-                  <li key={c.slug}>
-                    <Link
-                      href={`/learn/${encodeURIComponent(c.slug)}`}
-                      prefetch={false}
-                      onClick={() => persistLearnerCourseSlug(c.slug)}
-                      className={`flex h-full min-h-[5.5rem] flex-col rounded-xl border p-4 transition hover:bg-white/[0.04] ${
-                        here
-                          ? "border-cyan-400/50 bg-cyan-950/40 ring-1 ring-cyan-400/30"
-                          : "border-emerald-500/20 bg-[#0c1410]"
-                      }`}
-                    >
-                      <p className="font-semibold text-white">{c.title}</p>
-                      <p className="mt-1 font-mono text-xs text-emerald-300/95">{c.slug}</p>
-                      {c.facilitatorDisplayName ? (
-                        <p className="mt-2 text-[11px] text-slate-500">
-                          Instructor ·{" "}
-                          <span className="text-slate-400">{c.facilitatorDisplayName}</span>
-                        </p>
-                      ) : null}
-                      <p className="mt-auto pt-3 text-[11px] text-emerald-200/85">
-                        {here ? "You are here" : "Open this class hub →"}
-                      </p>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        ) : null}
-
         {catalog && courseSlug && catalog.courses.length > 1 ? (
-          <section className="rounded-2xl border border-white/10 bg-[#0c1018] p-5">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500">
-              Choose your class
-            </p>
+          <section className={`mt-8 ${HUB_PRIMARY_SECTION}`}>
+            <p className={HUB_CARD_KICKER}>Choose your class</p>
             {catalog.facilitatorDisplayName ? (
-              <p className="mt-2 text-xs text-slate-500">
-                Instructor ·{" "}
-                <span className="text-slate-300">{catalog.facilitatorDisplayName}</span>
+              <p className="mt-3 text-xs text-slate-400">
+                Facilitator ·{" "}
+                <span className="text-slate-200">{catalog.facilitatorDisplayName}</span>
               </p>
             ) : null}
-            <p className="mt-2 text-sm text-slate-300">
-              Your facilitator shared more than one class link. Open the class you were told to join —
-              grading is tied to that class, not whichever link you opened first.
+            <p className="mt-3 text-lg font-semibold text-white">
+              Your instructor linked more than one class
             </p>
-            <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+            <p className="mt-2 text-sm text-slate-400">
+              Open only the class you were told to join — tiles match the hub card layout above for easy
+              comparison.
+            </p>
+            <ul className="mt-6 grid gap-4 sm:grid-cols-2">
               {catalog.courses.map((c) => {
                 const here = courseSlug?.toLowerCase() === c.slug.toLowerCase();
                 return (
                   <li key={c.slug}>
                     {!c.submissionsOpen ? (
-                      <div className="flex h-full flex-col rounded-xl border border-stone-600/35 bg-black/20 p-4 opacity-70">
-                        <p className="font-semibold text-slate-300">{c.title}</p>
-                        <p className="mt-1 font-mono text-xs text-stone-500">{c.slug}</p>
-                        <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-amber-300">
+                      <div className="flex min-h-[6.75rem] flex-col rounded-2xl border border-cyan-950/70 bg-black/35 p-5 opacity-80">
+                        <span className={HUB_CARD_KICKER}>Facilitator class</span>
+                        <span className="mt-3 block text-lg font-semibold text-slate-300">{c.title}</span>
+                        <span className="mt-1 block font-mono text-xs text-stone-500">
+                          Class code · {c.slug}
+                        </span>
+                        <span className="mt-auto block pt-4 text-[11px] font-medium uppercase tracking-wide text-amber-300">
                           Submissions closed
-                        </p>
+                        </span>
                       </div>
                     ) : (
                       <Link
                         href={`/learn/${encodeURIComponent(c.slug)}`}
                         prefetch={false}
                         onClick={() => persistLearnerCourseSlug(c.slug)}
-                        className={`flex h-full flex-col rounded-xl border p-4 transition hover:bg-white/[0.04] ${
-                          here
-                            ? "border-cyan-400/50 bg-cyan-950/40 ring-1 ring-cyan-400/30"
-                            : "border-white/12 bg-[#111520]"
-                        }`}
+                        className={classBrowseTileClassSelected(here)}
                       >
-                        <p className="font-semibold text-white">{c.title}</p>
-                        <p className="mt-1 font-mono text-xs text-emerald-300/95">{c.slug}</p>
-                        <p className="mt-auto pt-3 text-[11px] text-cyan-200/85">
-                          {here ? "You are here — open slides below" : "Open this class hub →"}
-                        </p>
+                        <span className={HUB_CARD_KICKER}>Facilitator class</span>
+                        <span className="mt-3 block text-lg font-semibold text-white">{c.title}</span>
+                        <span className="mt-1 block font-mono text-xs text-slate-500">
+                          Class code · {c.slug}
+                        </span>
+                        <span className="mt-auto block pt-4 text-sm font-medium text-emerald-400">
+                          {here ? "Current class · open slides below" : "Open this class hub →"}
+                        </span>
                       </Link>
                     )}
                   </li>
@@ -444,9 +415,9 @@ export default function ClassHubBody({
         ) : null}
 
         {hub ? (
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-cyan-500/30 bg-cyan-950/20 p-5">
-              <p className="font-mono text-[10px] uppercase tracking-widest text-cyan-300/80">
+          <div className="mt-8 space-y-4">
+            <div className={HUB_PRIMARY_SECTION}>
+              <p className={HUB_CARD_KICKER}>
                 {courseSlug ? "Your course" : siteDefaultBanner(hub)}
               </p>
               <p className="mt-2 text-lg font-semibold text-white">
@@ -454,7 +425,7 @@ export default function ClassHubBody({
               </p>
               {hub.assessmentSlug ? (
                 <p className="mt-1 font-mono text-xs text-slate-500">
-                  Slug · {hub.assessmentSlug}
+                  Class code · {hub.assessmentSlug}
                 </p>
               ) : null}
               {courseSlug && hub.assessmentIntro?.trim() ? (
@@ -537,6 +508,49 @@ export default function ClassHubBody({
               )}
             </p>
           </div>
+        ) : null}
+
+        {!courseSlug && hub !== null && liveOpen === null && !liveOpenErr ? (
+          <p className="mt-6 text-xs text-slate-600">Loading facilitator classes…</p>
+        ) : null}
+
+        {!courseSlug && hub !== null && liveOpen && liveOpen.length > 0 ? (
+          <section className={`mt-8 ${HUB_PRIMARY_SECTION}`}>
+            <p className={HUB_CARD_KICKER}>Facilitator class · open now</p>
+            <p className="mt-3 text-lg font-semibold text-white">
+              Join the class your instructor shared
+            </p>
+            <p className="mt-2 text-sm text-slate-400">
+              Same layout as the shared lesson card above — each tile is a facilitator-run class accepting
+              work. Pick only yours; the wrong tile sends work elsewhere.
+            </p>
+            <ul className="mt-6 grid gap-4 sm:grid-cols-2">
+              {liveOpen.map((c) => (
+                <li key={c.slug}>
+                  <Link
+                    href={`/learn/${encodeURIComponent(c.slug)}`}
+                    prefetch={false}
+                    onClick={() => persistLearnerCourseSlug(c.slug)}
+                    className={classBrowseTileClassSelected(false)}
+                  >
+                    <span className={HUB_CARD_KICKER}>Facilitator class</span>
+                    <span className="mt-3 block text-lg font-semibold text-white">{c.title}</span>
+                    <span className="mt-1 block font-mono text-xs text-slate-500">
+                      Class code · {c.slug}
+                    </span>
+                    {c.facilitatorDisplayName ? (
+                      <span className="mt-2 block text-xs text-slate-400">
+                        Facilitator · {c.facilitatorDisplayName}
+                      </span>
+                    ) : null}
+                    <span className="mt-auto block pt-4 text-sm font-medium text-emerald-400">
+                      Open this class hub →
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
 
         {lastGrade?.result ? (

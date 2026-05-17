@@ -11,6 +11,7 @@
     "railway:set-groq": "node scripts/railway-set-groq.mjs",
     "railway:bootstrap-training": "node scripts/railway-bootstrap-training.mjs",
     "foundry:import-jsonl": "node scripts/foundry-import-jsonl-to-pg.mjs",
+    "foundry:validate-deck": "node scripts/validate-day03-deck-script.mjs",
     "foundry:smoke": "node scripts/foundry-smoke-test.mjs",
     "foundry:smoke-providers": "node scripts/foundry-grading-providers-smoke.mjs",
     "foundry:smoke:full": "node scripts/foundry-smoke-test.mjs --api --grade",

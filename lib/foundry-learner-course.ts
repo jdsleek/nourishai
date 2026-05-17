@@ -44,6 +44,11 @@ export function learnerDeckPath(slug: string): string {
   return `/foundry/deck/${encodeURIComponent(s)}`;
 }
 
+/** Opens cohort deck on the submit slide (skips generic curriculum slides when config loads). */
+export function learnerDeckSubmitPath(slug: string): string {
+  return `${learnerDeckPath(slug)}?step=submit`;
+}
+
 export function learnerClassHubPath(slug: string): string {
   return `/learn/${encodeURIComponent(slug)}`;
 }

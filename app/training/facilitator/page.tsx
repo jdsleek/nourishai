@@ -6,7 +6,7 @@ import {
   DashboardStatCard,
   DashboardStatGrid,
 } from "@/components/foundry/DashboardStatGrid";
-import { learnerDeckPath } from "@/lib/foundry-learner-course";
+import { learnerDeckPath, learnerDeckSubmitPath } from "@/lib/foundry-learner-course";
 import type { PortalFormMerged, PortalFormStepKey } from "@/lib/foundry-portal-form";
 import {
   DEFAULT_PORTAL_FORM,
@@ -1093,6 +1093,14 @@ export default function FacilitatorDashboard() {
                             >
                               {editingDesk?.id === a.id ? "Close editor" : "Desk & assignment"}
                             </button>
+                            <a
+                              href={originUrl(learnerDeckSubmitPath(a.slug))}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded border border-orange-400/50 px-2 py-1 text-[10px] font-semibold text-orange-100 hover:bg-orange-950/40"
+                            >
+                              Preview submit
+                            </a>
                             <button
                               type="button"
                               className="rounded bg-orange-500/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#140802]"
@@ -1105,6 +1113,14 @@ export default function FacilitatorDashboard() {
                             >
                               Copy deck
                             </button>
+                            <a
+                              href={originUrl(facilitatorClassHubPath(a.slug))}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded border border-cyan-400/40 px-2 py-1 text-[10px] text-cyan-100 hover:bg-cyan-950/35"
+                            >
+                              Preview hub
+                            </a>
                             <button
                               type="button"
                               className="rounded border border-emerald-400/35 px-2 py-1 text-[10px] text-emerald-100"

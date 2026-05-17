@@ -623,6 +623,39 @@ body.cohort-assessment-deck .slide[data-slide="0"] .cohort-intro-body{
   color:#e2e8f0;font-size:clamp(14px,2.4vmin,16px);line-height:1.65;font-family:'DM Sans',sans-serif;
 }
 body.cohort-assessment-deck .slide[data-slide="0"] .hero{font-size:clamp(2rem,6vmin,3.2rem);}
+
+/* Config / link problems — fixed under top chrome */
+.deck-config-alert{
+  position:fixed;left:0;right:0;z-index:45;
+  top:calc(env(safe-area-inset-top,0px) + var(--chrome-h) + var(--progress-h));
+  margin:0;padding:12px var(--pad-x);
+  background:rgba(127,29,29,0.94);border-bottom:1px solid rgba(248,113,113,0.45);
+  color:#fecaca;font-size:clamp(13px,2.35vmin,15px);line-height:1.55;
+  font-family:'DM Sans',sans-serif;
+  box-shadow:0 8px 24px rgba(0,0,0,0.35);
+}
+.deck-config-alert[hidden]{display:none!important;}
+body.deck-config-alert-on .deck{
+  top:calc(env(safe-area-inset-top,0px) + var(--chrome-h) + var(--progress-h) + 52px);
+}
+body.deck-config-alert-on.deck-config-alert-tall .deck{
+  top:calc(env(safe-area-inset-top,0px) + var(--chrome-h) + var(--progress-h) + 72px);
+}
+.cohort-step-hint{
+  font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,11px);
+  letter-spacing:0.12em;text-transform:uppercase;color:var(--cyan);margin-top:1rem;
+}
+.portal-steps{
+  display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px;
+}
+.portal-step{
+  font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,11px);
+  letter-spacing:0.08em;text-transform:uppercase;
+  padding:6px 10px;border-radius:999px;border:1px solid var(--border);
+  color:var(--muted);background:rgba(16,17,26,0.6);
+}
+.portal-step.active{border-color:rgba(249,115,22,0.55);color:var(--orange);background:var(--orange-dim);}
+.portal-step.done{border-color:rgba(74,222,128,0.35);color:var(--green);}
 </style>
 </head>
 <body class="deck-mode">
@@ -666,6 +699,8 @@ body.cohort-assessment-deck .slide[data-slide="0"] .hero{font-size:clamp(2rem,6v
  }catch(_){}})();
 </script>
 <div class="progress-bar" id="progressBar" role="progressbar" aria-valuemin="1" aria-valuemax="7" aria-valuenow="1" aria-label="Slide progress"></div>
+
+<div id="deckConfigAlert" class="deck-config-alert" role="alert" hidden></div>
 
 <div id="facilitator-desk-banner" class="facilitator-desk" hidden>
   <div class="facilitator-desk-head">
@@ -908,6 +943,12 @@ body.cohort-assessment-deck .slide[data-slide="0"] .hero{font-size:clamp(2rem,6v
       <h4>Before you submit</h4>
       <ul id="portalLearnerChecklistUl"></ul>
     </div>
+
+    <nav class="portal-steps" id="portalSteps" aria-label="Submit steps">
+      <span class="portal-step active" data-portal-step="1" id="portalStep1">1 · You</span>
+      <span class="portal-step" data-portal-step="2" id="portalStep2">2 · Your work</span>
+      <span class="portal-step" data-portal-step="3" id="portalStep3">3 · Submit</span>
+    </nav>
 
     <!-- FORM -->
     <div class="fgroup">
@@ -1167,6 +1208,8 @@ let CFG_MIN_OUTPUT = 80;
 let CURRENT_ASSESSMENT_TITLE = '';
 let CURRENT_ASSESSMENT_INTRO = '';
 let CFG_COHORT_CONFIG_OK = false;
+/** True after first assessment-config fetch finishes (avoids error banner flash while loading). */
+let CFG_CONFIG_LOAD_DONE = false;
 let CURRENT_LEVEL_UP_URL = '';
 let CURRENT_STUDENT_CHECKLIST = [];
 /** Faculty-defined textarea questions beyond portal fields 03/04 — rebuilt from GET /api/foundry/assessment-config */
@@ -1441,6 +1484,80 @@ function syncFacilitatorDesk(){
   }
 }
 
+function deckStepSubmitRequested(){
+  try{
+    var p=new URLSearchParams(location.search);
+    if(p.get('step')==='submit'||p.get('submit')==='1') return true;
+    var h=(location.hash||'').replace(/^#/,'').toLowerCase();
+    return h==='submit'||h==='portal';
+  }catch(_){ return false; }
+}
+
+/** Go to submit slide (6) — safe for cohort two-step deck and full Day 03 deck. */
+function goToSubmitSlide(){
+  var vis=visibleSlideIndices();
+  if(vis.indexOf(6)>=0){ goTo(6); return; }
+  if(vis.length) goTo(vis[vis.length-1]);
+}
+
+function syncDeckConfigBanner(){
+  var el=document.getElementById('deckConfigAlert');
+  if(!el) return;
+  var show=false;
+  var msg='';
+  if(typeof location!=='undefined' && location.protocol==='file:'){
+    show=true;
+    msg='You opened a saved copy of this page on your computer. Grading will not work. Ask your facilitator for the live https link.';
+  }else if(ASSESSMENT_SLUG && CFG_CONFIG_LOAD_DONE && !CFG_COHORT_CONFIG_OK){
+    show=true;
+    msg='We could not load course settings for “'+ASSESSMENT_SLUG+'”. Use the full link your facilitator sent (/foundry/deck/'+ASSESSMENT_SLUG+' or /learn/'+ASSESSMENT_SLUG+'). If this keeps happening, contact your facilitator.';
+  }
+  el.hidden=!show;
+  el.textContent=msg;
+  document.body.classList.toggle('deck-config-alert-on',show);
+  document.body.classList.toggle('deck-config-alert-tall',show && msg.length>120);
+}
+
+function finishDeckPresentationNav(){
+  syncDeckConfigBanner();
+  var vis=visibleSlideIndices();
+  if(vis.indexOf(cur)<0) cur=vis.length?vis[0]:0;
+  if(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK && deckStepSubmitRequested() && vis.indexOf(6)>=0){
+    cur=6;
+  }
+  reconcileDeckSlideClasses();
+  updateUI();
+}
+
+function setPortalStepActive(stepNum){
+  var n=Number(stepNum);
+  if(!n||n<1||n>3) return;
+  document.querySelectorAll('.portal-step').forEach(function(el){
+    var s=Number(el.getAttribute('data-portal-step'));
+    el.classList.remove('active','done');
+    if(s<n) el.classList.add('done');
+    else if(s===n) el.classList.add('active');
+  });
+}
+
+function syncPortalStepFromFocus(){
+  var sub=document.getElementById('subGroup');
+  var pr=document.getElementById('aPrompt');
+  var ou=document.getElementById('aOutput');
+  var active=document.activeElement;
+  if(ou&&(active===ou||document.getElementById('subBtn')===active)) setPortalStepActive(3);
+  else if(pr&&active===pr) setPortalStepActive(2);
+  else if(sub&&(active===sub||(document.getElementById('sName')===active))) setPortalStepActive(1);
+}
+
+function attachPortalStepListeners(){
+  var portal=document.getElementById('portal');
+  if(!portal||portal.dataset.stepListeners==='1') return;
+  portal.dataset.stepListeners='1';
+  portal.addEventListener('focusin',function(){ syncPortalStepFromFocus(); },true);
+  portal.addEventListener('input',function(){ syncPortalStepFromFocus(); },true);
+}
+
 /** Cohort URL: one assignment deck (title + intro) + submit slide — not generic Day 03 slides on top. */
 function applyCohortDeckPresentation(){
   captureDefaultSlideHtml();
@@ -1468,7 +1585,9 @@ function applyCohortDeckPresentation(){
       '<div class="badge">Your course · '+escapeHtml(ASSESSMENT_SLUG)+'</div>'+
       '<h1 class="hero">'+escapeHtml(title)+'</h1>'+
       introBlock+
-      '<p class="subtitle" style="margin-top:1.25rem">Grading uses your facilitator&apos;s rubric for this cohort.</p>';
+      '<p class="subtitle" style="margin-top:1.25rem">Grading uses your facilitator&apos;s rubric for this cohort.</p>'+
+      '<p class="cohort-step-hint">Step 1 of 2 · read your assignment</p>'+
+      '<button type="button" class="cta-main" style="margin-top:1.25rem" onclick="goToSubmitSlide()">Continue to submit →</button>';
   }
   const logo=document.querySelector('.chrome-top .logo');
   if(logo&&CURRENT_ASSESSMENT_TITLE.trim()){
@@ -1486,7 +1605,8 @@ function applyCohortDeckPresentation(){
     slide6.innerHTML=
       '<div class="tag">Submit assignment</div>'+
       '<h2 class="head">'+escapeHtml(submitTitle)+'</h2>'+
-      '<p class="subtitle" style="max-width:36rem;margin:0.75rem auto 0">When your work matches what your facilitator asked for on the previous slide, open the portal and submit.</p>'+
+      '<p class="cohort-step-hint">Step 2 of 2 · submit your work</p>'+
+      '<p class="subtitle" style="max-width:36rem;margin:0.75rem auto 0">When your work is ready, open the portal below. Use the arrow keys or dots to return to the assignment brief on the previous screen.</p>'+
       '<div class="submit-prep">'+
       '<h4>Before you submit</h4>'+
       '<ul>'+prepBody+'</ul></div>'+
@@ -1498,12 +1618,7 @@ function applyCohortDeckPresentation(){
   }
   }
 
-  var visFinish=visibleSlideIndices();
-  if(visFinish.indexOf(cur)<0){
-    cur=visFinish.length?visFinish[0]:0;
-  }
-  reconcileDeckSlideClasses();
-  updateUI();
+  finishDeckPresentationNav();
 }
 
 /** Facilitator assessments can be closed to block repeat submissions server-side too. */
@@ -1664,6 +1779,8 @@ async function ensureSubgroupsLoaded(force){
         banner.textContent='Assessment · could not load config ('+ASSESSMENT_SLUG+')'+facilitatorPortalSuffix(j);
       }
       rebuildPortalExtraAnswerSlots([]);
+      CFG_CONFIG_LOAD_DONE = true;
+      syncDeckConfigBanner();
       applySubmissionLockUI();
       applyDeckDocumentTitle();
       applyPortalFormFromConfig(j.portalForm);
@@ -1694,6 +1811,8 @@ async function ensureSubgroupsLoaded(force){
         banner.textContent = 'Day 03 AI Builder'+fac;
       }
     }
+    CFG_CONFIG_LOAD_DONE = true;
+    syncDeckConfigBanner();
     applySubmissionLockUI();
     applyDeckDocumentTitle();
     applyPortalFormFromConfig(j.portalForm);
@@ -1713,12 +1832,16 @@ async function ensureSubgroupsLoaded(force){
     CURRENT_ASSESSMENT_INTRO = '';
     ingestAssessmentConfigPayload({});
     rebuildPortalExtraAnswerSlots([]);
+    CFG_CONFIG_LOAD_DONE = true;
+    syncDeckConfigBanner();
     applyCohortDeckPresentation();
     applyDeckDocumentTitle();
     CFG_SUBMISSIONS_OPEN = !ASSESSMENT_SLUG;
     applySubmissionLockUI();
     fill(FALLBACK_QAF_SUBGROUPS);
   }
+  CFG_CONFIG_LOAD_DONE = true;
+  syncDeckConfigBanner();
   const btnLast=document.getElementById('btnLastGrade');
   if(btnLast) btnLast.style.display=lastGradeForCurrentAssessment()?'':'none';
 }
@@ -1743,6 +1866,8 @@ async function openPortal(){
   loadStudentProfileIntoForm();
   tryRestorePortalDraft();
   ensurePortalUiOpen();
+  attachPortalStepListeners();
+  setPortalStepActive(1);
   document.getElementById('portal').scrollTop=0;
 }
 function closePortal(){

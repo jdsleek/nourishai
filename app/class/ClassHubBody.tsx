@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   clearPersistedLearnerCourseSlug,
   learnerDeckPath,
+  learnerDeckSubmitPath,
   persistLearnerCourseSlug,
 } from "@/lib/foundry-learner-course";
 
@@ -280,6 +281,9 @@ export default function ClassHubBody({
   const openForSubmit = hub?.submissionsOpen !== false;
   const activeSlug = courseSlug ?? hub?.assessmentSlug ?? null;
   const deckHref = activeSlug ? learnerDeckPath(activeSlug) : hub?.deckHref ?? "/foundry/day03";
+  const deckSubmitHref = activeSlug
+    ? learnerDeckSubmitPath(activeSlug)
+    : `${deckHref}${deckHref.includes("?") ? "&" : "?"}step=submit`;
   const facilitatorLabel =
     hub?.facilitatorDisplayName?.trim() ||
     (hub?.facilitatorEmail ? hub.facilitatorEmail.split("@")[0] : "");
@@ -312,8 +316,8 @@ export default function ClassHubBody({
             <p className="mt-3 rounded-lg border border-cyan-500/25 bg-cyan-950/20 px-3 py-2 text-xs leading-relaxed text-cyan-100/95">
               <strong className="text-white">This page is your class home — the slides don&apos;t open by themselves.</strong>{" "}
               When you&apos;re ready, scroll down and tap{" "}
-              <strong className="font-medium text-slate-200">Open slides &amp; submit portal</strong> to view the
-              lesson and hand in your work (same browser tab, next screen).
+              <strong className="font-medium text-slate-200">Open assignment &amp; submit</strong> to go straight to
+              your hand-in screen (same browser tab).
             </p>
           ) : null}
           <p className="mt-1 text-xs text-slate-500">
@@ -497,14 +501,27 @@ export default function ClassHubBody({
 
             <div className="grid gap-3">
               <a
-                href={deckHref}
+                href={courseSlug && openForSubmit ? deckSubmitHref : deckHref}
                 onClick={() => {
                   if (activeSlug) persistLearnerCourseSlug(activeSlug);
                 }}
                 className="block rounded-xl bg-orange-500 px-5 py-4 text-center text-sm font-semibold text-[#0a0a0c] hover:bg-orange-400"
               >
-                Open slides &amp; submit portal
+                {courseSlug && openForSubmit
+                  ? "Open assignment & submit"
+                  : "Open slides & submit portal"}
               </a>
+              {courseSlug && openForSubmit ? (
+                <a
+                  href={deckHref}
+                  onClick={() => {
+                    if (activeSlug) persistLearnerCourseSlug(activeSlug);
+                  }}
+                  className="block rounded-xl border border-white/15 px-5 py-4 text-center text-sm font-medium text-slate-200 hover:bg-white/5"
+                >
+                  View full Day 03 lesson slides first
+                </a>
+              ) : null}
               <Link
                 href={hub.workbookPath}
                 className="block rounded-xl border border-white/15 px-5 py-4 text-center text-sm font-medium text-slate-200 hover:bg-white/5"

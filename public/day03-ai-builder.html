@@ -516,7 +516,7 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
 <div class="chrome-top">
   <div class="logo"><strong>QUBATORS</strong> AI FOUNDRY · DAY 03</div>
   <div class="chrome-actions">
-    <a href="/class" class="facilitator-link" style="margin-right:12px">Class hub</a>
+    <a href="/class" id="deckClassHubLink" class="facilitator-link" style="margin-right:12px">Class hub</a>
     <a href="/training/facilitator/login" class="facilitator-link">Trainer login</a>
     <span class="registry-link" title="Cohort summaries are instructor-only">Ideation summaries (instructors only)</span>
     <div class="kbd-hints" aria-hidden="true">
@@ -878,9 +878,42 @@ const FALLBACK_QAF_SUBGROUPS = [
   'Bethel','Carmel','Eden','Gilead','Goshen','Hebron','Israel','Zion','Other / not listed',
 ];
 
-const ASSESSMENT_SLUG = (typeof location !== 'undefined'
-  ? (new URLSearchParams(location.search).get('assessment') || '').trim()
-  : '');
+const FOUNDRY_COURSE_SLUG_KEY = 'foundry.courseSlug.v1';
+
+function resolveAssessmentSlug(){
+  if(typeof location==='undefined') return '';
+  let slug = (new URLSearchParams(location.search).get('assessment')||'').trim().toLowerCase();
+  if(!slug){
+    try{
+      const stored = sessionStorage.getItem(FOUNDRY_COURSE_SLUG_KEY);
+      if(stored) slug = stored.trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
+    }catch(_){}
+  }
+  if(slug && slug.length>=3){
+    try{ sessionStorage.setItem(FOUNDRY_COURSE_SLUG_KEY, slug); }catch(_){}
+    const params = new URLSearchParams(location.search);
+    if(params.get('assessment')!==slug){
+      params.set('assessment', slug);
+      const q = params.toString();
+      history.replaceState(null, '', location.pathname + (q ? ('?'+q) : ''));
+    }
+  }
+  return slug;
+}
+
+let ASSESSMENT_SLUG = resolveAssessmentSlug();
+
+function syncDeckClassHubLink(){
+  const a = document.getElementById('deckClassHubLink');
+  if(!a) return;
+  if(ASSESSMENT_SLUG){
+    a.href = '/learn/' + encodeURIComponent(ASSESSMENT_SLUG);
+    a.title = 'Class hub for course ' + ASSESSMENT_SLUG;
+  }else{
+    a.href = '/class';
+    a.title = 'Generic class hub — open your facilitator /learn/course link for your rubric';
+  }
+}
 
 /** Server-driven min lengths (facilitator assessment or legacy defaults). */
 let CFG_MIN_PROMPT = 40;
@@ -1190,6 +1223,7 @@ void ensureSubgroupsLoaded(false);
 
 
 (function initStudentUi(){
+  syncDeckClassHubLink();
   const lg = readStudentStore().lastGrade;
   const btn = document.getElementById('btnLastGrade');
   if(btn && (!lg || !lg.result)) btn.style.display='none';

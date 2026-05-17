@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import {
+  learnerDeckPath,
+  persistLearnerCourseSlug,
+} from "@/lib/foundry-learner-course";
 
 type HubConfig = {
   programName: string;
@@ -97,6 +101,12 @@ export default function ClassHubBody({
       throw new Error(data.message || data.error || "Could not load class info.");
     }
     setHub(data);
+    const slug = data.assessmentSlug ?? courseSlug;
+    if (slug) persistLearnerCourseSlug(slug);
+  }, [courseSlug]);
+
+  useEffect(() => {
+    if (courseSlug) persistLearnerCourseSlug(courseSlug);
   }, [courseSlug]);
 
   useEffect(() => {
@@ -136,6 +146,8 @@ export default function ClassHubBody({
   }
 
   const openForSubmit = hub?.submissionsOpen !== false;
+  const activeSlug = courseSlug ?? hub?.assessmentSlug ?? null;
+  const deckHref = activeSlug ? learnerDeckPath(activeSlug) : hub?.deckHref ?? "/foundry/day03";
 
   return (
     <div className="min-h-screen bg-[#07080d] px-4 py-10 text-slate-100">
@@ -213,12 +225,15 @@ export default function ClassHubBody({
             </div>
 
             <div className="grid gap-3">
-              <Link
-                href={hub.deckHref}
+              <a
+                href={deckHref}
+                onClick={() => {
+                  if (activeSlug) persistLearnerCourseSlug(activeSlug);
+                }}
                 className="block rounded-xl bg-orange-500 px-5 py-4 text-center text-sm font-semibold text-[#0a0a0c] hover:bg-orange-400"
               >
                 Open slides &amp; submit portal
-              </Link>
+              </a>
               <Link
                 href={hub.workbookPath}
                 className="block rounded-xl border border-white/15 px-5 py-4 text-center text-sm font-medium text-slate-200 hover:bg-white/5"
@@ -232,7 +247,7 @@ export default function ClassHubBody({
                 <>
                   Link opens{" "}
                   <code className="rounded bg-white/10 px-1 font-mono text-[11px]">
-                    {hub.deckHref}
+                    {deckHref}
                   </code>{" "}
                   so your facilitator&apos;s rubric stays attached even if chats shorten links.
                 </>
@@ -240,7 +255,7 @@ export default function ClassHubBody({
                 <>
                   Opens the shared deck at{" "}
                   <code className="rounded bg-white/10 px-1 font-mono text-[11px]">
-                    {hub.deckHref}
+                    {deckHref}
                   </code>
                   — add{" "}
                   <code className="rounded bg-white/10 px-1 font-mono text-[11px]">
@@ -265,13 +280,16 @@ export default function ClassHubBody({
                 Ref {lastGrade.submissionId.slice(0, 8)}…
               </p>
             ) : null}
-            {hub?.deckHref ? (
-              <Link
-                href={hub.deckHref}
+            {activeSlug || hub?.deckHref ? (
+              <a
+                href={deckHref}
+                onClick={() => {
+                  if (activeSlug) persistLearnerCourseSlug(activeSlug);
+                }}
                 className="mt-4 inline-block text-xs text-cyan-300 underline"
               >
                 Open deck to submit again
-              </Link>
+              </a>
             ) : null}
           </div>
         ) : null}

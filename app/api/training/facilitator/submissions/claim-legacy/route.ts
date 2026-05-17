@@ -8,7 +8,7 @@ import {
 
 export const runtime = "nodejs";
 
-/** One-click: attach all legacy (no assessment FK) rows to this facilitator's most recently updated assessment. */
+/** One-click: attach all legacy (no assessment FK) rows to this facilitator's oldest-published assessment. */
 export async function POST() {
   const ses = facilitatorFromCookie();
   if (!ses) return Response.json({ error: "Unauthorized." }, { status: 401 });

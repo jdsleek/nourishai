@@ -917,23 +917,20 @@ const FOUNDRY_COURSE_SLUG_KEY = 'foundry.courseSlug.v1';
 
 function resolveAssessmentSlug(){
   if(typeof location==='undefined') return '';
-  let slug = (new URLSearchParams(location.search).get('assessment')||'').trim().toLowerCase();
-  if(!slug){
-    try{
-      const stored = sessionStorage.getItem(FOUNDRY_COURSE_SLUG_KEY);
-      if(stored) slug = stored.trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
-    }catch(_){}
-  }
+  const raw = (new URLSearchParams(location.search).get('assessment')||'').trim().toLowerCase();
+  let slug = raw.replace(/[^a-z0-9-]/g,'');
   if(slug && slug.length>=3){
     try{ sessionStorage.setItem(FOUNDRY_COURSE_SLUG_KEY, slug); }catch(_){}
-    const params = new URLSearchParams(location.search);
+    const params=new URLSearchParams(location.search);
     if(params.get('assessment')!==slug){
-      params.set('assessment', slug);
-      const q = params.toString();
-      history.replaceState(null, '', location.pathname + (q ? ('?'+q) : ''));
+      params.set('assessment',slug);
+      const q=params.toString();
+      history.replaceState(null,'',location.pathname+(q?('?'+q):''));
     }
+    return slug;
   }
-  return slug;
+  /** Do NOT read sessionStorage into the deck URL — that forced the last lab slug onto “/” and bare /foundry/day03 so students graded the wrong cohort. Persisted slug is still used by /learn/… + workbook outbound links via Class hub. */
+  return '';
 }
 
 let ASSESSMENT_SLUG = resolveAssessmentSlug();

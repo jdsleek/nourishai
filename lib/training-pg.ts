@@ -165,7 +165,7 @@ export async function pgListAssessmentsForFacilitator(
   const { rows } = await pool.query(
     `SELECT ${ASSESSMENT_SELECT}
      FROM training_assessments WHERE facilitator_id = $1::uuid
-     ORDER BY updated_at DESC`,
+     ORDER BY created_at ASC`,
     [facilitatorId]
   );
   return rows.map((r) => rowAssessment(r as Record<string, unknown>));
@@ -270,7 +270,7 @@ export async function pgUpdateAssessment(
   return rowAssessment(rows[0] as Record<string, unknown>);
 }
 
-/** Attach orphan legacy rows to this facilitator's most recently updated course. */
+/** Attach orphan legacy rows to this facilitator's oldest-published assessment (stable main-course inbox). */
 export async function pgFacilitatorClaimLegacySubmissions(
   pool: Pool,
   facilitatorId: string,
@@ -278,7 +278,7 @@ export async function pgFacilitatorClaimLegacySubmissions(
   const pick = await pool.query(
     `SELECT id FROM training_assessments
      WHERE facilitator_id = $1::uuid
-     ORDER BY updated_at DESC
+     ORDER BY created_at ASC
      LIMIT 1`,
     [facilitatorId.trim()],
   );
@@ -339,6 +339,29 @@ export async function pgAdminSetAssessmentSubmissionsOpen(
     [trimmed, submissionsOpen]
   );
   return (r.rowCount ?? 0) > 0;
+}
+
+/** Organizer removes a facilitator assessment row. Submissions lose FK (SET NULL); slug is freed. */
+export async function pgAdminDeleteAssessment(
+  pool: Pool,
+  assessmentId: string
+): Promise<{ ok: boolean; submissionsUnlinked: number }> {
+  const trimmed = assessmentId.trim();
+  if (!looksLikeUuid(trimmed)) {
+    return { ok: false, submissionsUnlinked: 0 };
+  }
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::bigint AS n FROM foundry_submissions WHERE assessment_id = $1::uuid`,
+    [trimmed]
+  );
+  const submissionsUnlinked = Number(
+    (rows[0] as { n?: string } | undefined)?.n ?? 0
+  );
+  const r = await pool.query(`DELETE FROM training_assessments WHERE id = $1::uuid`, [
+    trimmed,
+  ]);
+  const ok = (r.rowCount ?? 0) > 0;
+  return { ok, submissionsUnlinked };
 }
 
 export async function pgFacilitatorByEmail(pool: Pool, email: string) {

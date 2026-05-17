@@ -110,6 +110,9 @@ export default function FoundryAdminPage() {
   const [subs, setSubs] = useState<Submission[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [assessmentDeletingId, setAssessmentDeletingId] = useState<string | null>(
+    null,
+  );
   const [section, setSection] = useState<AdminSection>("overview");
   const [ideationHtml, setIdeationHtml] = useState<string | null>(null);
   const [ideationLoading, setIdeationLoading] = useState(false);
@@ -490,6 +493,58 @@ export default function FoundryAdminPage() {
     }
   }, [loadLocks, loadFacilitators, loadLegacyStats]);
 
+  const deleteAssessmentRow = useCallback(
+    async (pwd: string, row: AssessmentLockRow) => {
+      const msg = [
+        `Delete assessment "${row.title}" (${row.slug})?`,
+        "",
+        "Learner URLs for this slug stop working until someone publishes an assessment with the same slug.",
+        "",
+        "Submissions tied to this course remain in the ledger but lose their assessment link (shown as unlinked — like legacy imports).",
+        "",
+        "This cannot be undone.",
+      ].join("\n");
+      if (!window.confirm(msg)) return;
+
+      setAssessmentDeletingId(row.id);
+      setLocksErr(null);
+      try {
+        const res = await fetch(
+          `/api/foundry/admin/assessments/${encodeURIComponent(row.id)}`,
+          {
+            method: "DELETE",
+            headers: { "x-foundry-admin-password": pwd },
+          },
+        );
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          submissionsUnlinked?: number;
+        };
+        if (!res.ok) {
+          throw new Error(data.error || res.statusText || "Delete failed.");
+        }
+        setMoveOwnerChoice((prev) => {
+          const next = { ...prev };
+          delete next[row.id];
+          return next;
+        });
+        await load(pwd);
+        const n =
+          typeof data.submissionsUnlinked === "number" ? data.submissionsUnlinked : 0;
+        if (n > 0) {
+          window.alert(
+            `Assessment deleted · ${n} submission(s) are now unlinked (still visible in ledger).`,
+          );
+        }
+      } catch (e) {
+        setLocksErr(e instanceof Error ? e.message : "Delete failed.");
+      } finally {
+        setAssessmentDeletingId(null);
+      }
+    },
+    [load],
+  );
+
   const runLegacyDryRunOrLink = useCallback(
     async (pwd: string, mode: "dry" | "commit") => {
       if (!legacyTargetId) {
@@ -765,8 +820,16 @@ export default function FoundryAdminPage() {
                   <code className="rounded bg-white/10 px-1 font-mono text-xs">
                     ?assessment=slug
                   </code>
-                  ). Existing rows in this list stay. Built-in legacy Day 03 deck (no slug) is{" "}
-                  always open unless you deprecate it in product.
+                  ).{" "}
+                  <strong className="text-slate-200">Delete assignment</strong> removes the Postgres
+                  row so the slug can be re‑used (e.g. wipe a test assessment). Ledger submissions that
+                  pointed at it remain visible but lose their course link{" "}
+                  <span className="text-slate-500">
+                    (same as clearing{" "}
+                    <code className="font-mono text-[11px]">assessment_id</code>).
+                  </span>{" "}
+                  Built‑in legacy Day 03 deck (no slug) is always open unless you deprecate it in
+                  product.
                 </p>
                 {locksErr ? (
                   <p className="mt-2 text-sm text-red-400">{locksErr}</p>
@@ -809,6 +872,7 @@ export default function FoundryAdminPage() {
                             type="button"
                             disabled={
                               !!lockToggling ||
+                              assessmentDeletingId !== null ||
                               deletingId !== null ||
                               !password ||
                               loading
@@ -828,6 +892,7 @@ export default function FoundryAdminPage() {
                             type="button"
                             disabled={
                               !!lockToggling ||
+                              assessmentDeletingId !== null ||
                               deletingId !== null ||
                               !password ||
                               loading
@@ -885,6 +950,7 @@ export default function FoundryAdminPage() {
                             aria-label={`Move assignment ${a.slug} to another facilitator`}
                             disabled={
                               !!ownerMoveBusy ||
+                              assessmentDeletingId !== null ||
                               facDirLoading ||
                               !password ||
                               loading ||
@@ -913,6 +979,7 @@ export default function FoundryAdminPage() {
                             type="button"
                             disabled={
                               !!ownerMoveBusy ||
+                              assessmentDeletingId !== null ||
                               !password ||
                               loading ||
                               !moveOwnerChoice[a.id] ||
@@ -927,6 +994,27 @@ export default function FoundryAdminPage() {
                           >
                             {ownerMoveBusy === a.id ? "Moving…" : "Move"}
                           </button>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 border-t border-red-500/15 pt-3">
+                          <button
+                            type="button"
+                            disabled={
+                              assessmentDeletingId !== null ||
+                              !!lockToggling ||
+                              !!ownerMoveBusy ||
+                              !password ||
+                              loading ||
+                              deletingId !== null
+                            }
+                            onClick={() => void deleteAssessmentRow(password, a)}
+                            className="rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-900/35 disabled:opacity-40"
+                          >
+                            {assessmentDeletingId === a.id ? "Deleting…" : "Delete assignment"}
+                          </button>
+                          <span className="max-w-xl text-[11px] text-slate-500">
+                            Drops the facilitator course row · frees slug for trainer to publish again ·
+                            does not erase submission ledger rows.
+                          </span>
                         </div>
                       </li>
                     ))}

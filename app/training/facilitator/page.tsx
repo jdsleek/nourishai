@@ -99,6 +99,21 @@ export default function FacilitatorDashboard() {
   const [deskSaveBusy, setDeskSaveBusy] = useState(false);
 
   const primaryAssessment = useMemo(() => assessments[0] ?? null, [assessments]);
+
+  /** Filter inbox by facilitator assessment slug ("", all). */
+  const [subsFilterSlug, setSubsFilterSlug] = useState("");
+  const filteredSubs = useMemo(() => {
+    if (!subsFilterSlug) return subs;
+    return subs.filter(
+      (x) => (x.assessmentSlug || "").trim() === subsFilterSlug,
+    );
+  }, [subs, subsFilterSlug]);
+
+  useEffect(() => {
+    setSubsFilterSlug((cur) =>
+      assessments.some((a) => a.slug === cur) ? cur : "",
+    );
+  }, [assessments]);
   const canClaimLegacy = assessments.length > 0;
   const openAssessmentCount = useMemo(
     () => assessments.filter((a) => a.submissionsOpen).length,
@@ -384,7 +399,7 @@ export default function FacilitatorDashboard() {
                   value={primaryAssessment ? primaryAssessment.slug : "—"}
                   hint={
                     primaryAssessment
-                      ? "Most recently updated assessment (copy links below)"
+                      ? "Shortcuts use your oldest-published assignment (avoid test drafts bumping it)"
                       : "Create one under Assessments"
                   }
                   tone="slate"
@@ -453,8 +468,13 @@ export default function FacilitatorDashboard() {
                 {primaryAssessment ? (
                   <div className="mt-4 space-y-3">
                     <p className="font-mono text-xs text-emerald-300">
-                      Featured (most recently edited):{" "}
-                      <strong>{primaryAssessment.title}</strong> ({primaryAssessment.slug})
+                      Main-course shortcuts: <strong>{primaryAssessment.title}</strong>{" "}
+                      <span className="opacity-95">({primaryAssessment.slug})</span>
+                      {" — "}
+                      <span className="text-slate-400">
+                        your oldest-published assignment; edit a test draft without changing these
+                        buttons.
+                      </span>
                     </p>
                     <p className="text-xs text-slate-400">
                       Every assessment has its own copy buttons under{" "}
@@ -508,7 +528,8 @@ export default function FacilitatorDashboard() {
                   <p className="mt-2 text-sm text-slate-300">
                     These were graded on the deck before they were linked to your facilitator course.
                     One click attaches them to your{" "}
-                    <strong>most recently updated course</strong> inbox.
+                    <strong>oldest-published course</strong> inbox (usually your live cohort, not the
+                    last draft you touched).
                   </p>
                   {!canClaimLegacy ? (
                     <div className="mt-4 space-y-3">
@@ -561,8 +582,34 @@ export default function FacilitatorDashboard() {
 
           {tab === "submissions" ? (
             <section className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold text-white">Learner submissions</h2>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-semibold text-white">Learner submissions</h2>
+                  {subs.length ? (
+                    <label className="flex items-center gap-2 text-xs text-slate-400">
+                      <span className="shrink-0">Show</span>
+                      <select
+                        className="max-w-[14rem] rounded-lg border border-white/15 bg-[#0c0e14] px-2 py-1.5 font-mono text-[11px] text-slate-200"
+                        value={subsFilterSlug}
+                        onChange={(e) => setSubsFilterSlug(e.target.value)}
+                        aria-label="Filter submissions by course slug"
+                      >
+                        <option value="">All published courses ({subs.length})</option>
+                        {assessments.map((c) => {
+                          const n = subs.filter(
+                            (s) => (s.assessmentSlug || "").trim() === c.slug,
+                          ).length;
+                          return (
+                            <option key={c.id} value={c.slug}>
+                              {c.slug} ({n}) · {c.title.slice(0, 28)}
+                              {c.title.length > 28 ? "…" : ""}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </label>
+                  ) : null}
+                </div>
                 <button
                   type="button"
                   onClick={() => void load()}
@@ -580,9 +627,17 @@ export default function FacilitatorDashboard() {
                     {""} into the deck URL if needed.
                   </p>
                 </div>
+              ) : !filteredSubs.length ? (
+                <div className="rounded-xl border border-amber-500/25 bg-amber-950/20 p-4 text-sm text-amber-100/95">
+                  No submissions for{" "}
+                  <code className="font-mono text-amber-200">{subsFilterSlug}</code>. Pick another
+                  filter or remind students their link must include{" "}
+                  <code className="font-mono">&amp;assessment={subsFilterSlug}</code>{" "}
+                  (or send the hub URL for that slug).
+                </div>
               ) : (
                 <ul className="space-y-2">
-                  {subs.map((x) => (
+                  {filteredSubs.map((x) => (
                     <li
                       key={x.id}
                       className="rounded-xl border border-white/10 bg-[#111520] px-4 py-3 text-sm"

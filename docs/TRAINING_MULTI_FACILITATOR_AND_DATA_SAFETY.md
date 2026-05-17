@@ -131,8 +131,26 @@ npm run dev
 
 - Organizer: `/foundry/admin`
 - Facilitator: `/training/facilitator/login`
-- Student legacy: `/foundry/day03`
-- Student new: `/foundry/day03?assessment=<slug>`
+- Student legacy (built-in deck): `/foundry/day03`
+- Student **recommended** (explicit course): **`/foundry/day03?assessment=<slug>`** — survives chat previews and avoids wrong facilitator inbox when multiple ministries share one app.
+- Student **hub** (one link for slides + status): **`/class?course=<slug>`**
+
+### Production data protection & continuity (high trust)
+
+Treat **Postgres (`DATABASE_URL`)** as the canonical store for facilitator accounts, assessments, and submission linkage. The service also mirrors successful writes to **`data/foundry-submissions*.jsonl`** when Postgres is down — do not rely on JSONL alone in production.
+
+1. **Railway Postgres** — enable Railway’s automated backups / point-in-time recovery on the managed database (project settings vary by region/plan — confirm backups are enabled for your DB service).
+2. **Manual logical backups** — from a trusted workstation with **`DATABASE_URL`**, run regularly (e.g. weekly + before risky migrations):
+
+```bash
+pg_dump "$DATABASE_URL" -Fc -f "foundry-training-$(date +%F).dump"
+```
+
+Encrypt the file at rest off-site.
+
+3. **Post-deploy sanity** — `SELECT COUNT(*) FROM foundry_submissions;` unchanged after deploy apart from legitimate new submits; monitor first hour after rollout.
+4. **Site default semantics** — only **one** row may be `training_assessments.is_site_default` at a time globally. Ministries with **multiple concurrent cohort facilitators** should share **explicit** **`?assessment=`** / **`?course=`** links with fellows; reserving `/` for a neutral org default is deliberate but must be coordinated centrally.
+
 
 Smoke: `npm run foundry:smoke` (DB + optional API) and `npm run foundry:smoke-providers` (one tiny hit per LLM key).
 

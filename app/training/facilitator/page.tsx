@@ -55,6 +55,15 @@ function originUrl(path: string) {
   return `${window.location.origin}${path}`;
 }
 
+/** Learner-facing deck URL — loads the facilitator rubric (chat apps rarely strip `/foundry/...`). */
+function learnerDeckPath(slug: string) {
+  return `/foundry/day03?assessment=${encodeURIComponent(slug)}`;
+}
+
+function facilitatorClassHubPath(slug: string) {
+  return `/class?course=${encodeURIComponent(slug)}`;
+}
+
 export default function FacilitatorDashboard() {
   const router = useRouter();
   const [tab, setTab] = useState<FacTab>("overview");
@@ -68,6 +77,10 @@ export default function FacilitatorDashboard() {
   const [claimBusy, setClaimBusy] = useState(false);
   const [claimMsg, setClaimMsg] = useState<string | null>(null);
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
+  const [newCourseShare, setNewCourseShare] = useState<{
+    title: string;
+    slug: string;
+  } | null>(null);
 
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -292,6 +305,50 @@ export default function FacilitatorDashboard() {
             </p>
           ) : null}
 
+          {newCourseShare ? (
+            <div className="rounded-xl border border-emerald-500/35 bg-emerald-950/20 p-4 text-sm">
+              <p className="font-semibold text-emerald-100">Course published</p>
+              <p className="mt-2 text-slate-300">
+                <strong>{newCourseShare.title}</strong> ({newCourseShare.slug}) — send fellows the
+                links below so they attach to{" "}
+                <strong className="text-white">your</strong> inbox, not the org-wide home deck only.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg bg-orange-500 px-3 py-2 text-[11px] font-semibold text-[#1a0803]"
+                  onClick={() =>
+                    void copyText(
+                      originUrl(learnerDeckPath(newCourseShare.slug)),
+                      "learner deck link",
+                    )
+                  }
+                >
+                  Copy learner deck link
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-emerald-400/40 px-3 py-2 text-[11px] font-semibold text-emerald-100"
+                  onClick={() =>
+                    void copyText(
+                      originUrl(facilitatorClassHubPath(newCourseShare.slug)),
+                      "class hub link",
+                    )
+                  }
+                >
+                  Copy class hub link
+                </button>
+              </div>
+              <button
+                type="button"
+                className="mt-3 text-xs text-slate-500 underline hover:text-white"
+                onClick={() => setNewCourseShare(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          ) : null}
+
           {tab === "overview" ? (
             <section className="space-y-6">
               <div>
@@ -345,12 +402,13 @@ export default function FacilitatorDashboard() {
                 />
               </DashboardStatGrid>
               <div className="flex flex-wrap gap-2">
-                <a
-                  href="/class"
+                <button
+                  type="button"
+                  onClick={() => setTab("assessments")}
                   className="rounded-lg border border-white/20 px-4 py-2 text-sm text-slate-200 hover:bg-white/5"
                 >
-                  Student class hub
-                </a>
+                  Copy learner links →
+                </button>
                 <button
                   type="button"
                   onClick={() => setTab("share")}
@@ -383,57 +441,78 @@ export default function FacilitatorDashboard() {
               <div className="rounded-2xl border border-cyan-500/30 bg-cyan-950/20 p-5">
                 <h2 className="text-lg font-semibold text-cyan-100">Class deck &amp; portal</h2>
                 <p className="mt-2 text-sm text-slate-300">
-                  Your students use the <strong>site home page</strong> (slides 1–7 + submit portal).
-                  When you mark an assessment as <strong>site default</strong>, grades from that URL
-                  without <code className="rounded bg-black/40 px-1 font-mono text-xs">?assessment=</code>{" "}
-                  attach to your course automatically.
+                  Fellows must open a link that includes your course slug{" "}
+                  <code className="rounded bg-black/40 px-1 font-mono text-xs">
+                    ?assessment=…
+                  </code>
+                  {" "}
+                  (slides) or{" "}
+                  <code className="rounded bg-black/40 px-1 font-mono text-xs">
+                    ?course=…
+                  </code>
+                  {" "}
+                  on the hub. Sending only the naked home URL (
+                  <code className="rounded bg-black/40 px-1 font-mono text-xs">/</code>) attaches
+                  submits to whoever holds the ministry&apos;s <strong>one</strong> site-default
+                  course — not yours — unless organizers put you there.
                 </p>
                 {primaryAssessment ? (
                   <div className="mt-4 space-y-3">
                     <p className="font-mono text-xs text-emerald-300">
-                      {markedSiteDefault ? "Site default" : "Your course"}:{" "}
-                      {primaryAssessment.title} ({primaryAssessment.slug})
+                      {markedSiteDefault ? "Site default" : "Sharing"}:{" "}
+                      <strong>{primaryAssessment.title}</strong> ({primaryAssessment.slug})
                     </p>
                     {!markedSiteDefault ? (
                       <p className="text-xs text-amber-200/90">
-                        Not marked as site default yet — use{" "}
-                        <strong>Use as site default</strong> under Assessments, or attach
-                        submissions below (we will set it automatically).
+                        This course isn&apos;t the org-wide home default yet. Always share{" "}
+                        <strong>deck</strong> or <strong>class hub</strong> links below until an
+                        organizer sets site default — if applicable.
                       </p>
-                    ) : null}
+                    ) : (
+                      <p className="text-xs text-emerald-200/85">
+                        You are currently the ministry site-default:{" "}
+                        <code className="rounded bg-black/50 px-1 font-mono">/</code>
+                        {""} grades also land here. Otherwise still share explicit links below for
+                        reliability.
+                      </p>
+                    )}
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                       <button
                         type="button"
-                        onClick={() => void copyText(originUrl("/"), "class deck URL")}
-                        className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-[#041018] hover:bg-cyan-500"
+                        onClick={() =>
+                          void copyText(
+                            originUrl(learnerDeckPath(primaryAssessment.slug)),
+                            "learner deck link",
+                          )
+                        }
+                        className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-[#0a0704] hover:bg-orange-400"
                       >
-                        Copy class URL (home / slides)
+                        Copy learner deck link (recommended)
                       </button>
                       <button
                         type="button"
                         onClick={() =>
                           void copyText(
-                            originUrl(
-                              `/foundry/day03?assessment=${encodeURIComponent(primaryAssessment.slug)}`,
-                            ),
-                            "slug URL",
+                            originUrl(facilitatorClassHubPath(primaryAssessment.slug)),
+                            "class hub link",
                           )
                         }
-                        className="rounded-lg border border-cyan-400/40 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-900/30"
+                        className="rounded-lg border border-emerald-400/40 px-4 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-950/30"
                       >
-                        Copy URL with ?assessment=
+                        Copy class hub (with ?course=)
                       </button>
                       <button
                         type="button"
-                        onClick={() => void copyText(originUrl("/class"), "student class hub")}
-                        className="rounded-lg border border-emerald-400/35 px-4 py-2 text-sm text-emerald-100 hover:bg-emerald-950/30"
+                        onClick={() => void copyText(originUrl("/"), "home deck URL")}
+                        disabled={!markedSiteDefault}
+                        className="rounded-lg border border-white/20 px-4 py-2 text-sm text-slate-300 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-35"
                       >
-                        Copy student class hub (/class)
+                        Copy home URL (/) — site default only
                       </button>
                     </div>
                     <p className="text-xs text-slate-500">
-                      Share the <strong className="text-slate-400">class hub</strong> link in
-                      WhatsApp or Slack — fellows see submission status and your deck in one place.
+                      More than one course? Each row under <strong>Assessments</strong> has its
+                      own learner + hub buttons.
                     </p>
                   </div>
                 ) : (
@@ -575,6 +654,30 @@ export default function FacilitatorDashboard() {
                             ) : null}
                           </div>
                           <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              className="rounded bg-orange-500/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#140802]"
+                              onClick={() =>
+                                void copyText(
+                                  originUrl(learnerDeckPath(a.slug)),
+                                  `deck (${a.slug})`,
+                                )
+                              }
+                            >
+                              Copy deck
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded border border-emerald-400/35 px-2 py-1 text-[10px] text-emerald-100"
+                              onClick={() =>
+                                void copyText(
+                                  originUrl(facilitatorClassHubPath(a.slug)),
+                                  `hub (${a.slug})`,
+                                )
+                              }
+                            >
+                              Copy hub
+                            </button>
                             {!a.isSiteDefault ? (
                               <button
                                 type="button"
@@ -628,15 +731,22 @@ export default function FacilitatorDashboard() {
                             minOutputChars: mo,
                           }),
                         });
-                        const data = await res.json().catch(() => ({}));
+                        const data = (await res.json().catch(() => ({}))) as {
+                          error?: string;
+                          assessment?: { slug?: string; title?: string };
+                        };
                         if (!res.ok)
-                          throw new Error((data as { error?: string }).error || "Save failed.");
+                          throw new Error(data.error || "Save failed.");
                         await load();
                         setTitle("");
                         setSlug("");
                         setIntro("");
                         setGraderInstructions("");
-                        setTab("share");
+                        const row = data.assessment;
+                        if (row?.slug && row.title) {
+                          setNewCourseShare({ slug: row.slug, title: row.title });
+                        }
+                        setTab("assessments");
                       } catch (er) {
                         setErr(er instanceof Error ? er.message : "Save failed.");
                       } finally {

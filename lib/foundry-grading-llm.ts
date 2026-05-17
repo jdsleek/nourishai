@@ -27,6 +27,8 @@ type ChatResp = {
   content?: string;
   status: number;
   bodyPreview?: string;
+  /** From Retry-After on failed responses, when parseable */
+  retryAfterMs?: number;
   /** From OpenAI-compatible `usage`, when present */
   promptTokens?: number;
   completionTokens?: number;
@@ -52,6 +54,33 @@ function backoffMs(attemptIndex: number): number {
   const cap = Math.min(base, 8000);
   const jitter = Math.floor(Math.random() * 260);
   return cap + jitter;
+}
+
+/** Prefer HTTP Retry-After when OpenRouter/upstream asks us to wait (limits pointless tight retries). */
+function parseRetryAfterMs(res: Response): number | undefined {
+  const raw = res.headers.get("retry-after")?.trim();
+  if (!raw) return undefined;
+  const sec = Number.parseInt(raw, 10);
+  if (Number.isFinite(sec) && sec >= 0) {
+    return Math.min(sec * 1000, 120_000);
+  }
+  const when = Date.parse(raw);
+  if (Number.isFinite(when)) {
+    const delta = when - Date.now();
+    if (delta > 0) return Math.min(delta, 120_000);
+  }
+  return undefined;
+}
+
+function sleepMsBeforeOpenAiRetry(resp: ChatResp, attemptIndex: number): number {
+  let ms = backoffMs(attemptIndex);
+  if (resp.retryAfterMs != null) ms = Math.max(ms, resp.retryAfterMs);
+  // 429 needs longer spacing than generic 5xx; short backoff rarely clears TPM/RPM windows.
+  if (resp.status === 429) {
+    const floorMs = Math.min(2500 * Math.pow(2, attemptIndex), 45_000);
+    ms = Math.max(ms, floorMs);
+  }
+  return ms;
 }
 
 function scrubForLogSnippet(s: string, maxLen: number): string {
@@ -173,7 +202,8 @@ async function chatOpenAiCompatibleOnce(params: {
     } catch {
       /* keep preview */
     }
-    return { ok: false, status: res.status, bodyPreview: preview };
+    const retryAfterMs = parseRetryAfterMs(res);
+    return { ok: false, status: res.status, bodyPreview: preview, retryAfterMs };
   }
 
   try {
@@ -251,7 +281,7 @@ async function chatOpenAiCompatibleWithRetries(
       })
     );
     if (!retry) break;
-    await sleep(backoffMs(a));
+    await sleep(sleepMsBeforeOpenAiRetry(last, a));
   }
 
   return last;

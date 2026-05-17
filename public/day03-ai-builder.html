@@ -34,7 +34,14 @@
 }
 html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 body.deck-mode{height:100%;height:100dvh;overflow:hidden;}
-body.portal-open{overflow:auto;-webkit-overflow-scrolling:touch;}
+/* Lock root scroll while portal is showing — avoids scrollIntoView/wheel chaining moving the deck behind the overlay */
+html.portal-open,body.portal-open{
+  height:100%;
+  height:100dvh;
+  overflow:hidden;
+  overscroll-behavior:none;
+  -webkit-overflow-scrolling:touch;
+}
 
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;}
@@ -382,6 +389,7 @@ code{font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:3
 .portal{
   position:fixed;inset:0;background:var(--bg);z-index:200;
   overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain;
   transform:translateY(100%);
   transition:transform 0.5s cubic-bezier(.4,0,.2,1);
   padding-bottom:env(safe-area-inset-bottom,0px);
@@ -770,7 +778,7 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
     </div>
     <button type="button" class="cta-main" onclick="void openPortal()">SUBMIT TO THE FOUNDRY PORTAL ↓</button>
     <p class="cta-sub">// The grader returns a score, rubric breakdown, and one “level up” action for your next attempt</p>
-    <button type="button" class="cta-secondary" id="btnLastGrade" onclick="viewLastGradeOnDevice()">See my last grade on this device</button>
+    <button type="button" class="cta-secondary" id="btnLastGrade" onclick="void viewLastGradeOnDevice()">See my last grade on this device</button>
   </div>
 
 </div><!-- /deck -->
@@ -1055,13 +1063,13 @@ function showReceipt(meta){
     box.style.display='none';
   }
 }
-function viewLastGradeOnDevice(){
+async function viewLastGradeOnDevice(){
   const lg = readStudentStore().lastGrade;
   if(!lg || !lg.result){
     alert('No saved grade on this device yet. Submit once through the portal first.');
     return;
   }
-  void openPortal();
+  await openPortal();
   render(lg.result, {
     submissionId: lg.submissionId,
     submittedAt: lg.submittedAt,
@@ -1176,20 +1184,47 @@ async function ensureSubgroupsLoaded(force){
     fill(FALLBACK_QAF_SUBGROUPS);
   }
 }
+function syncPortalAriaOpen(open){
+  const el=document.documentElement;
+  if(open) el.classList.add('portal-open');
+  else el.classList.remove('portal-open');
+}
+
+/** Applies slide deck classes so the portal overlay is visibly on-screen (portal already contains the grading form/results). */
+function ensurePortalUiOpen(){
+  const p=document.getElementById('portal');
+  if(!p) return;
+  p.classList.add('open');
+  p.setAttribute('aria-hidden','false');
+  document.body.classList.remove('deck-mode');
+  document.body.classList.add('portal-open');
+  syncPortalAriaOpen(true);
+}
 async function openPortal(){
   await ensureSubgroupsLoaded(true);
   loadStudentProfileIntoForm();
-  document.getElementById('portal').classList.add('open');
+  ensurePortalUiOpen();
   document.getElementById('portal').scrollTop=0;
-  document.getElementById('portal').setAttribute('aria-hidden','false');
-  document.body.classList.remove('deck-mode');
-  document.body.classList.add('portal-open');
 }
 function closePortal(){
   document.getElementById('portal').classList.remove('open');
   document.getElementById('portal').setAttribute('aria-hidden','true');
   document.body.classList.add('deck-mode');
   document.body.classList.remove('portal-open');
+  syncPortalAriaOpen(false);
+}
+
+/** Avoid document-level scrollIntoView — scroll only inside the portal (stable with fixed overlay). */
+function scrollPortalToElement(el,marginPx){
+  const portal=document.getElementById('portal');
+  const m=marginPx==null ? 16 : marginPx;
+  if(!portal||!el) return;
+  const pr=portal.getBoundingClientRect();
+  const er=el.getBoundingClientRect();
+  const raw=portal.scrollTop+(er.top-pr.top)-m;
+  const maxScroll=Math.max(0,portal.scrollHeight-portal.clientHeight);
+  const top=Math.max(0,Math.min(maxScroll,raw));
+  portal.scrollTo({top,behavior:'smooth'});
 }
 
 function clearFieldErrors(){
@@ -1301,8 +1336,12 @@ function render(r, meta){
   document.getElementById('luTip').textContent=r.level_up_tip;
   document.getElementById('verdict').textContent=r.verdict;
   showReceipt(meta||null);
-  document.getElementById('result').classList.add('on');
-  document.getElementById('result').scrollIntoView({behavior:'smooth',block:'start'});
+  ensurePortalUiOpen();
+  const box=document.getElementById('result');
+  box.classList.add('on');
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>scrollPortalToElement(box));
+  });
 }
 
 function resetForm(){

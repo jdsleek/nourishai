@@ -1,8 +1,4 @@
 import type { Pool } from "pg";
-import {
-  anthropicEquivalentUsd,
-  getAnthropicRefRatesUsdPerMTok,
-} from "@/lib/foundry-anthropic-cost";
 
 export type FoundryLlmUsageInsert = {
   source: string;
@@ -16,29 +12,23 @@ export type FoundryLlmUsageInsert = {
 };
 
 export type FoundryLlmUsageTotals = {
-  anthropicPricingLabel: string;
-  anthropicInputUsdPerMTok: number;
-  anthropicOutputUsdPerMTok: number;
   metered: {
     gradingCalls: number;
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
-    anthropicEquivalentUsd: number;
   };
   reconstructed: {
     gradingCalls: number;
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
-    anthropicEquivalentUsd: number;
   };
   combined: {
     gradingCalls: number;
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
-    anthropicEquivalentUsd: number;
   };
 };
 
@@ -200,8 +190,6 @@ export async function getFoundryLlmUsageTotals(
     return Number.isFinite(n) ? n : 0;
   };
 
-  const rates = getAnthropicRefRatesUsdPerMTok();
-
   const mc = parseN(r?.metered_calls);
   const mpt = parseN(r?.metered_pt);
   const mct = parseN(r?.metered_ct);
@@ -212,38 +200,29 @@ export async function getFoundryLlmUsageTotals(
   const rct = parseN(r?.recon_ct);
   const rtt = parseBig(r?.recon_tt) || rpt + rct;
 
-  const mUsd = anthropicEquivalentUsd(mpt, mct);
-  const rUsd = anthropicEquivalentUsd(rpt, rct);
-
   const cCalls = mc + rc;
   const cpt = mpt + rpt;
   const cct = mct + rct;
   const ctt = mtt + rtt;
 
   return {
-    anthropicPricingLabel: rates.label,
-    anthropicInputUsdPerMTok: rates.inputUsdPerMTok,
-    anthropicOutputUsdPerMTok: rates.outputUsdPerMTok,
     metered: {
       gradingCalls: mc,
       promptTokens: mpt,
       completionTokens: mct,
       totalTokens: mtt,
-      anthropicEquivalentUsd: mUsd,
     },
     reconstructed: {
       gradingCalls: rc,
       promptTokens: rpt,
       completionTokens: rct,
       totalTokens: rtt,
-      anthropicEquivalentUsd: rUsd,
     },
     combined: {
       gradingCalls: cCalls,
       promptTokens: cpt,
       completionTokens: cct,
       totalTokens: ctt,
-      anthropicEquivalentUsd: mUsd + rUsd,
     },
   };
 }

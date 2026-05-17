@@ -49,15 +49,6 @@ function facilitatorClassHubPath(slug: string) {
   return `/learn/${encodeURIComponent(slug)}`;
 }
 
-function fmtUsdRef(n: number) {
-  if (!Number.isFinite(n)) return "$0.0000";
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 4,
-  }).format(n);
-}
-
 function adminOriginAbs(path: string) {
   if (typeof window === "undefined") return path;
   return `${window.location.origin}${path}`;
@@ -708,36 +699,12 @@ export default function FoundryAdminPage() {
                 ) : null}
 
                 {llmTotals ? (
-                  <div className="space-y-3">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <DashboardStatCard
-                        label="Grading tokens (all time)"
-                        value={llmTotals.combined.totalTokens.toLocaleString()}
-                        hint={`Metered ${llmTotals.metered.totalTokens.toLocaleString()} (${llmTotals.metered.gradingCalls} grades) · reconstructed ${llmTotals.reconstructed.totalTokens.toLocaleString()} (${llmTotals.reconstructed.gradingCalls} rows, pre-counter heuristics)`}
-                        tone="emerald"
-                      />
-                      <DashboardStatCard
-                        label="Anthropic-ref cost (≈)"
-                        value={fmtUsdRef(
-                          llmTotals.combined.anthropicEquivalentUsd,
-                        )}
-                        hint={`Metered ${fmtUsdRef(llmTotals.metered.anthropicEquivalentUsd)} + reconstructed ${fmtUsdRef(llmTotals.reconstructed.anthropicEquivalentUsd)} · $${llmTotals.anthropicInputUsdPerMTok}/M in · $${llmTotals.anthropicOutputUsdPerMTok}/M out`}
-                        tone="amber"
-                      />
-                    </div>
-                    <p className="text-[11px] leading-relaxed text-slate-500">
-                      {llmTotals.anthropicPricingLabel}. Live grading uses Groq / OpenRouter / NVIDIA;
-                      the dollar line is Sonnet-tier Anthropic list-price equivalent for budgeting. Env:{" "}
-                      <code className="rounded bg-black/30 px-1 font-mono text-[10px]">
-                        FOUNDRY_ANTHROPIC_REF_INPUT_PER_MTOK_USD
-                      </code>{" "}
-                      /{" "}
-                      <code className="rounded bg-black/30 px-1 font-mono text-[10px]">
-                        FOUNDRY_ANTHROPIC_REF_OUTPUT_PER_MTOK_USD
-                      </code>
-                      .
-                    </p>
-                  </div>
+                  <DashboardStatCard
+                    label="Grading tokens (all time)"
+                    value={llmTotals.combined.totalTokens.toLocaleString()}
+                    hint={`Live-metered ${llmTotals.metered.totalTokens.toLocaleString()} (${llmTotals.metered.gradingCalls} grades) · backlog estimate ${llmTotals.reconstructed.totalTokens.toLocaleString()} (${llmTotals.reconstructed.gradingCalls} submissions)`}
+                    tone="emerald"
+                  />
                 ) : null}
 
                 <div className="rounded-xl border border-white/10 bg-[#111520] p-5 text-sm">

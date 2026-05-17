@@ -16,7 +16,7 @@ All user data (profile, food logs, weight history) is stored in the **browser's 
 
 **Day 03 Foundry portal** (`POST /api/foundry/grade`, admin at `/foundry/admin`): on **production (Railway)** you should set **`DATABASE_URL`** to **managed Postgres** so submissions survive redeploys. Without it, submissions are only appended under `food-app/data/*.jsonl`, which the container discards on each deploy.
 
-**Multi-facilitator assessments**: add **`FACILITATOR_SESSION_SECRET`** (long random) for facilitator session cookies — organizers onboard trainers from `/foundry/admin`, trainers sign in at `/training/facilitator/login`. Read `food-app/docs/TRAINING_MULTI_FACILITATOR_AND_DATA_SAFETY.md` before the next deploy (`pg_dump`, additive migrations only).
+**Multi-facilitator assessments**: add **`FACILITATOR_SESSION_SECRET`** (long random) for facilitator session cookies. Organizers onboard trainers from `/foundry/admin` (includes **per-assignment submit lock** for facilitator assessments), trainers sign in at `/training/facilitator/login` and manage assessments at `/training/facilitator`. Foundry grading chains **Groq → OpenRouter → NVIDIA** (configure optional keys in `.env.example`) to ride through rate limits. Read `food-app/docs/TRAINING_MULTI_FACILITATOR_AND_DATA_SAFETY.md` before deploy (`pg_dump`, additive migrations only).
 
 ## Setup
 

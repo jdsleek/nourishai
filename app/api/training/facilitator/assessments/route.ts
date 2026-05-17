@@ -44,6 +44,7 @@ export async function GET() {
       subgroupOptions: a.subgroup_options,
       minPromptChars: a.min_prompt_chars,
       minOutputChars: a.min_output_chars,
+      submissionsOpen: a.submissions_open,
       studentUrlHint: `/foundry/day03?assessment=${encodeURIComponent(a.slug)}`,
     })),
     studentDeckBasePath: "/foundry/day03",

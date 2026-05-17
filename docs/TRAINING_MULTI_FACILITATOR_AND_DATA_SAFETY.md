@@ -7,21 +7,23 @@ This document merges the conversation into an implementable shape, critiques wea
 | Role | Responsibilities |
 |------|------------------|
 | **Student** | In a subgroup for cohort labelling only. Opens the slide deck (`/foundry/day03`). Submits architecture prompt/output. Graded against **the assessment tied to `?assessment=<slug>`** (or legacy default when omitted). |
-| **Facilitator (4–5)** | Signs in **with email + password**. Creates/edits **assessments** (title, slug, subgroup list, min lengths, facilitator-written **grading instructions** driving the Groq prompt). Sees submissions for **their** assessments (same grader UX as today, config from DB). |
-| **Organizer (admin)** | Uses existing **admin password header** unchanged. **Sees everything** — all submissions, ideation registry, bootstrap new facilitators. Does **not** own rubric wording (facilitators do). |
+| **Facilitator (4–5)** | Signs in **with email + password**. Creates/edits **assessments** (title, slug, subgroup list, min lengths, facilitator-written **grading instructions** driving the AI grader). **Opens or closes new submissions per assessment.** Sees submissions for **their** assessments only. |
+| **Organizer (admin)** | Uses existing **admin password header** unchanged. **Sees everything** — all submissions, ideation registry, bootstrap new facilitators, **global assessment lock toggles**. Does **not** own rubric wording (facilitators do). |
 
 Critical review:
 
 - **Facilitator‑authored rubrics** imply **model variance**. Mitigation: enforced **JSON schema** downstream (`normalizeGraderResult` unchanged) and clear instructions in-app to paste “how to allocate the 10+10 categories.”
 - **Magic links** were deferred — **password + bcrypt** + httpOnly cookie keeps Railway setup simple (`FACILITATOR_SESSION_SECRET`).
+- **Assessment lock:** column **`submissions_open`** on **`training_assessments`** (`false` = no new learner grades for that slug; existing rows untouched). Organizer can toggle all assessments from **`/foundry/admin`**; each facilitator toggles theirs on **`/training/facilitator`**.
 - Subgroups remain **student metadata**, not facilitator access scopes (every facilitator still coaches every student academically; each **assessment** is owned by one facilitator).
 
 ## Data model (Postgres additive)
 
 Two new tables **`training_facilitators`**, **`training_assessments`**.  
-Legacy column on **`foundry_submissions`**:
+Additive columns:
 
-- `assessment_id` `UUID NULL` → `training_assessments(id)` **`ON DELETE SET NULL`**.
+- **`foundry_submissions.assessment_id`** `UUID NULL` → **`training_assessments(id)`** **`ON DELETE SET NULL`**.
+- **`training_assessments.submissions_open`** `BOOLEAN NOT NULL DEFAULT TRUE` — when **FALSE**, **`POST /api/foundry/grade`** with matching **`assessmentSlug`** returns **403** (learners cannot submit endlessly).
 
 **Existing rows survive**: `assessment_id` stays `NULL` → UI shows **“Legacy (built‑in rubric)”**; grading without `assessmentSlug` keeps the original `buildFoundryRubricPrompt` path.
 
@@ -50,13 +52,30 @@ Nothing is **`DROP`**ped; no row overwrites during migration.
 
 5. Facilitators & assessments exist **only** in Postgres (no PG ⇒ facilitator UI warns to configure DATABASE_URL).
 
+## Grading resilience (rate limits / TPM)
+
+Server-side grading uses **`lib/foundry-grading-llm.ts`**: **Groq**, **OpenRouter**, and **NVIDIA NIM** (OpenAI-compatible HTTP) in **`FOUNDRY_GRADING_PROVIDER_ORDER`** until one returns valid JSON. Each provider retries transient **429 / 5xx / empty** responses with backoff (`FOUNDRY_GRADE_LLM_ATTEMPTS`). Long learner pastes are **clipped for the model only** (`lib/foundry-grade-clip.ts`); **full prompt/output still persist** on success.
+
+Smokes: `npm run foundry:smoke-providers` (one tiny completion per configured key).
+
 ## Environment variables
 
 | Variable | Purpose |
 |----------|---------|
-| `DATABASE_URL` | Required for facilitator features + richer admin JOINs |
-| `FOUNDRY_ADMIN_PASSWORD` | Existing organizer/admin API gate |
-| `FACILITATOR_SESSION_SECRET` | HMAC sealing cookie `training_fac_session` (**set in prod**, long random string) |
+| `GROQ_API_KEY` | Primary grader (Groq Cloud) |
+| `GROQ_MODEL` | Optional Groq model id |
+| `OPENROUTER_API_KEY` | Optional fallback ([OpenRouter](https://openrouter.ai)) |
+| `OPENROUTER_MODEL` | e.g. `meta-llama/llama-3.3-70b-instruct:free` (`:free` for free tier) |
+| `OPENROUTER_HTTP_REFERER` | Public site URL (OpenRouter etiquette) |
+| `NVIDIA_API_KEY` | Optional fallback ([NVIDIA NIM](https://build.nvidia.com)) |
+| `NVIDIA_CHAT_MODEL` | e.g. `meta/llama-3.3-70b-instruct` |
+| `FOUNDRY_GRADING_PROVIDER_ORDER` | e.g. `openrouter,nvidia,groq` |
+| `FOUNDRY_GRADE_LLM_ATTEMPTS` | Per-provider retries (default `3`, max `8`) |
+| `DATABASE_URL` | Required for facilitator features + admin assessment JOINs |
+| `FOUNDRY_ADMIN_PASSWORD` | Organizer/admin API gate |
+| `FACILITATOR_SESSION_SECRET` | HMAC cookie `training_fac_session` — **set in prod** (long random) |
+
+Other clipping / admin envs: **`food-app/.env.example`**.
 
 ## Operational flow for organizers
 
@@ -65,6 +84,7 @@ Nothing is **`DROP`**ped; no row overwrites during migration.
 3. Facilitator visits `/training/facilitator/login`, sets session, creates assessment with unique **slug**.
 4. Share student link: **`/foundry/day03?assessment=<slug>`** (bookmark / LMS).
 5. Submissions tagged with `assessment_id`; organizer admin lists all incl. slug/title columns.
+6. **Close / reopen learner submits** — organizer **`/foundry/admin`** (“Assignment submission window”), or facilitator **`/training/facilitator`** on each assessment card **Close** / **Re-open** (`submissions_open` in Postgres).
 
 ## Local preview (before pushing to GitHub)
 
@@ -80,14 +100,16 @@ npm run dev
 - Student legacy: `/foundry/day03`
 - Student new: `/foundry/day03?assessment=<slug>`
 
-Smoke grade with `npm run foundry:smoke` after setting env vars.
+Smoke: `npm run foundry:smoke` (DB + optional API) and `npm run foundry:smoke-providers` (one tiny hit per LLM key).
 
 ## Code shipped in this repo (MVP wiring)
 
 | Area | Location |
 |------|-----------|
 | Spec + Railway safety framing | [`docs/TRAINING_MULTI_FACILITATOR_AND_DATA_SAFETY.md`](./TRAINING_MULTI_FACILITATOR_AND_DATA_SAFETY.md) (you are reading it) |
-| Additive DDL (`training_*` tables + nullable `foundry_submissions.assessment_id`) | [`lib/training-pg.ts`](../lib/training-pg.ts) via [`ensureFoundrySubmissionsSchema`](../lib/foundry-pg.ts) |
+| Additive DDL + `submissions_open` | [`lib/training-pg.ts`](../lib/training-pg.ts) via [`ensureFoundrySubmissionsSchema`](../lib/foundry-pg.ts) |
+| Multi-provider grading + retries | [`lib/foundry-grading-llm.ts`](../lib/foundry-grading-llm.ts) · clip [`lib/foundry-grade-clip.ts`](../lib/foundry-grade-clip.ts) |
+| Organizer assessment lock API | GET/PATCH [`/api/foundry/admin/assessment-locks`](../app/api/foundry/admin/assessment-locks/route.ts) |
 | Configurable grading prompt shell | [`lib/foundry-grade.ts`](../lib/foundry-grade.ts) (`buildAssessmentRubricPrompt`) + [`app/api/foundry/grade/route.ts`](../app/api/foundry/grade/route.ts) |
 | Public subgroup/min-length manifest | [`app/api/foundry/assessment-config/route.ts`](../app/api/foundry/assessment-config/route.ts) |
 | Learner deck `?assessment=` hook | [`public/day03-ai-builder.html`](../public/day03-ai-builder.html) |

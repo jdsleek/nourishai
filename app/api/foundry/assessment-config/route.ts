@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
         subgroups: [...QAF_COHORT_SUBGROUPS],
         minPromptChars: 40,
         minOutputChars: 80,
+        submissionsOpen: true,
       },
       { status: 200 },
     );
@@ -42,5 +43,6 @@ export async function GET(req: NextRequest) {
     subgroups,
     minPromptChars: Math.max(0, a.min_prompt_chars),
     minOutputChars: Math.max(0, a.min_output_chars),
+    submissionsOpen: a.submissions_open,
   });
 }

@@ -71,6 +71,16 @@ export async function POST(req: NextRequest) {
       if (!a) {
         return Response.json({ error: "Unknown assessment." }, { status: 404 });
       }
+      if (!a.submissions_open) {
+        return Response.json(
+          {
+            error:
+              "This assessment is closed for new submissions. Contact your facilitator if you need help.",
+            code: "assessment_submissions_closed",
+          },
+          { status: 403 },
+        );
+      }
       const allow =
         a.subgroup_options.length > 0 ? a.subgroup_options : [...QAF_COHORT_SUBGROUPS];
       if (!allow.includes(subgroup)) {

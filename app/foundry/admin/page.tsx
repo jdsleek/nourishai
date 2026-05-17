@@ -38,6 +38,14 @@ const BREAKDOWN_LABELS: Record<string, string> = {
   environment_setup: "Environment setup (legacy rubric)",
 };
 
+type AssessmentLockRow = {
+  id: string;
+  slug: string;
+  title: string;
+  facilitatorEmail: string;
+  submissionsOpen: boolean;
+};
+
 function breakdownRows(
   breakdown: Submission["result"]["breakdown"],
   legacy: boolean
@@ -82,6 +90,68 @@ export default function FoundryAdminPage() {
   const [facDisplay, setFacDisplay] = useState("");
   const [facBusy, setFacBusy] = useState(false);
   const [facMsg, setFacMsg] = useState<string | null>(null);
+  const [locks, setLocks] = useState<AssessmentLockRow[]>([]);
+  const [locksLoading, setLocksLoading] = useState(false);
+  const [locksErr, setLocksErr] = useState<string | null>(null);
+  const [lockToggling, setLockToggling] = useState<string | null>(null);
+
+  const loadLocks = useCallback(async (pwd: string) => {
+    setLocksLoading(true);
+    setLocksErr(null);
+    try {
+      const res = await fetch("/api/foundry/admin/assessment-locks", {
+        headers: { "x-foundry-admin-password": pwd },
+      });
+      const data = (await res.json()) as {
+        assessments?: AssessmentLockRow[];
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || "Could not load assignment locks.");
+      }
+      setLocks(data.assessments || []);
+    } catch (e) {
+      setLocksErr(e instanceof Error ? e.message : "Lock list failed.");
+      setLocks([]);
+    } finally {
+      setLocksLoading(false);
+    }
+  }, []);
+
+  const toggleAssessmentLock = useCallback(
+    async (
+      pwd: string,
+      assessmentId: string,
+      submissionsOpen: boolean,
+    ) => {
+      setLockToggling(assessmentId);
+      setLocksErr(null);
+      try {
+        const res = await fetch("/api/foundry/admin/assessment-locks", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "x-foundry-admin-password": pwd,
+          },
+          body: JSON.stringify({ assessmentId, submissionsOpen }),
+        });
+        const data = (await res.json()) as { error?: string };
+        if (!res.ok) {
+          throw new Error(data.error || "Update failed.");
+        }
+        setLocks((prev) =>
+          prev.map((x) =>
+            x.id === assessmentId ? { ...x, submissionsOpen } : x,
+          ),
+        );
+      } catch (e) {
+        setLocksErr(e instanceof Error ? e.message : "Toggle failed.");
+      } finally {
+        setLockToggling(null);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!unlocked || section !== "ideation" || !password) return undefined;
@@ -197,13 +267,14 @@ export default function FoundryAdminPage() {
       }
       setSubs(data.submissions || []);
       setUnlocked(true);
+      void loadLocks(pwd);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed.");
       setUnlocked(false);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadLocks]);
 
   return (
     <div className="min-h-screen bg-[#07080d] text-slate-100">
@@ -284,6 +355,8 @@ export default function FoundryAdminPage() {
                   onClick={() => {
                     setUnlocked(false);
                     setSubs([]);
+                    setLocks([]);
+                    setLocksErr(null);
                     setPassword("");
                     setSection("submissions");
                     setIdeationHtml(null);
@@ -291,13 +364,16 @@ export default function FoundryAdminPage() {
                   }}
                   className="text-sm text-slate-400 underline hover:text-white"
                 >
-                  Lock
+                  Close admin panel
                 </button>
                 {section === "submissions" ? (
                   <button
                     type="button"
                     disabled={loading || deletingId !== null}
-                    onClick={() => void load(password)}
+                    onClick={() => {
+                      void load(password);
+                      void loadLocks(password);
+                    }}
                     className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-slate-200 hover:bg-white/5 disabled:opacity-50"
                   >
                     Refresh submissions
@@ -346,6 +422,103 @@ export default function FoundryAdminPage() {
                 </button>
               </div>
             </div>
+
+            {section === "submissions" ? (
+              <div className="mb-6 rounded-xl border border-amber-500/25 bg-amber-950/10 p-4 text-sm">
+                <p className="font-semibold text-amber-200">
+                  Assignment submission window (facilitator assessments)
+                </p>
+                <p className="mt-2 text-slate-400">
+                  Closing an assignment stops <strong className="text-slate-200">new</strong>{" "}
+                  submissions for that learner link (
+                  <code className="rounded bg-white/10 px-1 font-mono text-xs">
+                    ?assessment=slug
+                  </code>
+                  ). Existing rows in this list stay. Built-in legacy Day 03 deck (no slug) is{" "}
+                  always open unless you deprecate it in product.
+                </p>
+                {locksErr ? (
+                  <p className="mt-2 text-sm text-red-400">{locksErr}</p>
+                ) : null}
+                {locksLoading ? (
+                  <p className="mt-3 text-xs text-slate-500">
+                    Loading assignment rules…
+                  </p>
+                ) : locks.length === 0 ? (
+                  <p className="mt-3 text-xs text-slate-500">
+                    No facilitator-created assessments yet (or Postgres not configured —
+                    DATABASE_URL required).
+                  </p>
+                ) : (
+                  <ul className="mt-4 space-y-3">
+                    {locks.map((a) => (
+                      <li
+                        key={a.id}
+                        className="flex flex-col gap-2 rounded-lg border border-white/10 bg-[#0c0e14] p-4 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-white">{a.title}</p>
+                          <p className="mt-1 font-mono text-xs text-slate-400">
+                            slug <span className="text-cyan-300">{a.slug}</span>
+                            {" · "}
+                            {a.facilitatorEmail}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 flex-wrap items-center gap-2">
+                          <span
+                            className={`rounded-md px-2 py-1 font-mono text-xs ${
+                              a.submissionsOpen
+                                ? "bg-emerald-500/15 text-emerald-300"
+                                : "bg-red-500/15 text-red-300"
+                            }`}
+                          >
+                            {a.submissionsOpen ? "Open" : "Closed"}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={
+                              !!lockToggling ||
+                              deletingId !== null ||
+                              !password ||
+                              loading
+                            }
+                            onClick={() =>
+                              void toggleAssessmentLock(
+                                password,
+                                a.id,
+                                false,
+                              )
+                            }
+                            className="rounded-lg border border-red-400/35 bg-red-950/35 px-3 py-1.5 text-xs font-semibold text-red-100 hover:bg-red-900/30 disabled:opacity-40"
+                          >
+                            {lockToggling === a.id ? "Updating…" : "Close submits"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={
+                              !!lockToggling ||
+                              deletingId !== null ||
+                              !password ||
+                              loading
+                            }
+                            onClick={() =>
+                              void toggleAssessmentLock(
+                                password,
+                                a.id,
+                                true,
+                              )
+                            }
+                            className="rounded-lg border border-emerald-400/35 bg-emerald-950/35 px-3 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-900/25 disabled:opacity-40"
+                          >
+                            Re‑open submits
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : null}
 
             {section === "submissions" ? (
               <details className="mb-6 rounded-xl border border-emerald-500/25 bg-emerald-950/20 p-4 text-sm">

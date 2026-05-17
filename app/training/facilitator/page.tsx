@@ -11,6 +11,8 @@ type Assessment = {
   minPromptChars: number;
   minOutputChars: number;
   studentUrlHint: string;
+  /** When false, learners cannot POST new grades for this slug. */
+  submissionsOpen: boolean;
 };
 
 type Submission = {
@@ -36,6 +38,7 @@ export default function FacilitatorDashboard() {
   const [subs, setSubs] = useState<Submission[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [lockBusy, setLockBusy] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -69,7 +72,22 @@ export default function FacilitatorDashboard() {
     });
     const aj = await a.json();
     if (!a.ok) throw new Error(aj.error || "Could not load assessments.");
-    setAssessments((aj.assessments ?? []) as Assessment[]);
+    const raw = (aj.assessments ?? []) as Partial<Assessment>[];
+    setAssessments(
+      raw.map((x) => ({
+        ...x,
+        id: String(x.id),
+        title: String(x.title ?? ""),
+        slug: String(x.slug ?? ""),
+        subgroupOptions: Array.isArray(x.subgroupOptions)
+          ? x.subgroupOptions.map(String)
+          : [],
+        minPromptChars: Number(x.minPromptChars ?? 40),
+        minOutputChars: Number(x.minOutputChars ?? 80),
+        studentUrlHint: String(x.studentUrlHint ?? ""),
+        submissionsOpen: x.submissionsOpen !== false,
+      })) as Assessment[],
+    );
 
     const s = await fetch("/api/training/facilitator/submissions", {
       credentials: "include",
@@ -78,6 +96,34 @@ export default function FacilitatorDashboard() {
     if (!s.ok) throw new Error(sj.error || "Could not load submissions.");
     setSubs((sj.submissions ?? []) as Submission[]);
   }, [router]);
+
+  const setAssessmentOpens = useCallback(
+    async (id: string, open: boolean) => {
+      setLockBusy(id);
+      setErr(null);
+      try {
+        const res = await fetch(
+          `/api/training/facilitator/assessments/${encodeURIComponent(id)}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ submissionsOpen: open }),
+          },
+        );
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        if (!res.ok) {
+          throw new Error(data.error || "Could not update submission window.");
+        }
+        await load();
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : "Update failed.");
+      } finally {
+        setLockBusy(null);
+      }
+    },
+    [load],
+  );
 
   useEffect(() => {
     void (async () => {
@@ -318,13 +364,45 @@ export default function FacilitatorDashboard() {
               {assessments.map((a) => (
                 <li
                   key={a.id}
-                  className="rounded-xl border border-white/10 bg-[#111520] px-4 py-3 font-mono text-xs text-emerald-200"
+                  className="rounded-xl border border-white/10 bg-[#111520] px-4 py-3 text-sm"
                 >
-                  <span className="text-white">{a.title}</span>
-                  {" — "}
-                  {a.studentUrlHint}
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 font-mono text-xs text-emerald-200">
+                      <span className="text-base font-semibold text-white">
+                        {a.title}
+                      </span>
+                      <p className="mt-1 break-all">{a.studentUrlHint}</p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-wide ${
+                          a.submissionsOpen
+                            ? "bg-emerald-500/15 text-emerald-300"
+                            : "bg-red-500/15 text-red-300"
+                        }`}
+                      >
+                        {a.submissionsOpen ? "Open" : "Closed"}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={lockBusy === a.id || busy}
+                        onClick={() => void setAssessmentOpens(a.id, false)}
+                        className="rounded-lg border border-red-400/35 bg-red-950/35 px-2.5 py-1 text-[11px] font-semibold text-red-100 hover:bg-red-900/30 disabled:opacity-40"
+                      >
+                        {lockBusy === a.id ? "…" : "Close"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={lockBusy === a.id || busy}
+                        onClick={() => void setAssessmentOpens(a.id, true)}
+                        className="rounded-lg border border-emerald-400/35 bg-emerald-950/35 px-2.5 py-1 text-[11px] font-semibold text-emerald-100 hover:bg-emerald-900/25 disabled:opacity-40"
+                      >
+                        {lockBusy === a.id ? "…" : "Re-open"}
+                      </button>
+                    </div>
+                  </div>
                   <details className="mt-3 text-[11px] text-slate-400">
-                    <summary className="cursor-pointer hover:text-emerald-200">
+                    <summary className="cursor-pointer font-mono hover:text-emerald-200">
                       Subgroup allow-list
                     </summary>
                     <pre className="mt-2 whitespace-pre-wrap text-slate-500">

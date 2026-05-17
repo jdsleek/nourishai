@@ -17,8 +17,18 @@ export type TrainingAssessmentRow = {
   min_output_chars: number;
   grader_instructions: string;
   assessment_intro: string;
+  /** False → learners cannot POST new grades for this slug (admin-managed). */
+  submissions_open: boolean;
   created_at: string;
   updated_at: string;
+};
+
+export type AssessmentLockSummary = {
+  id: string;
+  slug: string;
+  title: string;
+  facilitatorEmail: string;
+  submissionsOpen: boolean;
 };
 
 let trainingSchemaReady: Promise<void> | null = null;
@@ -70,6 +80,11 @@ export async function ensureTrainingSchema(pool: Pool): Promise<void> {
 
       await execIgnoreDuplicateColumn(
         pool,
+        `ALTER TABLE training_assessments ADD COLUMN submissions_open BOOLEAN NOT NULL DEFAULT TRUE`,
+      );
+
+      await execIgnoreDuplicateColumn(
+        pool,
         `ALTER TABLE foundry_submissions ADD COLUMN assessment_id UUID REFERENCES training_assessments(id) ON DELETE SET NULL`,
       );
 
@@ -83,6 +98,12 @@ export async function ensureTrainingSchema(pool: Pool): Promise<void> {
     });
   }
   await trainingSchemaReady;
+}
+
+function readSubmissionsOpen(row: Record<string, unknown>): boolean {
+  const v = row.submissions_open;
+  if (typeof v === "boolean") return v;
+  return true;
 }
 
 function rowAssessment(row: Record<string, unknown>): TrainingAssessmentRow {
@@ -100,6 +121,7 @@ function rowAssessment(row: Record<string, unknown>): TrainingAssessmentRow {
     min_output_chars: Number(row.min_output_chars ?? 80),
     grader_instructions: String(row.grader_instructions ?? ""),
     assessment_intro: String(row.assessment_intro ?? ""),
+    submissions_open: readSubmissionsOpen(row),
     created_at: row.created_at ? new Date(row.created_at as string).toISOString() : "",
     updated_at: row.updated_at ? new Date(row.updated_at as string).toISOString() : "",
   };
@@ -114,7 +136,7 @@ export async function pgAssessmentBySlug(
   const { rows } = await pool.query(
     `SELECT id, facilitator_id, title, slug, subgroup_options,
             min_prompt_chars, min_output_chars, assessment_intro,
-            grader_instructions, created_at, updated_at
+            grader_instructions, submissions_open, created_at, updated_at
      FROM training_assessments WHERE lower(slug) = lower($1) LIMIT 1`,
     [trimmed]
   );
@@ -129,7 +151,7 @@ export async function pgListAssessmentsForFacilitator(
   const { rows } = await pool.query(
     `SELECT id, facilitator_id, title, slug, subgroup_options,
             min_prompt_chars, min_output_chars, assessment_intro,
-            grader_instructions, created_at, updated_at
+            grader_instructions, submissions_open, created_at, updated_at
      FROM training_assessments WHERE facilitator_id = $1::uuid
      ORDER BY updated_at DESC`,
     [facilitatorId]
@@ -157,7 +179,7 @@ export async function pgInsertAssessment(
      VALUES ($1::uuid, $2, $3, $4::jsonb, $5, $6, $7, $8)
      RETURNING id, facilitator_id, title, slug, subgroup_options,
        min_prompt_chars, min_output_chars, assessment_intro,
-       grader_instructions, created_at, updated_at`,
+       grader_instructions, submissions_open, created_at, updated_at`,
     [
       facilitatorId,
       patch.title.trim(),
@@ -184,6 +206,7 @@ export async function pgUpdateAssessment(
     min_output_chars: number;
     assessment_intro: string;
     grader_instructions: string;
+    submissions_open: boolean;
   }>
 ): Promise<TrainingAssessmentRow | null> {
   const prev = await pool.query(
@@ -211,12 +234,14 @@ export async function pgUpdateAssessment(
   if (patch.min_output_chars != null) add("min_output_chars", patch.min_output_chars);
   if (patch.assessment_intro != null) add("assessment_intro", patch.assessment_intro);
   if (patch.grader_instructions != null) add("grader_instructions", patch.grader_instructions);
+  if (patch.submissions_open !== undefined)
+    add("submissions_open", patch.submissions_open);
 
   if (!fields.length) {
     const cur = await pool.query(
       `SELECT id, facilitator_id, title, slug, subgroup_options,
               min_prompt_chars, min_output_chars, assessment_intro,
-              grader_instructions, created_at, updated_at
+              grader_instructions, submissions_open, created_at, updated_at
        FROM training_assessments WHERE id = $1::uuid`,
       [assessmentId]
     );
@@ -234,11 +259,53 @@ export async function pgUpdateAssessment(
   const { rows } = await pool.query(
     `SELECT id, facilitator_id, title, slug, subgroup_options,
             min_prompt_chars, min_output_chars, assessment_intro,
-            grader_instructions, created_at, updated_at
+            grader_instructions, submissions_open, created_at, updated_at
      FROM training_assessments WHERE id = $1::uuid`,
     [assessmentId]
   );
   return rowAssessment(rows[0] as Record<string, unknown>);
+}
+
+export async function pgAdminListAssessmentLockSummaries(
+  pool: Pool
+): Promise<AssessmentLockSummary[]> {
+  const { rows } = await pool.query(`
+    SELECT ta.id, ta.slug, ta.title, ta.submissions_open, tf.email AS facilitator_email
+    FROM training_assessments ta
+    INNER JOIN training_facilitators tf ON tf.id = ta.facilitator_id
+    ORDER BY ta.updated_at DESC
+  `);
+  return rows.map((r) => {
+    const o = r as Record<string, unknown>;
+    return {
+      id: String(o.id ?? ""),
+      slug: String(o.slug ?? ""),
+      title: String(o.title ?? ""),
+      facilitatorEmail: String(o.facilitator_email ?? ""),
+      submissionsOpen: readSubmissionsOpen(o),
+    };
+  });
+}
+
+/** Organizer-only toggles learner submission window for one assessment row. */
+export async function pgAdminSetAssessmentSubmissionsOpen(
+  pool: Pool,
+  assessmentId: string,
+  submissionsOpen: boolean
+): Promise<boolean> {
+  const trimmed = assessmentId.trim();
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      trimmed
+    )
+  )
+    return false;
+  const r = await pool.query(
+    `UPDATE training_assessments SET submissions_open = $2, updated_at = NOW()
+     WHERE id = $1::uuid`,
+    [trimmed, submissionsOpen]
+  );
+  return (r.rowCount ?? 0) > 0;
 }
 
 export async function pgFacilitatorByEmail(pool: Pool, email: string) {

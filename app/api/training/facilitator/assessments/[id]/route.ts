@@ -15,6 +15,7 @@ type PatchBody = {
   minOutputChars?: number;
   assessmentIntro?: string;
   graderInstructions?: string;
+  submissionsOpen?: boolean;
 };
 
 async function auth() {
@@ -47,6 +48,7 @@ export async function PATCH(
     min_output_chars?: number;
     assessment_intro?: string;
     grader_instructions?: string;
+    submissions_open?: boolean;
   } = {};
   if (body.title !== undefined) patch.title = body.title;
   if (body.slug !== undefined)
@@ -64,6 +66,8 @@ export async function PATCH(
     patch.assessment_intro = body.assessmentIntro;
   if (body.graderInstructions !== undefined)
     patch.grader_instructions = body.graderInstructions.trim();
+  if (body.submissionsOpen !== undefined)
+    patch.submissions_open = Boolean(body.submissionsOpen);
 
   try {
     const next = await pgUpdateAssessment(ctx.pool, ctx.facilitatorId, id, patch);

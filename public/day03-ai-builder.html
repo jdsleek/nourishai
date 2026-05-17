@@ -723,6 +723,7 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
     <div class="privacy-banner">
       <strong>Foundry portal.</strong> Submissions are graded automatically on the <strong>Qubators AI Foundry server</strong> when you click submit (same tab/session). Stored for instructor review (password-protected admin, not public). Paste only coursework you’re comfortable sharing for class.
       <div id="portal-assessment-label" class="fhint" style="margin-top:10px;color:#bef264;font-family:JetBrains Mono,monospace;"></div>
+      <p id="portal-submissions-closed" class="fhint" role="alert" style="display:none;margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.35);color:#fca5a5;font-weight:600;font-family:JetBrains Mono, monospace;"></p>
     </div>
 
     <!-- FORM -->
@@ -852,6 +853,27 @@ const ASSESSMENT_SLUG = (typeof location !== 'undefined'
 let CFG_MIN_PROMPT = 40;
 let CFG_MIN_OUTPUT = 80;
 let CURRENT_ASSESSMENT_TITLE = '';
+/** Facilitator assessments can be closed to block repeat submissions server-side too. */
+let CFG_SUBMISSIONS_OPEN = true;
+
+function applySubmissionLockUI(){
+  const btn = document.getElementById('subBtn');
+  const bar = document.getElementById('portal-submissions-closed');
+  if(!btn || !bar) return;
+  if(ASSESSMENT_SLUG && !CFG_SUBMISSIONS_OPEN){
+    bar.style.display='block';
+    bar.textContent = 'Closed for submissions — this assessment no longer accepts new grades. Contact your facilitator if you need access.';
+    btn.disabled = true;
+    btn.style.opacity='0.5';
+    btn.style.cursor='not-allowed';
+  }else{
+    bar.style.display='none';
+    bar.textContent='';
+    btn.disabled = false;
+    btn.style.opacity='';
+    btn.style.cursor='';
+  }
+}
 
 async function ensureSubgroupsLoaded(force){
   const sel=document.getElementById('subGroup');
@@ -881,6 +903,22 @@ async function ensureSubgroupsLoaded(force){
       : '';
     const r=await fetch('/api/foundry/assessment-config'+q);
     const j=await r.json().catch(()=>({}));
+    if(ASSESSMENT_SLUG && !r.ok){
+      CFG_SUBMISSIONS_OPEN = false;
+      CFG_MIN_PROMPT = typeof j.minPromptChars==='number' ? Math.max(0,j.minPromptChars):40;
+      CFG_MIN_OUTPUT = typeof j.minOutputChars==='number' ? Math.max(0,j.minOutputChars):80;
+      CURRENT_ASSESSMENT_TITLE = typeof j.title==='string' ? j.title : 'Assessment unavailable';
+      const banner=document.getElementById('portal-assessment-label');
+      if(banner){
+        banner.textContent='Assessment · could not load config ('+ASSESSMENT_SLUG+')';
+      }
+      applySubmissionLockUI();
+      sel.innerHTML='<option value="">—</option>';
+      sel.dataset.slugKey=key;
+      sel.dataset.ready='1';
+      return;
+    }
+    CFG_SUBMISSIONS_OPEN = j.submissionsOpen !== false;
     CFG_MIN_PROMPT = typeof j.minPromptChars==='number' ? Math.max(0,j.minPromptChars):40;
     CFG_MIN_OUTPUT = typeof j.minOutputChars==='number' ? Math.max(0,j.minOutputChars):80;
     CURRENT_ASSESSMENT_TITLE = typeof j.title==='string'? j.title:'';
@@ -890,6 +928,7 @@ async function ensureSubgroupsLoaded(force){
         ? ('Assessment · '+CURRENT_ASSESSMENT_TITLE+' ('+ASSESSMENT_SLUG+')')
         : 'Built-in Day 03 AI Builder deck';
     }
+    applySubmissionLockUI();
     const list=Array.isArray(j.subgroups)?j.subgroups:[];
     if(list.length){
       fill(list);
@@ -897,6 +936,8 @@ async function ensureSubgroupsLoaded(force){
     }
     fill(FALLBACK_QAF_SUBGROUPS);
   }catch(_){
+    CFG_SUBMISSIONS_OPEN = !ASSESSMENT_SLUG;
+    applySubmissionLockUI();
     fill(FALLBACK_QAF_SUBGROUPS);
   }
 }
@@ -938,6 +979,10 @@ async function grade(){
   let ok=true;
   if(!name){showErr('sName','err-name');ok=false;}
   if(!subgroup){showErr('subGroup','err-sub');ok=false;}
+  if(ASSESSMENT_SLUG && !CFG_SUBMISSIONS_OPEN){
+    alert('Submissions are closed for this assessment. Contact your facilitator.');
+    ok=false;
+  }
   if(!prompt||prompt.length<CFG_MIN_PROMPT){showErr('aPrompt','err-prompt');ok=false;}
   if(!output||output.length<CFG_MIN_OUTPUT){showErr('aOutput','err-output');ok=false;}
   if(!ok)return;
@@ -968,7 +1013,7 @@ async function grade(){
   }catch(err){
     alert('Grader error: '+(err.message||err)+'\n\nOpen this deck on the hosted AI Builder site (not a saved copy of the HTML file) so /api/foundry/grade can reach the AI Foundry server.');
   }finally{
-    document.getElementById('subBtn').disabled=false;
+    applySubmissionLockUI();
     document.getElementById('loading').classList.remove('on');
   }
 }
@@ -1015,6 +1060,7 @@ function resetForm(){
   clearFieldErrors();
   document.getElementById('result').classList.remove('on');
   document.getElementById('portal').scrollTop=0;
+  applySubmissionLockUI();
 }
 
 // prefetch subgroup list (& assessment config when ?assessment= is present)

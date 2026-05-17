@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   type Body = { email?: string; password?: string };
   const body = (await req.json()) as Body;
   const email = String(body.email || "").trim().toLowerCase();
-  const password = String(body.password || "");
+  const password = String(body.password || "").trim();
 
   if (!email || !password) {
     return Response.json({ error: "Email and password required." }, { status: 400 });
@@ -33,7 +33,12 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Invalid credentials." }, { status: 401 });
   }
 
-  const ok = bcrypt.compareSync(password, fac.password_hash);
+  let ok = false;
+  try {
+    ok = bcrypt.compareSync(password, fac.password_hash);
+  } catch {
+    ok = false;
+  }
   if (!ok) {
     return Response.json({ error: "Invalid credentials." }, { status: 401 });
   }

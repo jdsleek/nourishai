@@ -42,6 +42,7 @@ type AssessmentLockRow = {
   id: string;
   slug: string;
   title: string;
+  facilitatorId: string;
   facilitatorEmail: string;
   submissionsOpen: boolean;
 };
@@ -72,6 +73,16 @@ function breakdownRows(
 
 type AdminSection = "submissions" | "ideation";
 
+/** Must stay in sync with API `confirm` checker */
+const LEGACY_LINK_CONFIRM_PHRASE = "LINK_ALL_LEGACY_SUBMISSIONS";
+
+type FacAdminRow = {
+  id: string;
+  email: string;
+  displayName: string;
+  assessmentCount: number;
+};
+
 export default function FoundryAdminPage() {
   const [password, setPassword] = useState("");
   const [unlocked, setUnlocked] = useState(false);
@@ -94,6 +105,37 @@ export default function FoundryAdminPage() {
   const [locksLoading, setLocksLoading] = useState(false);
   const [locksErr, setLocksErr] = useState<string | null>(null);
   const [lockToggling, setLockToggling] = useState<string | null>(null);
+  const [facilitators, setFacilitators] = useState<FacAdminRow[]>([]);
+  const [facDirLoading, setFacDirLoading] = useState(false);
+  const [facDirErr, setFacDirErr] = useState<string | null>(null);
+  const [updEmail, setUpdEmail] = useState("");
+  const [updPwd, setUpdPwd] = useState("");
+  const [updDisplay, setUpdDisplay] = useState("");
+  const [updApplyDisplay, setUpdApplyDisplay] = useState(false);
+  const [updBusy, setUpdBusy] = useState(false);
+  const [updMsg, setUpdMsg] = useState<string | null>(null);
+  const [moveOwnerChoice, setMoveOwnerChoice] = useState<Record<string, string>>(
+    {},
+  );
+  const [ownerMoveBusy, setOwnerMoveBusy] = useState<string | null>(null);
+  const [legacyCount, setLegacyCount] = useState<number | null>(null);
+  const [legacyTargetId, setLegacyTargetId] = useState("");
+  const [legacyMsg, setLegacyMsg] = useState<string | null>(null);
+  const [legacyBusy, setLegacyBusy] = useState(false);
+  const [legacyConfirm, setLegacyConfirm] = useState("");
+
+  const loadLegacyStats = useCallback(async (pwd: string) => {
+    try {
+      const res = await fetch("/api/foundry/admin/submissions-link-legacy", {
+        headers: { "x-foundry-admin-password": pwd },
+      });
+      const data = (await res.json()) as { legacyCount?: number; error?: string };
+      if (!res.ok) throw new Error(data.error || "Could not load legacy stats.");
+      setLegacyCount(Number(data.legacyCount ?? 0));
+    } catch {
+      setLegacyCount(null);
+    }
+  }, []);
 
   const loadLocks = useCallback(async (pwd: string) => {
     setLocksLoading(true);
@@ -115,6 +157,29 @@ export default function FoundryAdminPage() {
       setLocks([]);
     } finally {
       setLocksLoading(false);
+    }
+  }, []);
+
+  const loadFacilitators = useCallback(async (pwd: string) => {
+    setFacDirLoading(true);
+    setFacDirErr(null);
+    try {
+      const res = await fetch("/api/foundry/admin/facilitators", {
+        headers: { "x-foundry-admin-password": pwd },
+      });
+      const data = (await res.json()) as {
+        facilitators?: FacAdminRow[];
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || "Could not load facilitators.");
+      }
+      setFacilitators(data.facilitators || []);
+    } catch (e) {
+      setFacDirErr(e instanceof Error ? e.message : "Facilitator list failed.");
+      setFacilitators([]);
+    } finally {
+      setFacDirLoading(false);
     }
   }, []);
 
@@ -152,6 +217,43 @@ export default function FoundryAdminPage() {
     },
     [],
   );
+
+  const moveAssessmentOwner = useCallback(
+    async (pwd: string, assessmentId: string, targetFacilitatorId: string) => {
+      setOwnerMoveBusy(assessmentId);
+      setLocksErr(null);
+      try {
+        const res = await fetch("/api/foundry/admin/assessment-owner", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "x-foundry-admin-password": pwd,
+          },
+          body: JSON.stringify({ assessmentId, targetFacilitatorId }),
+        });
+        const data = (await res.json()) as { error?: string };
+        if (!res.ok) {
+          throw new Error(data.error || "Reassign failed.");
+        }
+        setMoveOwnerChoice((prev) => {
+          const next = { ...prev };
+          delete next[assessmentId];
+          return next;
+        });
+        await Promise.all([loadLocks(pwd), loadFacilitators(pwd)]);
+      } catch (e) {
+        setLocksErr(e instanceof Error ? e.message : "Reassign failed.");
+      } finally {
+        setOwnerMoveBusy(null);
+      }
+    },
+    [loadLocks, loadFacilitators],
+  );
+
+  useEffect(() => {
+    if (!locks.length) return;
+    setLegacyTargetId((prev) => prev || locks[0]!.id);
+  }, [locks]);
 
   useEffect(() => {
     if (!unlocked || section !== "ideation" || !password) return undefined;
@@ -216,12 +318,69 @@ export default function FoundryAdminPage() {
       setFacPwd("");
       setFacEmail("");
       setFacDisplay("");
+      void loadFacilitators(password);
     } catch (e) {
       setFacMsg(e instanceof Error ? e.message : "Create failed.");
     } finally {
       setFacBusy(false);
     }
-  }, [facDisplay, facEmail, facPwd, password]);
+  }, [facDisplay, facEmail, facPwd, password, loadFacilitators]);
+
+  const patchFacilitatorCreds = useCallback(async () => {
+    const emailTrim = updEmail.trim().toLowerCase();
+    if (!emailTrim.includes("@")) {
+      setUpdMsg("Enter a facilitator email.");
+      return;
+    }
+    const pwdTrim = updPwd.trim();
+    if (pwdTrim.length > 0 && pwdTrim.length < 10) {
+      setUpdMsg("New password must be at least 10 characters (or leave blank).");
+      return;
+    }
+
+    const body: { email: string; password?: string; displayName?: string } = {
+      email: emailTrim,
+    };
+    if (pwdTrim.length >= 10) body.password = pwdTrim;
+    if (updApplyDisplay)
+      Object.assign(body, { displayName: updDisplay.trim() });
+
+    if (!body.password && !("displayName" in body)) {
+      setUpdMsg(
+        'Set a new password (≥10 chars) and/or check "Update display name".',
+      );
+      return;
+    }
+
+    setUpdBusy(true);
+    setUpdMsg(null);
+    try {
+      const res = await fetch("/api/foundry/admin/facilitators", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-foundry-admin-password": password,
+        },
+        body: JSON.stringify(body),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error || res.statusText || "Update failed.");
+      setUpdMsg("Credentials updated.");
+      setUpdPwd("");
+      await loadFacilitators(password);
+    } catch (e) {
+      setUpdMsg(e instanceof Error ? e.message : "Update failed.");
+    } finally {
+      setUpdBusy(false);
+    }
+  }, [
+    password,
+    loadFacilitators,
+    updEmail,
+    updPwd,
+    updDisplay,
+    updApplyDisplay,
+  ]);
 
   const deleteOne = useCallback(
     async (pwd: string, submissionId: string) => {
@@ -268,13 +427,79 @@ export default function FoundryAdminPage() {
       setSubs(data.submissions || []);
       setUnlocked(true);
       void loadLocks(pwd);
+      void loadFacilitators(pwd);
+      void loadLegacyStats(pwd);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed.");
       setUnlocked(false);
     } finally {
       setLoading(false);
     }
-  }, [loadLocks]);
+  }, [loadLocks, loadFacilitators, loadLegacyStats]);
+
+  const runLegacyDryRunOrLink = useCallback(
+    async (pwd: string, mode: "dry" | "commit") => {
+      if (!legacyTargetId) {
+        setLegacyMsg("Choose a facilitator assessment slug first.");
+        return;
+      }
+      setLegacyBusy(true);
+      setLegacyMsg(null);
+      try {
+        if (mode === "dry") {
+          const res = await fetch("/api/foundry/admin/submissions-link-legacy", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-foundry-admin-password": pwd,
+            },
+            body: JSON.stringify({
+              toAssessmentId: legacyTargetId,
+              dryRun: true,
+            }),
+          });
+          const data = (await res.json()) as {
+            wouldLink?: number;
+            error?: string;
+          };
+          if (!res.ok)
+            throw new Error(data.error || "Preview failed.");
+          setLegacyMsg(
+            `Dry run: ${data.wouldLink ?? 0} legacy row(s) would attach to selected assessment.`,
+          );
+          await loadLegacyStats(pwd);
+          return;
+        }
+        const res = await fetch("/api/foundry/admin/submissions-link-legacy", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-foundry-admin-password": pwd,
+          },
+          body: JSON.stringify({
+            toAssessmentId: legacyTargetId,
+            dryRun: false,
+            confirm: legacyConfirm.trim(),
+          }),
+        });
+        const data = (await res.json()) as {
+          moved?: number;
+          error?: string;
+        };
+        if (!res.ok) throw new Error(data.error || "Link failed.");
+        setLegacyMsg(
+          `Attached ${data.moved ?? 0} legacy cohort row(s); trainers who own this assessment inbox will see them after refresh.`,
+        );
+        await loadLegacyStats(pwd);
+        await load(pwd);
+      } catch (e) {
+        setLegacyMsg(e instanceof Error ? e.message : "Operation failed.");
+      } finally {
+        setLegacyBusy(false);
+      }
+    },
+    [legacyTargetId, legacyConfirm, loadLegacyStats, load],
+  );
 
   return (
     <div className="min-h-screen bg-[#07080d] text-slate-100">
@@ -357,6 +582,14 @@ export default function FoundryAdminPage() {
                     setSubs([]);
                     setLocks([]);
                     setLocksErr(null);
+                    setFacilitators([]);
+                    setFacDirErr(null);
+                    setMoveOwnerChoice({});
+                    setUpdMsg(null);
+                    setLegacyCount(null);
+                    setLegacyTargetId("");
+                    setLegacyMsg(null);
+                    setLegacyConfirm("");
                     setPassword("");
                     setSection("submissions");
                     setIdeationHtml(null);
@@ -373,6 +606,8 @@ export default function FoundryAdminPage() {
                     onClick={() => {
                       void load(password);
                       void loadLocks(password);
+                      void loadFacilitators(password);
+                      void loadLegacyStats(password);
                     }}
                     className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-slate-200 hover:bg-white/5 disabled:opacity-50"
                   >
@@ -454,17 +689,18 @@ export default function FoundryAdminPage() {
                     {locks.map((a) => (
                       <li
                         key={a.id}
-                        className="flex flex-col gap-2 rounded-lg border border-white/10 bg-[#0c0e14] p-4 sm:flex-row sm:items-center sm:justify-between"
+                        className="flex flex-col gap-3 rounded-lg border border-white/10 bg-[#0c0e14] p-4"
                       >
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-white">{a.title}</p>
-                          <p className="mt-1 font-mono text-xs text-slate-400">
-                            slug <span className="text-cyan-300">{a.slug}</span>
-                            {" · "}
-                            {a.facilitatorEmail}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-white">{a.title}</p>
+                            <p className="mt-1 font-mono text-xs text-slate-400">
+                              slug <span className="text-cyan-300">{a.slug}</span>
+                              {" · "}
+                              {a.facilitatorEmail}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 flex-wrap items-center gap-2">
                           <span
                             className={`rounded-md px-2 py-1 font-mono text-xs ${
                               a.submissionsOpen
@@ -512,11 +748,194 @@ export default function FoundryAdminPage() {
                           >
                             Re‑open submits
                           </button>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2 border-t border-white/10 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
+                          <span className="shrink-0 text-xs uppercase tracking-wide text-slate-500">
+                            Ownership
+                          </span>
+                          <select
+                            className="max-w-xs flex-1 rounded-lg border border-white/15 bg-[#080910] px-2 py-1.5 font-mono text-xs text-slate-200"
+                            aria-label={`Move assignment ${a.slug} to another facilitator`}
+                            disabled={
+                              !!ownerMoveBusy ||
+                              facDirLoading ||
+                              !password ||
+                              loading ||
+                              facilitators.length === 0
+                            }
+                            value={moveOwnerChoice[a.id] ?? ""}
+                            onChange={(e) =>
+                              setMoveOwnerChoice((p) => ({
+                                ...p,
+                                [a.id]: e.target.value,
+                              }))
+                            }
+                          >
+                            <option value="">Select trainer…</option>
+                            {facilitators.map((f) => (
+                              <option
+                                key={f.id}
+                                value={f.id}
+                                disabled={f.id === a.facilitatorId}
+                              >
+                                {f.email} ({f.assessmentCount} assessments)
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            disabled={
+                              !!ownerMoveBusy ||
+                              !password ||
+                              loading ||
+                              !moveOwnerChoice[a.id] ||
+                              moveOwnerChoice[a.id] === a.facilitatorId
+                            }
+                            onClick={() => {
+                              const target = moveOwnerChoice[a.id];
+                              if (!target) return;
+                              void moveAssessmentOwner(password, a.id, target);
+                            }}
+                            className="rounded-lg border border-sky-500/35 bg-sky-950/30 px-3 py-1.5 text-xs font-semibold text-sky-100 hover:bg-sky-900/35 disabled:opacity-40"
+                          >
+                            {ownerMoveBusy === a.id ? "Moving…" : "Move"}
+                          </button>
                         </div>
                       </li>
                     ))}
                   </ul>
                 )}
+              </div>
+            ) : null}
+
+            {section === "submissions" ? (
+              <div className="mb-6 rounded-xl border border-cyan-500/25 bg-cyan-950/15 p-4 text-sm">
+                <p className="font-semibold text-cyan-200">
+                  Organizer: facilitator roster
+                </p>
+                <p className="mt-2 text-slate-400">
+                  Trainer accounts ({facilitators.length}). Use{" "}
+                  <strong className="text-slate-200">Ownership</strong> on each assignment
+                  above to move SIEST — or similar — bundles under one login without losing
+                  submission history (rows stay keyed by assessment id).
+                </p>
+                {facDirErr ? (
+                  <p className="mt-2 text-sm text-red-400">{facDirErr}</p>
+                ) : null}
+                {facDirLoading ? (
+                  <p className="mt-3 text-xs text-slate-500">
+                    Loading facilitators…
+                  </p>
+                ) : facilitators.length === 0 ? (
+                  <p className="mt-3 text-xs text-slate-500">
+                    No facilitator rows yet — create one below or run demo seed locally.
+                  </p>
+                ) : (
+                  <div className="mt-4 overflow-auto rounded-lg border border-white/10">
+                    <table className="w-full min-w-[480px] text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-white/10 bg-black/25 text-[10px] uppercase tracking-wide text-slate-500">
+                          <th className="px-3 py-2 font-medium">Email</th>
+                          <th className="px-3 py-2 font-medium">Display</th>
+                          <th className="px-3 py-2 font-medium">Assessments</th>
+                          <th className="px-3 py-2 font-medium">Id</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {facilitators.map((f) => (
+                          <tr
+                            key={f.id}
+                            className="border-b border-white/5 last:border-b-0"
+                          >
+                            <td className="px-3 py-2 font-mono text-slate-200">{f.email}</td>
+                            <td className="px-3 py-2 text-slate-300">{f.displayName}</td>
+                            <td className="px-3 py-2 font-mono text-cyan-200/90">
+                              {f.assessmentCount}
+                            </td>
+                            <td className="break-all px-3 py-1.5 font-mono text-[10px] text-slate-600">
+                              {f.id}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            {section === "submissions" ? (
+              <div className="mb-6 rounded-xl border border-rose-500/30 bg-rose-950/15 p-4 text-sm">
+                <p className="font-semibold text-rose-200">
+                  Organizer: cohort legacy submits → facilitator inbox
+                </p>
+                <p className="mt-2 text-xs text-slate-400">
+                  Bulk-attach learner rows that graded{" "}
+                  <strong className="text-slate-200">without</strong>{" "}
+                  <code className="rounded bg-white/10 px-1 font-mono text-[11px]">
+                    ?assessment=
+                  </code>{" "}
+                  (<code className="rounded bg-black/60 px-1 font-mono text-[11px]">assessment_id</code>
+                  {""} IS NULL). Trainers owning the selected slug inbox gain them instantly.
+                </p>
+                <p className="mt-3 font-mono text-xs text-slate-500">
+                  Rows pending link:{" "}
+                  <span className="text-white">
+                    {legacyCount === null ? "—" : legacyCount}
+                  </span>
+                </p>
+                <label className="mt-3 block text-[11px] text-slate-400">
+                  Target facilitator assessment
+                  <select
+                    className="mt-1 block w-full max-w-xl rounded-lg border border-white/15 bg-[#0c0e14] px-2 py-2 font-mono text-xs text-slate-100"
+                    value={legacyTargetId}
+                    disabled={locks.length === 0 || legacyBusy}
+                    onChange={(e) => setLegacyTargetId(e.target.value)}
+                  >
+                    {locks.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.title} · {l.slug} · {l.facilitatorEmail}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="mt-3 flex flex-wrap items-end gap-2">
+                  <button
+                    type="button"
+                    disabled={legacyBusy || !password || locks.length === 0}
+                    onClick={() => void runLegacyDryRunOrLink(password, "dry")}
+                    className="rounded-lg border border-rose-400/35 bg-rose-950/30 px-3 py-2 text-[11px] font-semibold text-rose-100 hover:bg-rose-900/30 disabled:opacity-40"
+                  >
+                    Preview (dry-run)
+                  </button>
+                  <label className="flex min-w-[180px] flex-1 flex-col text-[11px] text-slate-400">
+                    Type confirm phrase
+                    <input
+                      value={legacyConfirm}
+                      onChange={(e) => setLegacyConfirm(e.target.value)}
+                      placeholder={LEGACY_LINK_CONFIRM_PHRASE}
+                      disabled={legacyBusy}
+                      autoComplete="off"
+                      className="mt-1 rounded-lg border border-white/15 bg-[#0c0e14] px-2 py-2 font-mono text-[10px] text-white"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={
+                      legacyBusy ||
+                      !password ||
+                      legacyConfirm.trim() !== LEGACY_LINK_CONFIRM_PHRASE
+                    }
+                    onClick={() => void runLegacyDryRunOrLink(password, "commit")}
+                    className="rounded-lg bg-rose-500 px-3 py-2 text-[11px] font-semibold text-[#1c0510] disabled:opacity-40"
+                  >
+                    Link legacy rows
+                  </button>
+                </div>
+                {legacyMsg ? (
+                  <p className="mt-3 whitespace-pre-wrap text-xs text-rose-200/85">{legacyMsg}</p>
+                ) : null}
               </div>
             ) : null}
 
@@ -527,7 +946,10 @@ export default function FoundryAdminPage() {
                 </summary>
                 <p className="mt-2 text-slate-400">
                   Sends credentials securely over HTTPS once. Requires Postgres on the
-                  host. Share{" "}
+                  host. If you get{" "}
+                  <span className="text-amber-200/90">&quot;already exists&quot;</span>, use{" "}
+                  <strong className="text-slate-200">Update existing facilitator credentials</strong>{" "}
+                  below instead. Share{" "}
                   <code className="rounded bg-white/10 px-1 font-mono text-xs">
                     /training/facilitator/login
                   </code>{" "}
@@ -574,6 +996,69 @@ export default function FoundryAdminPage() {
                 {facMsg ? (
                   <p className="mt-3 whitespace-pre-wrap text-xs text-emerald-200/90">
                     {facMsg}
+                  </p>
+                ) : null}
+              </details>
+            ) : null}
+
+            {section === "submissions" ? (
+              <details className="mb-6 rounded-xl border border-sky-500/25 bg-sky-950/15 p-4 text-sm">
+                <summary className="cursor-pointer font-semibold text-sky-200">
+                  Organizer: update existing facilitator credentials
+                </summary>
+                <p className="mt-2 text-slate-400">
+                  Use this when the facilitator row already exists (e.g. you hit “already
+                  exists” during create). Set a password you control; never reuse personal
+                  passwords that also protect other accounts.
+                </p>
+                <label className="mt-4 block text-xs text-slate-400">
+                  Facilitator email
+                  <input
+                    type="email"
+                    value={updEmail}
+                    onChange={(e) => setUpdEmail(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
+                  />
+                </label>
+                <label className="mt-3 block text-xs text-slate-400">
+                  New password (≥10 chars — leave blank to skip if you only change display)
+                  <input
+                    type="password"
+                    value={updPwd}
+                    onChange={(e) => setUpdPwd(e.target.value)}
+                    autoComplete="new-password"
+                    className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
+                  />
+                </label>
+                <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-slate-400">
+                  <input
+                    type="checkbox"
+                    checked={updApplyDisplay}
+                    onChange={(e) => setUpdApplyDisplay(e.target.checked)}
+                    className="shrink-0"
+                  />
+                  <span>Update display name (below)</span>
+                </label>
+                {updApplyDisplay ? (
+                  <input
+                    type="text"
+                    value={updDisplay}
+                    onChange={(e) => setUpdDisplay(e.target.value)}
+                    placeholder="Display name shown in roster"
+                    className="mt-2 block w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 text-slate-100"
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  disabled={updBusy || !password || !updEmail.trim()}
+                  onClick={() => void patchFacilitatorCreds()}
+                  className="mt-4 rounded-lg border border-sky-400/50 bg-sky-600 px-4 py-2 font-semibold text-[#081218] hover:bg-sky-500 disabled:opacity-45"
+                >
+                  {updBusy ? "Saving…" : "Apply update"}
+                </button>
+                {updMsg ? (
+                  <p className="mt-3 whitespace-pre-wrap text-xs text-sky-100/85">
+                    {updMsg}
                   </p>
                 ) : null}
               </details>

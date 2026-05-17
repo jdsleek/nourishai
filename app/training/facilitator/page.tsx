@@ -50,6 +50,11 @@ export default function FacilitatorDashboard() {
   const [mp, setMp] = useState(40);
   const [mo, setMo] = useState(80);
 
+  const [mvFrom, setMvFrom] = useState("");
+  const [mvTo, setMvTo] = useState("");
+  const [mvMsg, setMvMsg] = useState<string | null>(null);
+  const [mvBusy, setMvBusy] = useState(false);
+
   const load = useCallback(async () => {
     setErr(null);
     const m = await fetch("/api/training/facilitator/me", {
@@ -96,6 +101,58 @@ export default function FacilitatorDashboard() {
     if (!s.ok) throw new Error(sj.error || "Could not load submissions.");
     setSubs((sj.submissions ?? []) as Submission[]);
   }, [router]);
+
+  useEffect(() => {
+    if (assessments.length < 2) return;
+    setMvFrom((f) => (f ? f : assessments[0]!.id));
+    setMvTo((t) => {
+      if (t) return t;
+      const first = assessments[0]!.id;
+      return assessments.find((a) => a.id !== first)?.id ?? "";
+    });
+  }, [assessments]);
+
+  const moveSubmitsBetweenMySlugs = useCallback(
+    async (dryRun: boolean) => {
+      if (!mvFrom || !mvTo || mvFrom === mvTo) {
+        setMvMsg("Pick two different assessments that you manage.");
+        return;
+      }
+      setMvBusy(true);
+      setMvMsg(null);
+      try {
+        const res = await fetch("/api/training/facilitator/submissions/move-assessment", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fromAssessmentId: mvFrom,
+            toAssessmentId: mvTo,
+            dryRun,
+          }),
+        });
+        const data = (await res.json()) as {
+          error?: string;
+          submissionCount?: number;
+          moved?: number;
+        };
+        if (!res.ok) throw new Error(data.error || "Request failed.");
+        if (dryRun) {
+          setMvMsg(
+            `Preview: ${data.submissionCount ?? 0} submission(s) on the chosen “from” slug would repoint toward “into”.`,
+          );
+        } else {
+          setMvMsg(`Done — moved ${data.moved ?? 0} PostgreSQL submission row(s).`);
+          await load();
+        }
+      } catch (e) {
+        setMvMsg(e instanceof Error ? e.message : "Failed.");
+      } finally {
+        setMvBusy(false);
+      }
+    },
+    [mvFrom, mvTo, load],
+  );
 
   const setAssessmentOpens = useCallback(
     async (id: string, open: boolean) => {
@@ -318,9 +375,136 @@ export default function FacilitatorDashboard() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold text-white">Learner submissions (yours)</h2>
+          <h2 className="text-lg font-semibold text-white">
+            Learner submissions (scoped to your assessment links)
+          </h2>
+          <div className="rounded-xl border border-amber-500/25 bg-amber-950/20 p-4 text-xs leading-relaxed text-slate-300">
+            <p className="font-semibold text-amber-100">
+              Why past class submits may look “missing” here
+            </p>
+            <ul className="mt-2 list-disc space-y-2 pl-4 marker:text-amber-500/70">
+              <li>
+                This list only pulls grades tied to{" "}
+                <strong className="text-slate-200">your facilitator assessments</strong>{" "}
+                — i.e. the learner opened the portal with{" "}
+                <code className="rounded bg-white/10 px-1 font-mono text-[11px]">
+                  ?assessment=
+                </code>{" "}
+                set to{" "}
+                <strong className="text-slate-200">one of your published slugs</strong>{" "}
+                (e.g. <code className="rounded bg-white/10 px-1 font-mono">sprint-architecture</code>). That is when Postgres stores{" "}
+                <code className="rounded bg-white/10 px-1 font-mono text-[11px]">
+                  assessment_id
+                </code>{" "}
+                on the row.
+              </li>
+              <li>
+                Any work graded from the slide deck{" "}
+                <strong className="text-slate-200">without</strong> that parameter is{" "}
+                <strong className="text-slate-200">legacy pool</strong> — it intentionally does{" "}
+                <strong className="text-slate-200">not</strong> show in trainer consoles
+                (only the organizer inbox has the full cohort view).
+              </li>
+              <li>
+                If learners graded against <strong className="text-slate-200">another slug row</strong>{" "}
+                that you still own alongside this sprint inbox, consolidate them with{" "}
+                <strong className="text-slate-200">Move submits between my slug rows</strong>{" "}
+                — it only updates Postgres <code className="rounded bg-black/60 px-1 font-mono text-[10px]">assessment_id</code>; rubric/display uses the slug you merge <em>into</em>.
+              </li>
+              <li>
+                <strong className="text-slate-200">Whole-cohort legacy</strong> (never used{" "}
+                <code className="rounded bg-white/10 px-1 font-mono text-[11px]">?assessment=</code>) — ask the organizer to use{" "}
+                <strong className="text-slate-200">/foundry/admin → cohort legacy submits</strong> and choose your inbox slug.
+              </li>
+              <li>
+                If students used{" "}
+                <strong className="text-slate-200">someone else’s</strong> assessment slug /
+                facilitator row, those rows attach to{" "}
+                <em>that</em> assessment UUID — yours stays empty until they re-grade with{" "}
+                <em>your</em> link or an organizer adjusts ownership upstream.
+              </li>
+            </ul>
+            <p className="mt-3 text-[11px] text-slate-400">
+              Cohort-wide history (all assessments + legacy):{" "}
+              <code className="rounded bg-white/10 px-1 font-mono">/foundry/admin</code>{" "}
+              (organizer password).
+            </p>
+          </div>
+          {assessments.length >= 2 ? (
+            <div className="rounded-xl border border-teal-500/30 bg-teal-950/20 p-4 text-xs leading-relaxed text-slate-200">
+              <p className="font-semibold text-teal-200">
+                Move submits between slug rows you manage
+              </p>
+              <p className="mt-2 text-slate-400">
+                Postgres stores one UUID per learner grade. Consolidate everything into the inbox you actively monitor (typically your Sprint slug) whenever you still legitimately{" "}
+                <strong className="text-slate-200">own both assessment definitions</strong> — for example duplicate SIEST-era rows plus today's sprint inbox.
+              </p>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <label className="block min-w-[160px] flex-1 text-[11px] text-slate-400">
+                  From (source inbox)
+                  <select
+                    className="mt-1 block w-full rounded-lg border border-white/15 bg-[#0c0e14] px-2 py-2 font-mono text-[11px] text-emerald-200"
+                    disabled={mvBusy}
+                    value={mvFrom}
+                    onChange={(e) => setMvFrom(e.target.value)}
+                  >
+                    {assessments.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.slug} · {x.title.slice(0, 40)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block min-w-[160px] flex-1 text-[11px] text-slate-400">
+                  Into (destination inbox)
+                  <select
+                    className="mt-1 block w-full rounded-lg border border-white/15 bg-[#0c0e14] px-2 py-2 font-mono text-[11px] text-emerald-200"
+                    disabled={mvBusy}
+                    value={mvTo}
+                    onChange={(e) => setMvTo(e.target.value)}
+                  >
+                    {assessments.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.slug} · {x.title.slice(0, 40)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={mvBusy || mvFrom === mvTo}
+                  onClick={() => void moveSubmitsBetweenMySlugs(true)}
+                  className="rounded-lg border border-teal-400/40 bg-teal-950/35 px-3 py-2 text-[11px] font-semibold text-teal-100 hover:bg-teal-900/30 disabled:opacity-40"
+                >
+                  Preview
+                </button>
+                <button
+                  type="button"
+                  disabled={mvBusy || mvFrom === mvTo}
+                  onClick={() => void moveSubmitsBetweenMySlugs(false)}
+                  className="rounded-lg bg-teal-500 px-3 py-2 text-[11px] font-semibold text-[#041c18] hover:bg-teal-400 disabled:opacity-40"
+                >
+                  Move rows now
+                </button>
+              </div>
+              {mvMsg ? (
+                <p className="mt-3 whitespace-pre-wrap text-[11px] text-teal-100/90">{mvMsg}</p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="rounded-lg border border-white/10 bg-black/25 p-3 text-[11px] text-slate-500">
+              Only one facilitator assessment published — duplicate SIEST submits show up{" "}
+              <strong className="text-slate-300">after organizer routes legacy submits</strong> or after you publish a{" "}
+              <strong className="text-slate-300">second slug</strong> and merge submits between them below.
+            </p>
+          )}
           {!subs.length ? (
-            <p className="text-sm text-slate-500">Nothing stored yet.</p>
+            <p className="text-sm text-slate-500">
+              Nothing graded through your slug(s) yet. Share the learner link from “Your assessment
+              links” below — new submits will accumulate here automatically.
+            </p>
           ) : (
             <ul className="space-y-2">
               {subs.map((x) => (

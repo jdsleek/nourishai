@@ -15,7 +15,8 @@
     "foundry:smoke-providers": "node scripts/foundry-grading-providers-smoke.mjs",
     "foundry:smoke:full": "node scripts/foundry-smoke-test.mjs --api --grade",
     "foundry:smoke:railway-deploy": "node scripts/foundry-smoke-railway-deploy.mjs",
-    "facilitator:demo-seed": "node scripts/demo-facilitator-seed.mjs"
+    "facilitator:demo-seed": "node scripts/demo-facilitator-seed.mjs",
+    "facilitator:reassign-assessments": "node scripts/reassign-assessment-ownership.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

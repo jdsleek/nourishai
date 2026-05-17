@@ -27,6 +27,7 @@ export type AssessmentLockSummary = {
   id: string;
   slug: string;
   title: string;
+  facilitatorId: string;
   facilitatorEmail: string;
   submissionsOpen: boolean;
 };
@@ -270,7 +271,12 @@ export async function pgAdminListAssessmentLockSummaries(
   pool: Pool
 ): Promise<AssessmentLockSummary[]> {
   const { rows } = await pool.query(`
-    SELECT ta.id, ta.slug, ta.title, ta.submissions_open, tf.email AS facilitator_email
+    SELECT ta.id,
+           ta.slug,
+           ta.title,
+           ta.submissions_open,
+           tf.id AS facilitator_id,
+           tf.email AS facilitator_email
     FROM training_assessments ta
     INNER JOIN training_facilitators tf ON tf.id = ta.facilitator_id
     ORDER BY ta.updated_at DESC
@@ -281,6 +287,7 @@ export async function pgAdminListAssessmentLockSummaries(
       id: String(o.id ?? ""),
       slug: String(o.slug ?? ""),
       title: String(o.title ?? ""),
+      facilitatorId: String(o.facilitator_id ?? ""),
       facilitatorEmail: String(o.facilitator_email ?? ""),
       submissionsOpen: readSubmissionsOpen(o),
     };
@@ -344,4 +351,183 @@ export async function pgCreateFacilitator(
     display_name: String(r.display_name ?? ""),
     created_at: r.created_at ? new Date(r.created_at as string).toISOString() : "",
   };
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function looksLikeUuid(val: string): boolean {
+  return UUID_RE.test(val.trim());
+}
+
+export type FacilitatorListSummary = TrainingFacilitatorRow & {
+  assessment_count: number;
+};
+
+/** Organizer-only: facilitator directory with owned assessment counts */
+export async function pgAdminListFacilitators(pool: Pool): Promise<FacilitatorListSummary[]> {
+  const { rows } = await pool.query(`
+    SELECT tf.id,
+           tf.email,
+           tf.display_name,
+           tf.created_at,
+           COALESCE(ac.cnt, 0)::bigint AS assessment_count
+    FROM training_facilitators tf
+    LEFT JOIN (
+      SELECT facilitator_id AS fid, COUNT(*)::bigint AS cnt
+      FROM training_assessments
+      GROUP BY facilitator_id
+    ) ac ON ac.fid = tf.id
+    ORDER BY tf.created_at DESC
+  `);
+  return rows.map((row) => {
+    const r = row as Record<string, unknown>;
+    return {
+      id: String(r.id),
+      email: String(r.email ?? ""),
+      display_name: String(r.display_name ?? ""),
+      created_at: r.created_at ? new Date(r.created_at as string).toISOString() : "",
+      assessment_count: Number(r.assessment_count ?? 0),
+    };
+  });
+}
+
+export async function pgFacilitatorById(pool: Pool, facilitatorId: string) {
+  if (!looksLikeUuid(facilitatorId)) return null;
+  const { rows } = await pool.query(
+    `SELECT id, email, display_name, created_at
+     FROM training_facilitators WHERE id = $1::uuid LIMIT 1`,
+    [facilitatorId.trim()]
+  );
+  if (!rows.length) return null;
+  const r = rows[0] as Record<string, unknown>;
+  return {
+    id: String(r.id),
+    email: String(r.email ?? ""),
+    display_name: String(r.display_name ?? ""),
+    created_at: r.created_at ? new Date(r.created_at as string).toISOString() : "",
+  };
+}
+
+export async function pgAdminUpdateFacilitatorByEmail(
+  pool: Pool,
+  email: string,
+  patch: { passwordHash?: string; displayName?: string }
+): Promise<TrainingFacilitatorRow | null> {
+  const hasPwd = patch.passwordHash != null && patch.passwordHash.length > 0;
+  const hasDisplay = Object.prototype.hasOwnProperty.call(patch, "displayName");
+  if (!hasPwd && !hasDisplay) return null;
+
+  const fields: string[] = [];
+  const args: unknown[] = [];
+  let i = 1;
+  if (hasPwd) {
+    fields.push(`password_hash = $${i++}`);
+    args.push(patch.passwordHash);
+  }
+  if (hasDisplay) {
+    fields.push(`display_name = $${i++}`);
+    args.push(String(patch.displayName ?? "").trim());
+  }
+  args.push(email.trim());
+  const emailParam = i;
+
+  const { rows } = await pool.query(
+    `UPDATE training_facilitators SET ${fields.join(", ")}
+     WHERE lower(email) = lower($${emailParam})
+     RETURNING id, email, display_name, created_at`,
+    args
+  );
+  if (!rows.length) return null;
+  const r = rows[0] as Record<string, unknown>;
+  return {
+    id: String(r.id),
+    email: String(r.email ?? ""),
+    display_name: String(r.display_name ?? ""),
+    created_at: r.created_at ? new Date(r.created_at as string).toISOString() : "",
+  };
+}
+
+/** Organizer-only reassignment — does not change submissions rows (still point at same assessment ids). */
+export async function pgAdminSetAssessmentFacilitator(
+  pool: Pool,
+  assessmentId: string,
+  facilitatorId: string
+): Promise<boolean> {
+  if (!looksLikeUuid(assessmentId) || !looksLikeUuid(facilitatorId)) return false;
+  const fac = await pgFacilitatorById(pool, facilitatorId);
+  if (!fac) return false;
+  const r = await pool.query(
+    `UPDATE training_assessments SET facilitator_id = $2::uuid, updated_at = NOW()
+     WHERE id = $1::uuid`,
+    [assessmentId.trim(), facilitatorId.trim()]
+  );
+  return (r.rowCount ?? 0) > 0;
+}
+
+/** Count submits tied to one assessment UUID (excluding null FK). */
+export async function pgCountSubmissionsForAssessment(
+  pool: Pool,
+  assessmentId: string
+): Promise<number> {
+  if (!looksLikeUuid(assessmentId)) return 0;
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::bigint AS n FROM foundry_submissions WHERE assessment_id = $1::uuid`,
+    [assessmentId.trim()]
+  );
+  return Number((rows[0] as { n?: string })?.n ?? 0);
+}
+
+export async function pgCountSubmissionsLegacyNoAssessment(pool: Pool): Promise<number> {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::bigint AS n FROM foundry_submissions WHERE assessment_id IS NULL`
+  );
+  return Number((rows[0] as { n?: string })?.n ?? 0);
+}
+
+/**
+ * Repoint submits from source assessment UUID to destination.
+ * Both assessments must belong to facilitatorId (trainer merge / consolidation).
+ */
+export async function pgFacilitatorMergeSubmissionsToAssessment(
+  pool: Pool,
+  facilitatorId: string,
+  fromAssessmentId: string,
+  toAssessmentId: string
+): Promise<number> {
+  if (
+    !looksLikeUuid(facilitatorId) ||
+    !looksLikeUuid(fromAssessmentId) ||
+    !looksLikeUuid(toAssessmentId) ||
+    fromAssessmentId.trim() === toAssessmentId.trim()
+  ) {
+    return 0;
+  }
+  const r = await pool.query(
+    `UPDATE foundry_submissions SET assessment_id = $2::uuid
+     WHERE assessment_id = $1::uuid
+     AND EXISTS (SELECT 1 FROM training_assessments s WHERE s.id = $1::uuid AND s.facilitator_id = $3::uuid)
+     AND EXISTS (SELECT 1 FROM training_assessments t WHERE t.id = $2::uuid AND t.facilitator_id = $3::uuid)`,
+    [fromAssessmentId.trim(), toAssessmentId.trim(), facilitatorId.trim()]
+  );
+  return r.rowCount ?? 0;
+}
+
+/** Organizer: attach cohort legacy rows (assessment_id null) under one facilitator assessment inbox. */
+export async function pgAdminLinkLegacySubmissions(
+  pool: Pool,
+  toAssessmentId: string
+): Promise<number> {
+  if (!looksLikeUuid(toAssessmentId)) return 0;
+  const exists = await pool.query(
+    `SELECT 1 FROM training_assessments WHERE id = $1::uuid LIMIT 1`,
+    [toAssessmentId.trim()]
+  );
+  if (!exists.rows.length) return 0;
+
+  const r = await pool.query(
+    `UPDATE foundry_submissions SET assessment_id = $1::uuid WHERE assessment_id IS NULL`,
+    [toAssessmentId.trim()]
+  );
+  return r.rowCount ?? 0;
 }

@@ -8,7 +8,7 @@ This document merges the conversation into an implementable shape, critiques wea
 |------|------------------|
 | **Student** | In a subgroup for cohort labelling only. Opens the slide deck (`/foundry/day03`). Submits architecture prompt/output. Graded against **the assessment tied to `?assessment=<slug>`** (or legacy default when omitted). |
 | **Facilitator (4–5)** | Signs in **with email + password**. Creates/edits **assessments** (title, slug, subgroup list, min lengths, facilitator-written **grading instructions** driving the AI grader). **Opens or closes new submissions per assessment.** Sees submissions for **their** assessments only. |
-| **Organizer (admin)** | Uses existing **admin password header** unchanged. **Sees everything** — all submissions, ideation registry, bootstrap new facilitators, **global assessment lock toggles**. Does **not** own rubric wording (facilitators do). |
+| **Organizer (admin)** | Uses existing **admin password header** unchanged. **Sees everything** — submissions, ideation registry, facilitator roster (+ assessment counts), create trainers, credential rotation when a row exists, reassign **`training_assessments.facilitator_id`** (UI/API/CLI), **global assessment lock toggles**. Does **not** own rubric wording (facilitators do). |
 
 Critical review:
 
@@ -85,6 +85,9 @@ Other clipping / admin envs: **`food-app/.env.example`**.
 4. Share student link: **`/foundry/day03?assessment=<slug>`** (bookmark / LMS).
 5. Submissions tagged with `assessment_id`; organizer admin lists all incl. slug/title columns.
 6. **Close / reopen learner submits** — organizer **`/foundry/admin`** (“Assignment submission window”), or facilitator **`/training/facilitator`** on each assessment card **Close** / **Re-open** (`submissions_open` in Postgres).
+7. **Trainer directory** — same admin page renders every row in **`training_facilitators`** plus how many **`training_assessments`** reference it APIs: **`GET /api/foundry/admin/facilitators`**.
+8. If assessments were authored under the wrong facilitator account, move **`training_assessments.facilitator_id`** with **`PATCH /api/foundry/admin/assessment-owner`** `{ assessmentId, targetFacilitatorId }` (**UI**: “Ownership” on each assessed assignment under **`/foundry/admin`**), or use bulk CLI **`npm run facilitator:reassign-assessments`** with **`REASSIGN_TO_EMAIL`** plus **`--slug-prefix`**, **`--slugs`**, or **`--from-email`**. Submissions stay attached by **`foundry_submissions.assessment_id`** (unchanged IDs).
+9. **`PATCH /api/foundry/admin/facilitators`** with `{ email, password?, displayName? }` rotates bcrypt for an existing email (HTTPS only; **UI**: “Organizer: update existing facilitator credentials”).
 
 ## Demo facilitator seed (optional)
 

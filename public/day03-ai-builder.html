@@ -67,6 +67,14 @@ body.portal-open{overflow:auto;-webkit-overflow-scrolling:touch;}
   letter-spacing:0.12em;color:var(--muted);line-height:1.25;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;
 }
+.chrome-actions{display:flex;align-items:center;gap:clamp(8px,1.6vw,14px);flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
+.facilitator-link{
+  font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,11px);color:var(--cyan);text-decoration:none;
+  border:1px solid rgba(34,211,238,0.45);padding:6px 12px;border-radius:6px;white-space:nowrap;
+  transition:border-color .2s,color .2s,background .2s;
+}
+.facilitator-link:hover{color:#ecfeff;border-color:var(--cyan);background:var(--cyan-dim);}
+.facilitator-link:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
 .logo strong{color:var(--orange);}
 .registry-link{
   font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,11px);color:var(--muted2);
@@ -493,11 +501,14 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
 <!-- TOP CHROME -->
 <div class="chrome-top">
   <div class="logo"><strong>QUBATORS</strong> AI FOUNDRY · DAY 03</div>
-  <span class="registry-link" title="Cohort summaries are instructor-only">Ideation summaries (instructors only)</span>
-  <div class="kbd-hints" aria-hidden="true">
-    <span class="key">←</span><span class="key">→</span> navigate
-    &nbsp;&nbsp;
-    <span class="key">ESC</span> close portal
+  <div class="chrome-actions">
+    <a href="/training/facilitator/login" class="facilitator-link">Trainer login</a>
+    <span class="registry-link" title="Cohort summaries are instructor-only">Ideation summaries (instructors only)</span>
+    <div class="kbd-hints" aria-hidden="true">
+      <span class="key">←</span><span class="key">→</span> navigate
+      &nbsp;&nbsp;
+      <span class="key">ESC</span> close portal
+    </div>
   </div>
 </div>
 <div class="progress-bar" id="progressBar" role="progressbar" aria-valuemin="1" aria-valuemax="7" aria-valuenow="1" aria-label="Slide progress"></div>
@@ -509,7 +520,7 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
   <div class="slide active" data-slide="0">
     <div class="badge">Day 03 · Qubators AI Foundry</div>
     <h1 class="hero">THE <span class="or">AI</span><br>BUILDER<span class="cur" aria-hidden="true"></span></h1>
-    <div class="subtitle">// The AI Developer's Mindset · From chat prompts to systems you can ship · cohort ideation is visible in <strong>Foundry admin</strong> (<code>/foundry/admin</code>) only</div>
+    <div class="subtitle">// The AI Developer's Mindset · From chat prompts to systems you can ship · <strong>Cadence: Mon · Wed · Fri</strong> (facilitator-led) · Cohort ideation visible in Foundry admin only (<code>/foundry/admin</code>)</div>
   </div>
 
   <!-- SLIDE 2: MINDSET -->
@@ -534,8 +545,8 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
       <li>
         <span class="pip" aria-hidden="true"></span>
         <div class="bullet-body">
-          <p class="bullet-lead">Yesterday was conversation; today is construction.</p>
-          <p class="bullet-detail">You move from one-off chat answers to <strong>structured work</strong>: a project on disk, named files, a terminal, and specs clear enough that another person (or the grader) can follow your logic.</p>
+          <p class="bullet-lead">This cohort meets <strong>Mon · Wed · Fri</strong> with facilitators — each live session builds on the last.</p>
+          <p class="bullet-detail">You move from conversational exploration to <strong>structured work</strong>: a project on disk, named files, a terminal, and specs clear enough that another person (or the grader) can follow your logic. Next live block advances the syllabus (Day&nbsp;04 onward) — not the next calendar day.</p>
         </div>
       </li>
     </ul>

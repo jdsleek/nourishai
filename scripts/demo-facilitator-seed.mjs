@@ -184,7 +184,11 @@ async function main() {
     const r = rows[0];
     const usingEnvPwd = Boolean(process.env.DEMO_FACILITATOR_PASSWORD?.trim());
     console.log("");
-    console.log("[demo-facilitator] OK — facilitator ready for trainer login:");
+    console.log("[demo-facilitator] OK — facilitator row upserted in THIS database.");
+    console.log(
+      "[demo-facilitator] Trainer login connects to DATABASE_URL above — production sign-in fails if that URL is NOT the Railway service Postgres.",
+    );
+    console.log("[demo-facilitator] Ready for trainer login:");
     console.log(`  Login URL : /training/facilitator/login`);
     console.log(`  Email     : ${r.email}`);
     console.log(

@@ -22,7 +22,14 @@ export default function FacilitatorLoginPage() {
           </h1>
           <p className="mt-2 text-sm text-slate-400">
             Build assessments with your own grading instructions. Organizer creates
-            your account via admin.
+            your account via admin{" "}
+            <span className="text-slate-500">
+              (or provisions the row in{" "}
+              <code className="rounded bg-white/10 px-1 font-mono text-[11px]">
+                training_facilitators
+              </code>
+              ).
+            </span>
           </p>
         </div>
         <form
@@ -37,7 +44,10 @@ export default function FacilitatorLoginPage() {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   credentials: "include",
-                  body: JSON.stringify({ email: email.trim(), password }),
+                  body: JSON.stringify({
+                    email: email.trim(),
+                    password: password.trim(),
+                  }),
                 });
                 const data = (await res.json().catch(() => ({}))) as {
                   error?: string;
@@ -84,6 +94,35 @@ export default function FacilitatorLoginPage() {
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
+
+        <details className="mt-6 rounded-lg border border-white/10 bg-black/25 p-4 text-xs text-slate-400">
+          <summary className="cursor-pointer font-medium text-slate-300">
+            Can’t sign in? (credentials look right but get “invalid” here)
+          </summary>
+          <ul className="mt-3 list-disc space-y-2 pl-4 text-slate-400 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_code]:font-mono">
+            <li>
+              This app only accepts logins backed by{" "}
+              <strong className="text-slate-300">this deployment’s Postgres</strong>{" "}
+              (<code>DATABASE_URL</code>). If nobody created your row{" "}
+              <em>against that same database</em>, every password will fail —
+              including duplicates of the demo password.
+            </li>
+            <li>
+              Organizer fixes it from <strong className="text-slate-300">/foundry/admin</strong>{" "}
+              → create facilitator, <strong className="text-slate-300">or</strong> “Update existing
+              facilitator credentials” → set email + password.
+            </li>
+            <li>
+              Ops / CLI (with Railway <code>DATABASE_URL</code> wired in{" "}
+              <code>food-app/.env.local</code>):{" "}
+              <code>
+                DEMO_FACILITATOR_EMAIL=you@corp.com DEMO_FACILITATOR_PASSWORD='… ≥10 chars …' npm
+                run facilitator:demo-seed
+              </code>{" "}
+              — upserts bcrypt for that email, then retry sign-in here.
+            </li>
+          </ul>
+        </details>
       </div>
     </div>
   );

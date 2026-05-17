@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
+  clearPersistedLearnerCourseSlug,
   learnerDeckPath,
   persistLearnerCourseSlug,
 } from "@/lib/foundry-learner-course";
@@ -11,6 +12,7 @@ type HubConfig = {
   programName: string;
   deckHref: string;
   workbookPath: string;
+  facilitatorEmail?: string | null;
   assessmentSlug: string | null;
   assessmentTitle: string | null;
   submissionsOpen: boolean;
@@ -91,6 +93,7 @@ export default function ClassHubBody({
         return;
       }
       if (data.error === "UNKNOWN_COURSE") {
+        clearPersistedLearnerCourseSlug();
         setHubLoadFailed(
           data.message ||
             "This course link could not be found. Ask your facilitator to resend the link.",
@@ -108,6 +111,11 @@ export default function ClassHubBody({
   useEffect(() => {
     if (courseSlug) persistLearnerCourseSlug(courseSlug);
   }, [courseSlug]);
+
+  useEffect(() => {
+    if (!hub) return;
+    if (!courseSlug && hub.mode === "builtin") clearPersistedLearnerCourseSlug();
+  }, [hub, courseSlug]);
 
   useEffect(() => {
     setLastGrade(readStore().lastGrade ?? null);
@@ -201,6 +209,11 @@ export default function ClassHubBody({
               {hub.assessmentSlug ? (
                 <p className="mt-1 font-mono text-xs text-slate-500">
                   Slug · {hub.assessmentSlug}
+                </p>
+              ) : null}
+              {hub.facilitatorEmail ? (
+                <p className="mt-1 text-xs text-slate-400">
+                  Grading inbox · {hub.facilitatorEmail}
                 </p>
               ) : null}
               {!courseSlug && hub.mode === "builtin" ? (

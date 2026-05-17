@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  learnerClassHubPath,
+  learnerDeckPath,
+  readPersistedLearnerCourseSlug,
+} from "@/lib/foundry-learner-course";
 
 const STORAGE_KEY = "nourishai.class-workbook.v1";
 
@@ -23,6 +28,11 @@ export default function ClassWorkbookPage() {
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
+  const [cohortSlug, setCohortSlug] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCohortSlug(readPersistedLearnerCourseSlug());
+  }, []);
 
   useEffect(() => {
     try {
@@ -56,6 +66,9 @@ export default function ClassWorkbookPage() {
       behavior: "smooth",
     });
   }, [messages]);
+
+  const hubHref = cohortSlug ? learnerClassHubPath(cohortSlug) : "/class";
+  const deckHref = cohortSlug ? learnerDeckPath(cohortSlug) : "/foundry/day03";
 
   async function send() {
     const text = input.trim();
@@ -121,18 +134,24 @@ export default function ClassWorkbookPage() {
         </p>
         <p className="mt-3 flex flex-wrap gap-2">
           <a
-            href="/class"
+            href={hubHref}
             className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-brand-700"
           >
             Class hub — slides &amp; submit
           </a>
           <a
-            href="/"
+            href={deckHref}
             className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-100 dark:border-stone-600 dark:text-stone-200 dark:hover:bg-stone-900"
           >
             Open slides directly
           </a>
         </p>
+        {cohortSlug ? (
+          <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">
+            Links use your last class hub from this browser ({cohortSlug}). Open your facilitator’s
+            hub link first if these should point to a different cohort.
+          </p>
+        ) : null}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_minmax(300px,360px)] lg:items-start">

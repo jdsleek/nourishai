@@ -1046,7 +1046,10 @@ async function ensureSubgroupsLoaded(force){
       CURRENT_ASSESSMENT_TITLE = typeof j.title==='string' ? j.title : 'Assessment unavailable';
       const banner=document.getElementById('portal-assessment-label');
       if(banner){
-        banner.textContent='Assessment · could not load config ('+ASSESSMENT_SLUG+')';
+        const fac = typeof j.facilitatorEmail === 'string' && j.facilitatorEmail.trim()
+          ? (' · Grading inbox: '+j.facilitatorEmail.trim())
+          : '';
+        banner.textContent='Assessment · could not load config ('+ASSESSMENT_SLUG+')'+fac;
       }
       applySubmissionLockUI();
       sel.innerHTML='<option value="">—</option>';
@@ -1061,9 +1064,16 @@ async function ensureSubgroupsLoaded(force){
     CURRENT_ASSESSMENT_TITLE = typeof j.title==='string'? j.title:'';
     const banner=document.getElementById('portal-assessment-label');
     if(banner){
-      banner.textContent = ASSESSMENT_SLUG
-        ? ('Assessment · '+CURRENT_ASSESSMENT_TITLE+' ('+ASSESSMENT_SLUG+')')
-        : (SITE_DEFAULT_MODE ? ('Class course · '+CURRENT_ASSESSMENT_TITLE) : 'Day 03 AI Builder');
+      const fac = typeof j.facilitatorEmail === 'string' && j.facilitatorEmail.trim()
+        ? (' · Grading inbox: '+j.facilitatorEmail.trim())
+        : '';
+      if(ASSESSMENT_SLUG){
+        banner.textContent = 'Assessment · '+CURRENT_ASSESSMENT_TITLE+' ('+ASSESSMENT_SLUG+')'+fac;
+      }else if(SITE_DEFAULT_MODE){
+        banner.textContent = 'Class course · '+CURRENT_ASSESSMENT_TITLE+fac;
+      }else{
+        banner.textContent = 'Day 03 AI Builder'+fac;
+      }
     }
     applySubmissionLockUI();
     const list=Array.isArray(j.subgroups)?j.subgroups:[];

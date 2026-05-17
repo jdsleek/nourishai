@@ -27,6 +27,16 @@ export function readPersistedLearnerCourseSlug(): string | null {
   }
 }
 
+/** Drop cohort context (e.g. generic /class hub or stale session before a facilitator link). */
+export function clearPersistedLearnerCourseSlug(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(FOUNDRY_LEARNER_COURSE_SLUG_KEY);
+  } catch {
+    /* private mode */
+  }
+}
+
 export function learnerDeckPath(slug: string): string {
   return `/foundry/day03?assessment=${encodeURIComponent(slug)}`;
 }

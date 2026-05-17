@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
-import { pgAssessmentBySlug } from "@/lib/training-pg";
+import { pgAssessmentBySlug, pgFacilitatorById } from "@/lib/training-pg";
 import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
 
 export const runtime = "nodejs";
@@ -38,9 +38,14 @@ export async function GET(req: NextRequest) {
   const subgroups =
     a.subgroup_options.length > 0 ? a.subgroup_options : [...QAF_COHORT_SUBGROUPS];
 
+  const fac = await pgFacilitatorById(pool, a.facilitator_id);
+  const facilitatorEmail =
+    typeof fac?.email === "string" && fac.email.trim().length > 0 ? fac.email.trim() : null;
+
   return Response.json({
     slug: a.slug,
     title: a.title,
+    facilitatorEmail,
     intro: a.assessment_intro,
     subgroups,
     minPromptChars: Math.max(0, a.min_prompt_chars),

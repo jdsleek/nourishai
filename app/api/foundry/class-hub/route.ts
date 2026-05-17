@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
-import { pgAssessmentBySlug } from "@/lib/training-pg";
+import { pgAssessmentBySlug, pgFacilitatorById } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
 
@@ -62,10 +62,15 @@ export async function GET(req: NextRequest) {
     const subgroups =
       a.subgroup_options.length > 0 ? a.subgroup_options : [...QAF_COHORT_SUBGROUPS];
 
+    const fac = await pgFacilitatorById(pool, a.facilitator_id);
+    const facilitatorEmail =
+      typeof fac?.email === "string" && fac.email.trim().length > 0 ? fac.email.trim() : null;
+
     return Response.json({
       programName: "Qubators AI Foundry",
       deckHref: deckWithAssessment(a.slug),
       workbookPath,
+      facilitatorEmail,
       assessmentSlug: a.slug,
       assessmentTitle: a.title,
       submissionsOpen: a.submissions_open,

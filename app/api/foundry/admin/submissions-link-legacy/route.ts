@@ -8,6 +8,7 @@ import {
 } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /** Organizers only — catastrophic if mis-used; gated by typed confirm phrase when not dry-run. */
 const CONFIRM = "LINK_ALL_LEGACY_SUBMISSIONS";

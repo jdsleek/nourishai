@@ -17,6 +17,7 @@ import { appendFoundrySubmission } from "@/lib/foundry-store";
 import { pgAssessmentBySlug, type TrainingAssessmentRow } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const GRADE_MAX_TOKENS = 1400;

@@ -4,6 +4,7 @@ import { pgAssessmentBySlug, pgFacilitatorById } from "@/lib/training-pg";
 import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /** Public endpoint for learner deck — subgroup list & min lengths for an assessment */
 export async function GET(req: NextRequest) {

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getFoundrySubmissionGradeById } from "@/lib/foundry-store";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /** Public learner lookup by submission id — grade summary only (no prompt/output). */
 export async function GET(req: NextRequest) {

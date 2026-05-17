@@ -7,6 +7,7 @@ import {
 } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /** One-click: attach all legacy (no assessment FK) rows to this facilitator's oldest-published assessment. */
 export async function POST() {

@@ -5,6 +5,7 @@ import { getFoundryPgPool } from "@/lib/foundry-pg";
 import { getFoundryLlmUsageTotals } from "@/lib/foundry-llm-usage";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /** Aggregated Foundry grader usage + Anthropic-priced reference equivalents (organizer dashboard). */
 export async function GET(req: NextRequest) {

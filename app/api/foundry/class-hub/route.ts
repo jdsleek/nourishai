@@ -5,6 +5,7 @@ import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
 import { pgAssessmentBySlug, pgFacilitatorById } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function deckWithAssessment(slug: string): string {
   return learnerDeckPath(slug.trim().toLowerCase());

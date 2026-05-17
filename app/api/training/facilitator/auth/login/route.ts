@@ -9,6 +9,7 @@ import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-
 import { pgFacilitatorByEmail } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   const pool = getFoundryPgPool();

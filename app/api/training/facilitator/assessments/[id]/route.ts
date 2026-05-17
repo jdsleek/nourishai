@@ -4,6 +4,7 @@ import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-
 import { pgFacilitatorByEmail, pgUpdateAssessment } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type PatchBody = {
   title?: string;

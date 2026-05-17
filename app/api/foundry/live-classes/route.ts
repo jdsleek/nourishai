@@ -2,6 +2,7 @@ import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-
 import { pgLiveOpenCoursesPublic } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * Public list of facilitator cohorts currently accepting submissions (student discovery).

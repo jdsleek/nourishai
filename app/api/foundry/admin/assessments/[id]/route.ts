@@ -4,6 +4,7 @@ import { isFoundryAdminRequest } from "@/lib/foundry-admin-auth";
 import { pgAdminDeleteAssessment } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /** Organizer deletes a facilitator assessment row (frees slug; submissions become unlinked). */
 export async function DELETE(

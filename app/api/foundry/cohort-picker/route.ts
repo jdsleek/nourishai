@@ -3,6 +3,7 @@ import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-
 import { pgFacilitatorCourseCatalogBySlug } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * Given any known assessment slug, return that facilitator’s cohort list (student hub picker).

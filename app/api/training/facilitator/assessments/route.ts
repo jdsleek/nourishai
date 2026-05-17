@@ -8,6 +8,7 @@ import {
 } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type PostBody = {
   title?: string;

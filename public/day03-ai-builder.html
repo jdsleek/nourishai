@@ -550,6 +550,19 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
     </div>
   </div>
 </div>
+<script>
+(function hubLinkFromQuery(){
+ try{
+ var p=new URLSearchParams(location.search);
+ var slug=(String(p.get('assessment')||'').trim().toLowerCase().replace(/[^a-z0-9-]/g,''));
+ if(slug.length<3) return;
+ var a=document.getElementById('deckClassHubLink');
+ if(!a) return;
+ a.setAttribute('href','/learn/'+encodeURIComponent(slug));
+ a.textContent='Cohort hub';
+ a.setAttribute('title','Open your learner hub (workbook, links) — this page is slides + portal');
+ }catch(_){}})();
+</script>
 <div class="progress-bar" id="progressBar" role="progressbar" aria-valuemin="1" aria-valuemax="7" aria-valuenow="1" aria-label="Slide progress"></div>
 
 <div id="facilitator-desk-banner" class="facilitator-desk" hidden>
@@ -940,10 +953,12 @@ function syncDeckClassHubLink(){
   if(!a) return;
   if(ASSESSMENT_SLUG){
     a.href = '/learn/' + encodeURIComponent(ASSESSMENT_SLUG);
-    a.title = 'Class hub for course ' + ASSESSMENT_SLUG;
+    a.textContent = 'Cohort hub';
+    a.title = 'Open your learner hub (workbook, links) — this page is slides + portal';
   }else{
     a.href = '/class';
-    a.title = 'Generic class hub — open your facilitator /learn/course link for your rubric';
+    a.textContent = 'Class hub';
+    a.title = 'Generic program hub — your facilitator\'s cohort uses /learn/your-course';
   }
 }
 

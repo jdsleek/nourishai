@@ -285,6 +285,15 @@ export default function ClassHubBody({
             text apply once you choose the right{" "}
             <span className="font-mono text-slate-400">/learn/&lt;slug&gt;</span> link.
           </p>
+          {courseSlug ? (
+            <p className="mt-3 rounded-lg border border-cyan-500/25 bg-cyan-950/20 px-3 py-2 text-xs leading-relaxed text-cyan-100/95">
+              <strong className="text-white">This page is your cohort home — it does not auto-open the slides.</strong>{" "}
+              Scroll to <strong className="font-medium text-slate-200">Open slides &amp; submit portal</strong> when you
+              want the deck; that opens{" "}
+              <span className="font-mono text-slate-500">/foundry/day03?assessment={courseSlug}</span> in the same tab
+              (different page, not a redirect from this URL).
+            </p>
+          ) : null}
           <p className="mt-1 text-xs text-slate-500">
             The <strong className="font-medium text-slate-400">assessment title</strong> on your hub (e.g.
             what appears next to “Your course”) is set by your facilitator in their trainer console — not by

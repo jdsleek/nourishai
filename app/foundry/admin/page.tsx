@@ -702,7 +702,7 @@ export default function FoundryAdminPage() {
                   <DashboardStatCard
                     label="Grading tokens (all time)"
                     value={llmTotals.combined.totalTokens.toLocaleString()}
-                    hint={`Live-metered ${llmTotals.metered.totalTokens.toLocaleString()} (${llmTotals.metered.gradingCalls} grades) · backlog estimate ${llmTotals.reconstructed.totalTokens.toLocaleString()} (${llmTotals.reconstructed.gradingCalls} submissions)`}
+                    hint={`${llmTotals.combined.gradingCalls.toLocaleString()} grades total · ${llmTotals.metered.gradingCalls.toLocaleString()} live-metered (${llmTotals.metered.totalTokens.toLocaleString()} tokens) · ${llmTotals.reconstructed.gradingCalls.toLocaleString()} backlog-estimated (${llmTotals.reconstructed.totalTokens.toLocaleString()} tokens)`}
                     tone="emerald"
                   />
                 ) : null}

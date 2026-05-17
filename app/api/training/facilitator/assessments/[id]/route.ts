@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 import { learnerDeckPath } from "@/lib/foundry-learner-course";
-import { mergePortalForm } from "@/lib/foundry-portal-form";
+import { mergeAssessmentPortalBlobForPatch } from "@/lib/foundry-portal-extras";
 import {
   facilitatorAuthFailureResponse,
   resolveFacilitatorRequest,
@@ -9,7 +9,7 @@ import {
   sanitizeLevelUpUrl,
   sanitizeStudentChecklistInput,
 } from "@/lib/foundry-learner-checklist";
-import { pgUpdateAssessment } from "@/lib/training-pg";
+import { pgAssessmentByIdForFacilitator, pgUpdateAssessment } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +27,8 @@ type PatchBody = {
   portalForm?: unknown;
   levelUpUrl?: string;
   studentChecklist?: string[];
+  /** Replaces extras when supplied (empty array clears) */
+  extraAnswerSlots?: unknown;
 };
 
 async function auth(): Promise<
@@ -79,11 +81,20 @@ export async function PATCH(
     patch.grader_instructions = body.graderInstructions.trim();
   if (body.submissionsOpen !== undefined)
     patch.submissions_open = Boolean(body.submissionsOpen);
-  if (body.portalForm !== undefined)
-    patch.portal_form_copy = mergePortalForm(body.portalForm) as unknown as Record<
-      string,
-      unknown
-    >;
+  if (body.portalForm !== undefined || body.extraAnswerSlots !== undefined) {
+    const prevRow = await pgAssessmentByIdForFacilitator(
+      ctx.pool,
+      ctx.facilitatorId,
+      id,
+    );
+    if (!prevRow)
+      return Response.json({ error: "Assessment not found." }, { status: 404 });
+    patch.portal_form_copy = mergeAssessmentPortalBlobForPatch({
+      previousCopy: prevRow.portal_form_copy,
+      portalFormPatch: body.portalForm,
+      extraSlotsPatch: body.extraAnswerSlots,
+    });
+  }
   if (body.levelUpUrl !== undefined)
     patch.level_up_url = sanitizeLevelUpUrl(String(body.levelUpUrl));
   if (body.studentChecklist !== undefined)

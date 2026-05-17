@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { learnerChecklistFromRows } from "@/lib/foundry-learner-checklist";
 import { mergePortalForm } from "@/lib/foundry-portal-form";
+import { readPortalExtraSlots } from "@/lib/foundry-portal-extras";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import { pgAssessmentBySlug, pgFacilitatorById } from "@/lib/training-pg";
 import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
         studentChecklist: learnerChecklistFromRows([]),
         levelUpUrl: null as string | null,
         portalForm: mergePortalForm({}),
+        extraAnswerSlots: [] as unknown[],
       },
       { status: 200 },
     );
@@ -65,5 +67,6 @@ export async function GET(req: NextRequest) {
     studentChecklist: learnerChecklistFromRows(a.student_checklist),
     levelUpUrl: a.level_up_url.trim().length > 0 ? a.level_up_url.trim() : null,
     portalForm: mergePortalForm(a.portal_form_copy),
+    extraAnswerSlots: readPortalExtraSlots(a.portal_form_copy),
   });
 }

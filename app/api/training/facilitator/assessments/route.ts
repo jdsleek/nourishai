@@ -3,6 +3,10 @@ import {
   sanitizeLevelUpUrl,
   sanitizeStudentChecklistInput,
 } from "@/lib/foundry-learner-checklist";
+import {
+  persistPortalFormCopy,
+  readPortalExtraSlots,
+} from "@/lib/foundry-portal-extras";
 import { mergePortalForm } from "@/lib/foundry-portal-form";
 import {
   facilitatorAuthFailureResponse,
@@ -26,6 +30,9 @@ type PostBody = {
   graderInstructions?: string;
   levelUpUrl?: string;
   studentChecklist?: string[];
+  portalForm?: unknown;
+  /** Up to six extra multi-line questions beyond fields 03/04 */
+  extraAnswerSlots?: unknown;
 };
 
 /** List facilitator-authored assessments */
@@ -50,6 +57,7 @@ export async function GET() {
       classHubPath: `/learn/${encodeURIComponent(a.slug)}`,
       levelUpUrl: a.level_up_url,
       studentChecklist: a.student_checklist,
+      extraAnswerSlots: readPortalExtraSlots(a.portal_form_copy),
     })),
     studentDeckBasePath: "/foundry/deck",
   });
@@ -77,6 +85,7 @@ export async function POST(req: Request) {
   const graderInstructions = String(body.graderInstructions || "").trim();
   const levelUpUrl = sanitizeLevelUpUrl(String(body.levelUpUrl || ""));
   const studentChecklist = sanitizeStudentChecklistInput(body.studentChecklist);
+  const portalPersist = persistPortalFormCopy(body.portalForm, body.extraAnswerSlots, undefined);
 
   if (!title) {
     return Response.json({ error: "Assessment title required." }, { status: 400 });
@@ -102,6 +111,7 @@ export async function POST(req: Request) {
       grader_instructions: graderInstructions,
       level_up_url: levelUpUrl,
       student_checklist: studentChecklist,
+      portal_form_copy: portalPersist,
     });
 
     return Response.json({

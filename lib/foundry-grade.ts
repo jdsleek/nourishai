@@ -71,7 +71,9 @@ export function buildAssessmentRubricPrompt(
   name: string,
   subgroup: string,
   prompt: string,
-  output: string
+  output: string,
+  /** Optional · appended after main prompt for facilitator-defined bonus questions */
+  extraLearnerAnswers?: string
 ): string {
   const intro = cfg.facilitatorIntro?.trim()
     ? `${cfg.facilitatorIntro.trim()}\n\n`
@@ -80,6 +82,10 @@ export function buildAssessmentRubricPrompt(
   const body =
     cfg.facilitatorInstructions.trim() ||
     "(No facilitator rubric text — award marks fairly across prompt quality vs architecture viability, 10+10.)";
+
+  const addon = extraLearnerAnswers?.trim()
+    ? `\n\nADDITIONAL LEARNER ANSWERS (count toward completeness of their submission):\n${extraLearnerAnswers.trim()}\n`
+    : "";
 
   return `You are the AI grading assistant for a facilitator-led training cohort.
 
@@ -97,7 +103,7 @@ ARCHITECTURE PROMPT:
 ${prompt}
 
 ARCHITECT OUTPUT:
-${output}
+${output}${addon}
 
 Use two scored categories only (still 20 total): prompt_quality (/10), architecture_viability (/10).
 Bands: GO 15–20, REVIEW 10–14, REBUILD 0–9.

@@ -940,6 +940,8 @@ body.cohort-assessment-deck .slide[data-slide="0"] .hero{font-size:clamp(2rem,6v
       <p class="field-err" id="err-output">Paste enough output for Frontend, Backend/API, Database, and Data flow.</p>
     </div>
 
+    <div id="portalExtraAnswersMount" aria-live="polite"></div>
+
     <button type="button" class="submit-btn" id="subBtn" onclick="grade()">SUBMIT FOR GRADING →</button>
 
     <!-- LOADING -->
@@ -1122,6 +1124,9 @@ let CURRENT_ASSESSMENT_INTRO = '';
 let CFG_COHORT_CONFIG_OK = false;
 let CURRENT_LEVEL_UP_URL = '';
 let CURRENT_STUDENT_CHECKLIST = [];
+/** Faculty-defined textarea questions beyond portal fields 03/04 — rebuilt from GET /api/foundry/assessment-config */
+let CFG_EXTRA_ANSWER_SLOT_COUNT = 0;
+let CFG_EXTRA_ANSWER_SLOTS = [];
 let SLIDE_0_DEFAULT_HTML = "";
 let SLIDE_6_DEFAULT_HTML = "";
 
@@ -1142,6 +1147,59 @@ function escapeHtml(s){
     .replace(/</g,'&lt;')
     .replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;');
+}
+
+function attrEscQuotes(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+/** DOM id prefix for facilitator extra textarea (must match rebuildPortalExtraAnswerSlots). */
+function portalExtraFieldGid(slotId){
+  return 'extraTa_'+String(slotId||'').replace(/[^a-zA-Z0-9_-]/g,'_');
+}
+
+function sanitizeExtraSlotsClient(raw){
+  if(!Array.isArray(raw)||!raw.length)return [];
+  var out=[];
+  for(var i=0;i<raw.length&&out.length<6;i++){
+    var it=raw[i];
+    if(!it||typeof it!=='object')continue;
+    var label=String(it.label||'').trim();
+    if(!label)continue;
+    var idRaw=String(it.id||'').trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
+    var id=idRaw.length>=2?idRaw.slice(0,40):('x'+Math.random().toString(36).slice(2,10));
+    out.push({
+      id:id,
+      label:label.slice(0,200),
+      hint:String(it.hint||'').trim().slice(0,600),
+      placeholder:String(it.placeholder||'').trim().slice(0,2000),
+      required:it.required===true
+    });
+  }
+  return out;
+}
+
+function rebuildPortalExtraAnswerSlots(raw){
+  var slots=sanitizeExtraSlotsClient(raw||[]);
+  CFG_EXTRA_ANSWER_SLOTS=slots;
+  CFG_EXTRA_ANSWER_SLOT_COUNT=slots.length;
+  var mount=document.getElementById('portalExtraAnswersMount');
+  if(!mount)return;
+  mount.innerHTML='';
+  for(var i=0;i<slots.length;i++){
+    var s=slots[i];
+    var gid=portalExtraFieldGid(s.id);
+    var wrap=document.createElement('div');
+    wrap.className='fgroup portal-extra-slot';
+    var ht=s.hint?('<p class="fhint" id="'+gid+'_hint">'+escapeHtml(s.hint)+'</p>'):'';
+    wrap.innerHTML='<label class="flabel" for="'+gid+'">'+escapeHtml(s.label)+(s.required?' · required':' · optional')+'</label>'
+      +ht
+      +'<textarea id="'+gid+'" class="fi code portal-extra-input" rows="5" data-extra-id="'+escapeHtml(s.id)+'" placeholder="'+attrEscQuotes(s.placeholder||'')+'"></textarea>'
+      +'<p class="field-err" id="'+gid+'_err">'+(s.required?escapeHtml('Please complete this field.'):escapeHtml('Optional — add detail if helpful.'))+'</p>';
+    mount.appendChild(wrap);
+    var ta=document.getElementById(gid);
+    if(ta&&s.hint) ta.setAttribute('aria-describedby', gid+'_hint');
+  }
 }
 
 function facilitatorPortalSuffix(cfg){
@@ -1272,6 +1330,14 @@ function savePortalDraftSnapshot(){
       prompt:p.value||'',
       output:o.value||'',
       savedAt:Date.now(),
+      extraAnswers:(function(){
+        var ex={};
+        document.querySelectorAll('#portalExtraAnswersMount textarea[data-extra-id]').forEach(function(el){
+          var sid=el.getAttribute('data-extra-id');
+          if(sid) ex[sid]=el.value||'';
+        });
+        return ex;
+      })(),
     };
     writePortalDraftBag(bag);
   }catch(_){}
@@ -1298,7 +1364,14 @@ function tryRestorePortalDraft(){
     if(g && g.dataset.ready==='1' && typeof bag.subgroup==='string' && bag.subgroup){
       for(var i=0;i<g.options.length;i++){ if(g.options[i].value===bag.subgroup){ g.selectedIndex=i; break; } }
     }
-  }catch(_){}
+    if(bag.extraAnswers&&typeof bag.extraAnswers==='object'&&!Array.isArray(bag.extraAnswers)){
+      document.querySelectorAll('#portalExtraAnswersMount textarea[data-extra-id]').forEach(function(el){
+        var sid=el.getAttribute('data-extra-id');
+        if(!sid)return;
+        var v=bag.extraAnswers[sid];
+        if(typeof v==='string') el.value=v;
+      });
+    }
 }
 
 function syncFacilitatorDesk(){
@@ -1361,6 +1434,9 @@ function applyCohortDeckPresentation(){
     const submitTitle=CURRENT_ASSESSMENT_TITLE.trim()||ASSESSMENT_SLUG;
     const checklistLines=CURRENT_STUDENT_CHECKLIST.slice();
     checklistLines.push('Paste lengths · at least '+CFG_MIN_PROMPT+' characters in the first portal box and '+CFG_MIN_OUTPUT+' in the second unless your facilitator said otherwise.');
+    if(CFG_EXTRA_ANSWER_SLOT_COUNT>0){
+      checklistLines.push('Answer '+CFG_EXTRA_ANSWER_SLOT_COUNT+' additional facilitator question(s) in the portal (below the usual two paste boxes).');
+    }
     const prepBody=checklistLines.map(function(l){ return '<li>'+escapeHtml(l)+'</li>'; }).join('');
     slide6.innerHTML=
       '<div class="tag">Submit assignment</div>'+
@@ -1537,11 +1613,12 @@ async function ensureSubgroupsLoaded(force){
       if(banner){
         banner.textContent='Assessment · could not load config ('+ASSESSMENT_SLUG+')'+facilitatorPortalSuffix(j);
       }
+      rebuildPortalExtraAnswerSlots([]);
       applySubmissionLockUI();
-      applyCohortDeckPresentation();
       applyDeckDocumentTitle();
       applyPortalFormFromConfig(j.portalForm);
       ingestAssessmentConfigPayload(j);
+      applyCohortDeckPresentation();
       sel.innerHTML='<option value="">—</option>';
       sel.dataset.slugKey=key;
       sel.dataset.ready='1';
@@ -1568,10 +1645,11 @@ async function ensureSubgroupsLoaded(force){
       }
     }
     applySubmissionLockUI();
-    applyCohortDeckPresentation();
     applyDeckDocumentTitle();
     applyPortalFormFromConfig(j.portalForm);
     ingestAssessmentConfigPayload(j);
+    rebuildPortalExtraAnswerSlots(Array.isArray(j.extraAnswerSlots)?j.extraAnswerSlots:[]);
+    applyCohortDeckPresentation();
     const list=Array.isArray(j.subgroups)?j.subgroups:[];
     if(list.length){
       fill(list);
@@ -1584,6 +1662,7 @@ async function ensureSubgroupsLoaded(force){
     CFG_COHORT_CONFIG_OK = false;
     CURRENT_ASSESSMENT_INTRO = '';
     ingestAssessmentConfigPayload({});
+    rebuildPortalExtraAnswerSlots([]);
     applyCohortDeckPresentation();
     applyDeckDocumentTitle();
     CFG_SUBMISSIONS_OPEN = !ASSESSMENT_SLUG;
@@ -1640,6 +1719,8 @@ function scrollPortalToElement(el,marginPx){
 function clearFieldErrors(){
   document.querySelectorAll('.field-err').forEach(e=>e.classList.remove('on'));
   document.querySelectorAll('.fi.invalid').forEach(e=>e.classList.remove('invalid'));
+  document.querySelectorAll('#portalExtraAnswersMount .portal-extra-slot .field-err').forEach(function(e){ e.classList.remove('on'); });
+  document.querySelectorAll('#portalExtraAnswersMount textarea.fi').forEach(function(e){ e.classList.remove('invalid'); });
 }
 
 function showErr(fieldId, errId){
@@ -1666,6 +1747,18 @@ async function grade(){
   }
   if(!prompt||prompt.length<CFG_MIN_PROMPT){showErr('aPrompt','err-prompt');ok=false;}
   if(!output||output.length<CFG_MIN_OUTPUT){showErr('aOutput','err-output');ok=false;}
+  var extrasPayload=null;
+  if(ASSESSMENT_SLUG && CFG_EXTRA_ANSWER_SLOTS.length){
+    extrasPayload={};
+    for(var ei=0;ei<CFG_EXTRA_ANSWER_SLOTS.length;ei++){
+      var slot=CFG_EXTRA_ANSWER_SLOTS[ei];
+      var egid=portalExtraFieldGid(slot.id);
+      var tx=document.getElementById(egid);
+      var vx=tx?tx.value.trim():'';
+      extrasPayload[slot.id]=vx;
+      if(slot.required&&!vx){showErr(egid,egid+'_err');ok=false;}
+    }
+  }
   if(!ok)return;
   saveStudentProfileFromForm();
 
@@ -1674,9 +1767,16 @@ async function grade(){
   document.getElementById('result').classList.remove('on');
 
   try{
-    const body = ASSESSMENT_SLUG
-      ? {name,subgroup,prompt,output,assessmentSlug:ASSESSMENT_SLUG}
-      : {name,subgroup,prompt,output};
+    var body={
+      name:name,
+      subgroup:subgroup,
+      prompt:prompt,
+      output:output,
+    };
+    if(ASSESSMENT_SLUG){
+      body.assessmentSlug=ASSESSMENT_SLUG;
+      if(extrasPayload) body.extraAnswers=extrasPayload;
+    }
     const res=await fetch('/api/foundry/grade',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -1788,6 +1888,7 @@ function render(r, meta){
 
 function resetForm(){
   ['sName','aPrompt','aOutput'].forEach(id=>document.getElementById(id).value='');
+  document.querySelectorAll('#portalExtraAnswersMount textarea').forEach(function(el){ el.value=''; });
   const sg=document.getElementById('subGroup');
   if(sg&&sg.dataset.ready==='1'){sg.selectedIndex=0;}
   clearFieldErrors();
@@ -1832,7 +1933,7 @@ void ensureSubgroupsLoaded(false);
     portal.addEventListener('input',function(e){
       var t=e.target;
       if(!t||!t.id) return;
-      if(t.id==='sName'||t.id==='aPrompt'||t.id==='aOutput') schedulePortalDraftSave();
+      if(t.id==='sName'||t.id==='aPrompt'||t.id==='aOutput'||(t.classList&&t.classList.contains('portal-extra-input'))) schedulePortalDraftSave();
     },true);
     portal.addEventListener('change',function(e){
       var t=e.target;

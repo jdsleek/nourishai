@@ -14,6 +14,8 @@ import { insertFoundryLlmUsageEvent } from "@/lib/foundry-llm-usage";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
 import { appendFoundrySubmission } from "@/lib/foundry-store";
+import type { PortalExtraAnswerSlot } from "@/lib/foundry-portal-extras";
+import { readPortalExtraSlots } from "@/lib/foundry-portal-extras";
 import { pgAssessmentBySlug, type TrainingAssessmentRow } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
@@ -22,6 +24,48 @@ export const maxDuration = 120;
 
 const GRADE_MAX_TOKENS = 1400;
 
+const EXTRA_ANSWER_MAX_PER_FIELD_CHARS = 16_000;
+const EXTRA_BLOCK_MAX_FOR_MODEL_CHARS = 14_000;
+
+function coerceExtraAnswersMap(
+  raw: unknown,
+  allowedIds: ReadonlySet<string>,
+): Record<string, string> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const o = raw as Record<string, unknown>;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(o)) {
+    const id = String(k || "").trim();
+    if (!id || !allowedIds.has(id)) continue;
+    out[id] = String(v ?? "").trim().slice(0, EXTRA_ANSWER_MAX_PER_FIELD_CHARS);
+  }
+  return out;
+}
+
+function validateRequiredExtras(
+  slots: PortalExtraAnswerSlot[],
+  map: Record<string, string>,
+): string | null {
+  for (const s of slots) {
+    if (!s.required) continue;
+    if (!(map[s.id] ?? "").trim()) return `Please complete: ${s.label}`;
+  }
+  return null;
+}
+
+function formatExtraAnswersForGrader(
+  slots: PortalExtraAnswerSlot[],
+  map: Record<string, string>,
+): string {
+  const parts: string[] = [];
+  for (const s of slots) {
+    const t = (map[s.id] ?? "").trim();
+    if (!t) continue;
+    parts.push(`${s.label}:\n${t}`);
+  }
+  return parts.join("\n\n");
+}
+
 type Body = {
   name?: string;
   subgroup?: string;
@@ -29,6 +73,8 @@ type Body = {
   output?: string;
   /** When set, loads facilitator rubric from Postgres and stores `assessment_id` on the row. */
   assessmentSlug?: string;
+  /** Keys are slot ids from facilitator extra_answer_slots config */
+  extraAnswers?: unknown;
 };
 
 export async function POST(req: NextRequest) {
@@ -54,6 +100,7 @@ export async function POST(req: NextRequest) {
     }
 
     const clipped = clipFoundryBodiesForGroq(prompt, output);
+    let promptForPersistence = prompt;
     let assessmentId: string | null = null;
     let rubricPrompt: string;
 
@@ -116,6 +163,29 @@ export async function POST(req: NextRequest) {
         );
       }
       assessmentId = a.id;
+
+      const extraSlots = readPortalExtraSlots(a.portal_form_copy);
+      const extrasMap =
+        extraSlots.length > 0
+          ? coerceExtraAnswersMap(
+              body.extraAnswers,
+              new Set(extraSlots.map((s) => s.id)),
+            )
+          : {};
+
+      const extraErr =
+        extraSlots.length > 0 ? validateRequiredExtras(extraSlots, extrasMap) : null;
+      if (extraErr) {
+        return Response.json({ error: extraErr }, { status: 400 });
+      }
+
+      const extraMarkdown =
+        extraSlots.length > 0 ? formatExtraAnswersForGrader(extraSlots, extrasMap) : "";
+
+      if (extraMarkdown.trim()) {
+        promptForPersistence = `${prompt}\n\n--- Extra learner answers ---\n${extraMarkdown}`;
+      }
+
       rubricPrompt = buildAssessmentRubricPrompt(
         {
           assessmentTitle: a.title,
@@ -128,6 +198,9 @@ export async function POST(req: NextRequest) {
         subgroup,
         clipped.promptForModel,
         clipped.outputForModel,
+        extraMarkdown.trim()
+          ? extraMarkdown.slice(0, EXTRA_BLOCK_MAX_FOR_MODEL_CHARS)
+          : undefined,
       );
     } else {
       if (!QAF_COHORT_SUBGROUPS.includes(subgroup)) {
@@ -207,7 +280,7 @@ export async function POST(req: NextRequest) {
       fellowName: name,
       subgroup,
       ide: "",
-      prompt,
+      prompt: promptForPersistence,
       output,
       result,
       assessmentId,

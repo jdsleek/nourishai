@@ -225,6 +225,20 @@ export async function pgAssessmentBySlug(
   return rowAssessment(rows[0] as Record<string, unknown>);
 }
 
+export async function pgAssessmentByIdForFacilitator(
+  pool: Pool,
+  facilitatorId: string,
+  assessmentId: string
+): Promise<TrainingAssessmentRow | null> {
+  const { rows } = await pool.query(
+    `SELECT ${ASSESSMENT_SELECT}
+     FROM training_assessments WHERE id = $1::uuid AND facilitator_id = $2::uuid LIMIT 1`,
+    [assessmentId, facilitatorId]
+  );
+  if (!rows.length) return null;
+  return rowAssessment(rows[0] as Record<string, unknown>);
+}
+
 export type FacilitatorCourseCard = {
   slug: string;
   title: string;
@@ -341,16 +355,19 @@ export async function pgInsertAssessment(
     grader_instructions: string;
     level_up_url?: string;
     student_checklist?: string[];
+    /** Full merged portal JSONB blob (four fields + optional extra_answer_slots). */
+    portal_form_copy?: Record<string, unknown>;
   }
 ): Promise<TrainingAssessmentRow> {
   const levelUrl = patch.level_up_url ?? "";
   const checklistJson = JSON.stringify(patch.student_checklist ?? []);
+  const portalJson = JSON.stringify(patch.portal_form_copy ?? {});
   const { rows } = await pool.query(
     `INSERT INTO training_assessments
       (facilitator_id, title, slug, subgroup_options,
        min_prompt_chars, min_output_chars, assessment_intro, grader_instructions, is_site_default,
-       level_up_url, student_checklist)
-     VALUES ($1::uuid, $2, $3, $4::jsonb, $5, $6, $7, $8, false, $9, $10::jsonb)
+       level_up_url, student_checklist, portal_form_copy)
+     VALUES ($1::uuid, $2, $3, $4::jsonb, $5, $6, $7, $8, false, $9, $10::jsonb, $11::jsonb)
      RETURNING ${ASSESSMENT_SELECT}`,
     [
       facilitatorId,
@@ -363,6 +380,7 @@ export async function pgInsertAssessment(
       patch.grader_instructions,
       levelUrl,
       checklistJson,
+      portalJson,
     ]
   );
   return rowAssessment(rows[0] as Record<string, unknown>);

@@ -18,6 +18,9 @@ import {
   PORTAL_TEMPLATE_OPTIONS,
 } from "@/lib/foundry-portal-presets";
 import { DEFAULT_LEARNER_PROGRESS_CHECKLIST } from "@/lib/foundry-learner-checklist";
+import type { PortalExtraAnswerSlot } from "@/lib/foundry-portal-extras";
+import { MAX_PORTAL_EXTRA_ANSWER_SLOTS } from "@/lib/foundry-portal-extras";
+import type { FoundryGradeResult } from "@/lib/foundry-grade";
 
 function publishChecklistTemplate(): string {
   return DEFAULT_LEARNER_PROGRESS_CHECKLIST.join("\n");
@@ -35,6 +38,7 @@ type Assessment = {
   assessmentIntro: string;
   graderInstructions: string;
   portalForm: PortalFormMerged;
+  extraAnswerSlots: PortalExtraAnswerSlot[];
   studentUrlHint: string;
   submissionsOpen: boolean;
   levelUpUrl: string;
@@ -46,13 +50,11 @@ type Submission = {
   submittedAt: string;
   fellowName: string;
   subgroup: string;
+  prompt: string;
+  output: string;
+  result: FoundryGradeResult;
   assessmentSlug?: string | null;
   assessmentTitle?: string | null;
-  result: {
-    total_score: number;
-    grade: string;
-    verdict: string;
-  };
 };
 
 type Stats = {
@@ -94,6 +96,305 @@ function facilitatorClassHubPath(slug: string) {
   return `/learn/${encodeURIComponent(slug)}`;
 }
 
+function freshExtraPortalSlot(): PortalExtraAnswerSlot {
+  const id =
+    typeof globalThis.crypto !== "undefined" && "randomUUID" in globalThis.crypto
+      ? `q${globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 10)}`
+      : `q${Date.now().toString(36)}`;
+  return { id, label: "", hint: "", placeholder: "", required: false };
+}
+
+function csvEscape(cell: unknown): string {
+  const s = cell == null ? "" : String(cell);
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function submissionRowToCsvLine(s: Submission): string {
+  const pq = s.result?.breakdown?.prompt_quality;
+  const arch = s.result?.breakdown?.architecture_viability;
+  return [
+    csvEscape(s.id),
+    csvEscape(s.submittedAt),
+    csvEscape(s.fellowName),
+    csvEscape(s.subgroup),
+    csvEscape(s.assessmentSlug ?? ""),
+    csvEscape(s.assessmentTitle ?? ""),
+    csvEscape(s.result.total_score),
+    csvEscape(s.result.grade),
+    csvEscape(s.result.verdict),
+    csvEscape(pq?.score ?? ""),
+    csvEscape(pq?.feedback ?? ""),
+    csvEscape(arch?.score ?? ""),
+    csvEscape(arch?.feedback ?? ""),
+    csvEscape(s.result.level_up_tip ?? ""),
+    csvEscape(s.prompt ?? ""),
+    csvEscape(s.output ?? ""),
+  ].join(",");
+}
+
+function triggerFilteredSubmissionsCsvDownload(rows: Submission[], label: string) {
+  if (!rows.length || typeof window === "undefined") return;
+  const header = [
+    "id",
+    "submitted_at_iso",
+    "learner_name",
+    "subgroup",
+    "assessment_slug",
+    "assessment_title",
+    "total_score",
+    "grade_band",
+    "verdict",
+    "prompt_quality_score",
+    "prompt_quality_feedback",
+    "architecture_score",
+    "architecture_feedback",
+    "level_up_tip",
+    "stored_prompt_blob",
+    "architecture_output",
+  ];
+  const bom = "\uFEFF";
+  const body =
+    `${bom}${header.join(",")}\r\n` + rows.map((r) => submissionRowToCsvLine(r)).join("\r\n");
+  const blob = new Blob([body], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `facilitator-submissions-${label}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function SubmitPortalEditor(props: {
+  portal: PortalFormMerged;
+  onChangePortal: (next: PortalFormMerged) => void;
+  extraSlots: PortalExtraAnswerSlot[];
+  onChangeExtraSlots: (next: PortalExtraAnswerSlot[]) => void;
+}) {
+  const { portal, onChangePortal, extraSlots, onChangeExtraSlots } = props;
+  return (
+    <div className="space-y-4 rounded-xl border border-orange-400/35 bg-orange-950/18 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-orange-300/95">
+          Submit portal (learner-facing form)
+        </p>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <select
+            aria-label="Apply portal wording template"
+            className="max-w-[14rem] rounded border border-white/20 bg-[#07080d] px-2 py-1 text-[10px] text-slate-200"
+            defaultValue=""
+            onChange={(e) => {
+              const id = e.target.value;
+              if (!id) return;
+              onChangePortal(portalFormFromTemplate(id));
+              e.currentTarget.selectedIndex = 0;
+            }}
+          >
+            <option value="" disabled>
+              Template…
+            </option>
+            {PORTAL_TEMPLATE_OPTIONS.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="rounded border border-white/20 px-2 py-1 text-[10px] text-slate-300 hover:bg-white/[0.04]"
+            onClick={() => onChangePortal(structuredClone(DEFAULT_PORTAL_FORM))}
+          >
+            Restore built-in wording
+          </button>
+        </div>
+      </div>
+      <p className="text-[11px] leading-snug text-slate-400">
+        Edit labels, help text under each title, placeholders, and the short error hints that appear if a field
+        is empty. Fellows see this in the grading portal before submit.
+      </p>
+      {STEPS_KEYS.map((step) => (
+        <div key={step} className="space-y-2 rounded-lg border border-white/12 bg-black/35 p-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange-400/95">
+            {FACILITATOR_PORTAL_GROUP_TITLE[step]}
+          </p>
+          <label className="block text-[11px] text-slate-500">
+            Label (top line)
+            <input
+              type="text"
+              value={portal[step].label}
+              onChange={(e) =>
+                onChangePortal({
+                  ...portal,
+                  [step]: {
+                    ...portal[step],
+                    label: e.target.value,
+                  },
+                })
+              }
+              className="mt-1 w-full rounded border border-white/15 bg-[#07080d] px-2 py-1 font-sans text-xs text-white"
+            />
+          </label>
+          <label className="block text-[11px] text-slate-500">
+            Help text (shown under title)
+            <textarea
+              value={portal[step].hint}
+              onChange={(e) =>
+                onChangePortal({
+                  ...portal,
+                  [step]: {
+                    ...portal[step],
+                    hint: e.target.value,
+                  },
+                })
+              }
+              rows={3}
+              className="mt-1 w-full rounded border border-white/15 bg-[#07080d] px-2 py-2 font-sans text-xs leading-relaxed text-slate-200"
+            />
+          </label>
+          <label className="block text-[11px] text-slate-500">
+            Placeholder (gray sample — long fields only)
+            <textarea
+              value={portal[step].placeholder}
+              onChange={(e) =>
+                onChangePortal({
+                  ...portal,
+                  [step]: {
+                    ...portal[step],
+                    placeholder: e.target.value,
+                  },
+                })
+              }
+              rows={step === "name" ? 2 : 4}
+              className="mt-1 w-full rounded border border-white/15 bg-[#07080d] px-2 py-2 font-mono text-[11px] leading-relaxed text-slate-200"
+            />
+          </label>
+          <label className="block text-[11px] text-slate-500">
+            Error hint (one line if they skip this field)
+            <input
+              type="text"
+              value={portal[step].fieldError}
+              onChange={(e) =>
+                onChangePortal({
+                  ...portal,
+                  [step]: {
+                    ...portal[step],
+                    fieldError: e.target.value,
+                  },
+                })
+              }
+              className="mt-1 w-full rounded border border-white/15 bg-[#07080d] px-2 py-1 font-sans text-xs text-white"
+            />
+          </label>
+        </div>
+      ))}
+
+      <div className="space-y-3 rounded-lg border border-cyan-500/35 bg-black/35 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-cyan-200/95">
+            Extra questions (optional · beyond fields 03/04 · max {MAX_PORTAL_EXTRA_ANSWER_SLOTS})
+          </p>
+          <button
+            type="button"
+            disabled={extraSlots.length >= MAX_PORTAL_EXTRA_ANSWER_SLOTS}
+            onClick={() => onChangeExtraSlots([...extraSlots, freshExtraPortalSlot()])}
+            className="rounded border border-cyan-400/40 px-2 py-1 text-[10px] text-cyan-100 hover:bg-cyan-950/35 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Add row
+          </button>
+        </div>
+        {extraSlots.length ? (
+          <ul className="space-y-3">
+            {extraSlots.map((slot, idx) => (
+              <li
+                key={slot.id + String(idx)}
+                className="space-y-2 rounded border border-white/12 bg-[#07080d]/80 px-3 py-3"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-mono text-[10px] text-slate-500">Row {idx + 1}</p>
+                  <button
+                    type="button"
+                    className="text-[10px] text-rose-300 underline hover:text-rose-100"
+                    onClick={() =>
+                      onChangeExtraSlots(extraSlots.filter((_, j) => j !== idx))
+                    }
+                  >
+                    Remove
+                  </button>
+                </div>
+                <label className="flex items-start gap-2 text-[11px] text-slate-400">
+                  <input
+                    type="checkbox"
+                    checked={!!slot.required}
+                    onChange={(e) =>
+                      onChangeExtraSlots(
+                        extraSlots.map((s, j) =>
+                          j === idx ? { ...s, required: e.target.checked } : s,
+                        ),
+                      )
+                    }
+                    className="mt-0.5"
+                  />
+                  <span>Required for submit</span>
+                </label>
+                <label className="block text-[11px] text-slate-500">
+                  Question title (shown to learners)
+                  <input
+                    type="text"
+                    value={slot.label}
+                    onChange={(e) =>
+                      onChangeExtraSlots(
+                        extraSlots.map((s, j) =>
+                          j === idx ? { ...s, label: e.target.value } : s,
+                        ),
+                      )
+                    }
+                    className="mt-1 w-full rounded border border-white/15 bg-[#0c0e14] px-2 py-1 text-xs text-white"
+                  />
+                </label>
+                <label className="block text-[11px] text-slate-500">
+                  Help text
+                  <textarea
+                    value={slot.hint}
+                    onChange={(e) =>
+                      onChangeExtraSlots(
+                        extraSlots.map((s, j) =>
+                          j === idx ? { ...s, hint: e.target.value } : s,
+                        ),
+                      )
+                    }
+                    rows={2}
+                    className="mt-1 w-full rounded border border-white/15 bg-[#0c0e14] px-2 py-2 text-xs text-slate-200"
+                  />
+                </label>
+                <label className="block text-[11px] text-slate-500">
+                  Placeholder
+                  <textarea
+                    value={slot.placeholder}
+                    onChange={(e) =>
+                      onChangeExtraSlots(
+                        extraSlots.map((s, j) =>
+                          j === idx ? { ...s, placeholder: e.target.value } : s,
+                        ),
+                      )
+                    }
+                    rows={2}
+                    className="mt-1 w-full rounded border border-white/15 bg-[#0c0e14] px-2 py-2 font-mono text-[11px] text-slate-200"
+                  />
+                </label>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[11px] text-slate-500">
+            Need more long answers besides the usual two portals? Add rows — each saves as an extra textarea on
+            the learner deck until you remove them.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function FacilitatorDashboard() {
   const router = useRouter();
   const [tab, setTab] = useState<FacTab>("overview");
@@ -124,12 +425,17 @@ export default function FacilitatorDashboard() {
   const [newLevelUpUrl, setNewLevelUpUrl] = useState("");
   const [newStudentChecklistText, setNewStudentChecklistText] =
     useState(publishChecklistTemplate);
+  const [newPortalForm, setNewPortalForm] = useState<PortalFormMerged>(() =>
+    structuredClone(DEFAULT_PORTAL_FORM),
+  );
+  const [newExtraSlots, setNewExtraSlots] = useState<PortalExtraAnswerSlot[]>([]);
   /** Inline edit desk + rubric for an existing assessment */
   const [editingDesk, setEditingDesk] = useState<{
     id: string;
     intro: string;
     grader: string;
     portal: PortalFormMerged;
+    extraAnswerSlots: PortalExtraAnswerSlot[];
     levelUpUrl: string;
     studentChecklistText: string;
   } | null>(null);
@@ -183,6 +489,11 @@ export default function FacilitatorDashboard() {
         assessmentIntro: String(x.assessmentIntro ?? ""),
         graderInstructions: String(x.graderInstructions ?? ""),
         portalForm: mergePortalForm((x as { portalForm?: unknown }).portalForm),
+        extraAnswerSlots: structuredClone(
+          Array.isArray((x as { extraAnswerSlots?: unknown }).extraAnswerSlots)
+            ? ((x as { extraAnswerSlots: PortalExtraAnswerSlot[] }).extraAnswerSlots ?? [])
+            : [],
+        ),
         studentUrlHint: String(x.studentUrlHint ?? ""),
         submissionsOpen: x.submissionsOpen !== false,
         levelUpUrl: String((x as { levelUpUrl?: string }).levelUpUrl ?? ""),
@@ -264,6 +575,7 @@ export default function FacilitatorDashboard() {
             assessmentIntro: editingDesk.intro,
             graderInstructions: editingDesk.grader.trim(),
             portalForm: editingDesk.portal,
+            extraAnswerSlots: editingDesk.extraAnswerSlots,
             levelUpUrl: editingDesk.levelUpUrl,
             studentChecklist: editingDesk.studentChecklistText
               .split(/\r?\n/)
@@ -662,13 +974,28 @@ export default function FacilitatorDashboard() {
                     </label>
                   ) : null}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void load()}
-                  className="text-xs text-slate-400 underline hover:text-white"
-                >
-                  Refresh
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={!filteredSubs.length}
+                    onClick={() =>
+                      triggerFilteredSubmissionsCsvDownload(
+                        filteredSubs,
+                        subsFilterSlug || "all-courses",
+                      )
+                    }
+                    className="rounded-lg border border-emerald-400/40 px-3 py-1.5 text-[11px] font-semibold text-emerald-100 hover:bg-emerald-950/35 disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    Download CSV
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void load()}
+                    className="text-xs text-slate-400 underline hover:text-white"
+                  >
+                    Refresh
+                  </button>
+                </div>
               </div>
               {!subs.length ? (
                 <div className="rounded-xl border border-white/10 bg-[#111520] p-6 text-sm text-slate-400">
@@ -757,6 +1084,7 @@ export default function FacilitatorDashboard() {
                                         intro: a.assessmentIntro,
                                         grader: a.graderInstructions,
                                         portal: structuredClone(a.portalForm),
+                                        extraAnswerSlots: structuredClone(a.extraAnswerSlots),
                                         levelUpUrl: a.levelUpUrl,
                                         studentChecklistText: a.studentChecklist.join("\n"),
                                       },
@@ -866,169 +1194,18 @@ export default function FacilitatorDashboard() {
                                 placeholder="Use the facilitator’s hosted /learn/your-course link..."
                               />
                             </label>
-                            <div className="space-y-4 rounded-xl border border-orange-400/35 bg-orange-950/18 p-4">
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-orange-300/95">
-                                  Submit portal (learner-facing form)
-                                </p>
-                                <div className="flex flex-wrap items-center justify-end gap-2">
-                                  <select
-                                    aria-label="Apply portal wording template"
-                                    className="max-w-[14rem] rounded border border-white/20 bg-[#07080d] px-2 py-1 text-[10px] text-slate-200"
-                                    defaultValue=""
-                                    onChange={(e) => {
-                                      const id = e.target.value;
-                                      if (!id) return;
-                                      setEditingDesk((d) =>
-                                        d
-                                          ? {
-                                              ...d,
-                                              portal: portalFormFromTemplate(id),
-                                            }
-                                          : null,
-                                      );
-                                      e.currentTarget.selectedIndex = 0;
-                                    }}
-                                  >
-                                    <option value="" disabled>
-                                      Template…
-                                    </option>
-                                    {PORTAL_TEMPLATE_OPTIONS.map((o) => (
-                                      <option key={o.id} value={o.id}>
-                                        {o.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <button
-                                    type="button"
-                                    className="rounded border border-white/20 px-2 py-1 text-[10px] text-slate-300 hover:bg-white/[0.04]"
-                                    onClick={() =>
-                                      setEditingDesk((d) =>
-                                        d
-                                          ? {
-                                              ...d,
-                                              portal: structuredClone(DEFAULT_PORTAL_FORM),
-                                            }
-                                          : null,
-                                      )
-                                    }
-                                  >
-                                    Restore built-in wording
-                                  </button>
-                                </div>
-                              </div>
-                              <p className="text-[11px] leading-snug text-slate-400">
-                                Edit the numbered fields on your deck—the title next to each box,
-                                explanation under it, gray placeholder samples, and the short error hint if
-                                they leave something blank.
-                              </p>
-                              {STEPS_KEYS.map((step) => (
-                                <div
-                                  key={step}
-                                  className="space-y-2 rounded-lg border border-white/12 bg-black/35 p-3"
-                                >
-                                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange-400/95">
-                                    {FACILITATOR_PORTAL_GROUP_TITLE[step]}
-                                  </p>
-                                  <label className="block text-[11px] text-slate-500">
-                                    Label (top line)
-                                    <input
-                                      type="text"
-                                      value={editingDesk.portal[step].label}
-                                      onChange={(e) =>
-                                        setEditingDesk((d) =>
-                                          d
-                                            ? {
-                                                ...d,
-                                                portal: {
-                                                  ...d.portal,
-                                                  [step]: {
-                                                    ...d.portal[step],
-                                                    label: e.target.value,
-                                                  },
-                                                },
-                                              }
-                                            : null,
-                                        )
-                                      }
-                                      className="mt-1 w-full rounded border border-white/15 bg-[#07080d] px-2 py-1 font-sans text-xs text-white"
-                                    />
-                                  </label>
-                                  <label className="block text-[11px] text-slate-500">
-                                    Help text (shown under title)
-                                    <textarea
-                                      value={editingDesk.portal[step].hint}
-                                      onChange={(e) =>
-                                        setEditingDesk((d) =>
-                                          d
-                                            ? {
-                                                ...d,
-                                                portal: {
-                                                  ...d.portal,
-                                                  [step]: {
-                                                    ...d.portal[step],
-                                                    hint: e.target.value,
-                                                  },
-                                                },
-                                              }
-                                            : null,
-                                        )
-                                      }
-                                      rows={3}
-                                      className="mt-1 w-full rounded border border-white/15 bg-[#07080d] px-2 py-2 font-sans text-xs leading-relaxed text-slate-200"
-                                    />
-                                  </label>
-                                  <label className="block text-[11px] text-slate-500">
-                                    Placeholder (gray sample in empty box — long fields only)
-                                    <textarea
-                                      value={editingDesk.portal[step].placeholder}
-                                      onChange={(e) =>
-                                        setEditingDesk((d) =>
-                                          d
-                                            ? {
-                                                ...d,
-                                                portal: {
-                                                  ...d.portal,
-                                                  [step]: {
-                                                    ...d.portal[step],
-                                                    placeholder: e.target.value,
-                                                  },
-                                                },
-                                              }
-                                            : null,
-                                        )
-                                      }
-                                      rows={step === "name" ? 2 : 4}
-                                      className="mt-1 w-full rounded border border-white/15 bg-[#07080d] px-2 py-2 font-mono text-[11px] leading-relaxed text-slate-200"
-                                    />
-                                  </label>
-                                  <label className="block text-[11px] text-slate-500">
-                                    Error hint (one line shown if they skip this box)
-                                    <input
-                                      type="text"
-                                      value={editingDesk.portal[step].fieldError}
-                                      onChange={(e) =>
-                                        setEditingDesk((d) =>
-                                          d
-                                            ? {
-                                                ...d,
-                                                portal: {
-                                                  ...d.portal,
-                                                  [step]: {
-                                                    ...d.portal[step],
-                                                    fieldError: e.target.value,
-                                                  },
-                                                },
-                                              }
-                                            : null,
-                                        )
-                                      }
-                                      className="mt-1 w-full rounded border border-white/15 bg-[#07080d] px-2 py-1 font-sans text-xs text-white"
-                                    />
-                                  </label>
-                                </div>
-                              ))}
-                            </div>
+                            {editingDesk ? (
+                              <SubmitPortalEditor
+                                portal={editingDesk.portal}
+                                onChangePortal={(next) =>
+                                  setEditingDesk((d) => (d ? { ...d, portal: next } : null))
+                                }
+                                extraSlots={editingDesk.extraAnswerSlots}
+                                onChangeExtraSlots={(next) =>
+                                  setEditingDesk((d) => (d ? { ...d, extraAnswerSlots: next } : null))
+                                }
+                              />
+                            ) : null}
                             <div className="flex flex-wrap gap-2">
                               <button
                                 type="button"
@@ -1087,6 +1264,8 @@ export default function FacilitatorDashboard() {
                               .split(/\r?\n/)
                               .map((s) => s.trim())
                               .filter(Boolean),
+                            portalForm: newPortalForm,
+                            extraAnswerSlots: newExtraSlots,
                           }),
                         });
                         const data = (await res.json().catch(() => ({}))) as {
@@ -1102,6 +1281,8 @@ export default function FacilitatorDashboard() {
                         setGraderInstructions("");
                         setNewLevelUpUrl("");
                         setNewStudentChecklistText(publishChecklistTemplate());
+                        setNewPortalForm(structuredClone(DEFAULT_PORTAL_FORM));
+                        setNewExtraSlots([]);
                         const row = data.assessment;
                         if (row?.slug && row.title) {
                           setNewCourseShare({ slug: row.slug, title: row.title });
@@ -1225,6 +1406,12 @@ export default function FacilitatorDashboard() {
                       className="mt-1 w-full rounded-lg border border-white/15 bg-[#0c0e14] px-3 py-2 font-mono text-[13px]"
                     />
                   </label>
+                  <SubmitPortalEditor
+                    portal={newPortalForm}
+                    onChangePortal={setNewPortalForm}
+                    extraSlots={newExtraSlots}
+                    onChangeExtraSlots={setNewExtraSlots}
+                  />
                   <button
                     type="submit"
                     disabled={busy || graderInstructions.trim().length < 20}

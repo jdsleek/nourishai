@@ -102,6 +102,21 @@ npm run facilitator:demo-seed
 
 Then visit **`/training/facilitator/login`** while `FACILITATOR_SESSION_SECRET` is set (`npm run dev`).
 
+### One-command Railway bootstrap (your laptop — needs account token)
+
+1. Create **Account token** → [Railway → Account → Tokens](https://railway.app/account/tokens). Put **`RAILWAY_TOKEN`** + optional **`NOURISHAI_RAILWAY_PROJECT_ID`** in `food-app/.env.local` (never committed).
+2. Install CLI: `npm i -g @railway/cli` (or use Railway’s install instructions).
+3. From `food-app/`:
+
+```bash
+npm run railway:bootstrap-training
+```
+
+This pushes **`FACILITATOR_SESSION_SECRET`** onto the detected NourishAI **app** service, runs **`railway link -p … -s …`**, then **`railway run npm run facilitator:demo-seed`** (injects **`DATABASE_URL`** so the demo row hits Railway Postgres).
+
+- Flags: **`--vars-only`** (secret only); **`--print-secret`** (echoes a freshly generated cookie secret — risky in shared terminals).
+4. Trigger or wait for deploy, then log in with the **[Demo facilitator defaults](#demo-facilitator-seed-optional)**.
+
 ## Local preview (before pushing to GitHub)
 
 ```bash
@@ -130,7 +145,11 @@ Smoke: `npm run foundry:smoke` (DB + optional API) and `npm run foundry:smoke-pr
 | Public subgroup/min-length manifest | [`app/api/foundry/assessment-config/route.ts`](../app/api/foundry/assessment-config/route.ts) |
 | Learner deck `?assessment=` hook | [`public/day03-ai-builder.html`](../public/day03-ai-builder.html) |
 | Organizer facilitator bootstrap UI + API | [`app/foundry/admin/page.tsx`](../app/foundry/admin/page.tsx) · POST [`/api/foundry/admin/facilitators`](../app/api/foundry/admin/facilitators/route.ts) |
-| Demo facilitator seed CLI | [`scripts/demo-facilitator-seed.mjs`](../scripts/demo-facilitator-seed.mjs) · `npm run facilitator:demo-seed` |
+| Facilitator console | [`app/training/facilitator/page.tsx`](../app/training/facilitator/page.tsx) · login [`app/training/facilitator/login/page.tsx`](../app/training/facilitator/login/page.tsx) |
+| Demo DB seed (`DATABASE_URL`) | [`scripts/demo-facilitator-seed.mjs`](../scripts/demo-facilitator-seed.mjs) · `npm run facilitator:demo-seed` |
+| Railway one-shot facilitator bootstrap | [`scripts/railway-bootstrap-training.mjs`](../scripts/railway-bootstrap-training.mjs) · `npm run railway:bootstrap-training` (needs `RAILWAY_TOKEN`) |
+
+## Known limitations (MVP)
 
 - No facilitator password reset mail.
 - Assessments editable without draft/version pinning (risk if submissions already exist — operators should duplicate slug by creating a new slug if rubric materially changes).

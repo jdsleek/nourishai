@@ -20,6 +20,8 @@ All user data (profile, food logs, weight history) is stored in the **browser's 
 
 **Demo facilitator (Postgres required):** from `food-app/` run `npm run facilitator:demo-seed` — creates `nourishai-demo-facilitator@example.local` (password **`DemoCoach2026!`** unless `DEMO_FACILITATOR_PASSWORD` is set). Do **not** use defaults in production; rotate immediately on shared DBs.
 
+**Railway bootstrap (your laptop):** put **`RAILWAY_TOKEN`** (+ optional **`NOURISHAI_RAILWAY_PROJECT_ID`) in `food-app/.env.local`, install the [Railway CLI](https://docs.railway.com/cli/quick-start), then `npm run railway:bootstrap-training` — pushes **`FACILITATOR_SESSION_SECRET`**, links this folder, seeds the demo facilitator into Railway Postgres. See **`docs/TRAINING_MULTI_FACILITATOR_AND_DATA_SAFETY.md`**.
+
 ## Setup
 
 ### 1. Install dependencies

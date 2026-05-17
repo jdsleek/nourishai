@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "railway:set-groq": "node scripts/railway-set-groq.mjs",
+    "railway:bootstrap-training": "node scripts/railway-bootstrap-training.mjs",
     "foundry:import-jsonl": "node scripts/foundry-import-jsonl-to-pg.mjs",
     "foundry:smoke": "node scripts/foundry-smoke-test.mjs",
     "foundry:smoke-providers": "node scripts/foundry-grading-providers-smoke.mjs",

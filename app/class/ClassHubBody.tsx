@@ -72,6 +72,14 @@ export default function ClassHubBody({
       message?: string;
     };
     if (!res.ok) {
+      if (data.error === "DATABASE_UNAVAILABLE") {
+        setHubLoadFailed(
+          data.message ||
+            "Course links need the deployed site with Postgres. Plain local npm dev without DATABASE_URL cannot load ?course links.",
+        );
+        setHub(null);
+        return;
+      }
       if (data.error === "UNKNOWN_COURSE") {
         setHubLoadFailed(
           data.message ||

@@ -31,6 +31,16 @@ export async function GET(req: NextRequest) {
   const slugRequested = req.nextUrl.searchParams.get("slug")?.trim();
 
   if (!pool) {
+    if (slugRequested) {
+      return Response.json(
+        {
+          error: "DATABASE_UNAVAILABLE",
+          message:
+            "Course lookup requires the live database. Open this link on the deployed site.",
+        },
+        { status: 503 },
+      );
+    }
     return Response.json(baseFallback);
   }
 

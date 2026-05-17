@@ -154,6 +154,26 @@ Encrypt the file at rest off-site.
 
 Smoke: `npm run foundry:smoke` (DB + optional API) and `npm run foundry:smoke-providers` (one tiny hit per LLM key).
 
+### Automated HTTP E2E for training routes (read-only)
+
+From `food-app/` after `npm install`:
+
+```bash
+npm run e2e:verify:full
+```
+
+This script starts `next dev` on an **ephemeral localhost port** and runs `scripts/e2e-verify-training-platform.mjs` against **GET** routes (deck, class hub, facilitator login, `assessment-config`, `class-hub`, and safe `POST /api/foundry/grade` rejection). It does **not** create facilitators or submissions—**nothing to delete** after a green run.
+
+Options:
+
+- **Stricter check** (needs `DATABASE_URL` in env so the server can hit Postgres): asserts `UNKNOWN_COURSE` for a fake slug on `/api/foundry/class-hub?slug=…`.
+- **Against a live URL** after deploy:  
+  `E2E_BASE_URL=https://your.host npm run e2e:verify`
+- **Production runner** (requires a working local `next build`):  
+  `E2E_NEXT_MODE=production npm run e2e:verify:full`
+
+End-to-end grading (LLM) and cookie-based facilitator sessions still need manual or separate integration tests on staging with real keys.
+
 ## Code shipped in this repo (MVP wiring)
 
 | Area | Location |

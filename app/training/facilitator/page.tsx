@@ -7,6 +7,12 @@ import {
   DashboardStatGrid,
 } from "@/components/foundry/DashboardStatGrid";
 import { learnerDeckPath } from "@/lib/foundry-learner-course";
+import type { PortalFormMerged, PortalFormStepKey } from "@/lib/foundry-portal-form";
+import {
+  DEFAULT_PORTAL_FORM,
+  mergePortalForm,
+  STEPS_KEYS,
+} from "@/lib/foundry-portal-form";
 
 type FacTab = "overview" | "share" | "submissions" | "assessments";
 
@@ -19,6 +25,7 @@ type Assessment = {
   minOutputChars: number;
   assessmentIntro: string;
   graderInstructions: string;
+  portalForm: PortalFormMerged;
   studentUrlHint: string;
   submissionsOpen: boolean;
 };
@@ -41,6 +48,13 @@ type Stats = {
   submissionCount: number;
   assessmentCount: number;
   orphanLegacyCount: number;
+};
+
+const FACILITATOR_PORTAL_GROUP_TITLE: Record<PortalFormStepKey, string> = {
+  name: "Field 01 — Fellow / learner name",
+  subgroup: "Field 02 — Subgroup dropdown",
+  prompt: "Field 03 — First long answer (e.g. prompt they pasted)",
+  output: "Field 04 — Second long answer (e.g. model reply)",
 };
 
 const TAB_LABELS: { id: FacTab; label: string }[] = [
@@ -91,6 +105,7 @@ export default function FacilitatorDashboard() {
     id: string;
     intro: string;
     grader: string;
+    portal: PortalFormMerged;
   } | null>(null);
   const [deskSaveBusy, setDeskSaveBusy] = useState(false);
 
@@ -141,6 +156,7 @@ export default function FacilitatorDashboard() {
         minOutputChars: Number(x.minOutputChars ?? 80),
         assessmentIntro: String(x.assessmentIntro ?? ""),
         graderInstructions: String(x.graderInstructions ?? ""),
+        portalForm: mergePortalForm((x as { portalForm?: unknown }).portalForm),
         studentUrlHint: String(x.studentUrlHint ?? ""),
         submissionsOpen: x.submissionsOpen !== false,
       })),
@@ -217,6 +233,7 @@ export default function FacilitatorDashboard() {
           body: JSON.stringify({
             assessmentIntro: editingDesk.intro,
             graderInstructions: editingDesk.grader.trim(),
+            portalForm: editingDesk.portal,
           }),
         },
       );
@@ -704,6 +721,7 @@ export default function FacilitatorDashboard() {
                                         id: a.id,
                                         intro: a.assessmentIntro,
                                         grader: a.graderInstructions,
+                                        portal: structuredClone(a.portalForm),
                                       },
                                 )
                               }
@@ -774,6 +792,140 @@ export default function FacilitatorDashboard() {
                                 className="mt-1 w-full rounded-lg border border-white/15 bg-[#07080d] px-3 py-2 font-mono text-[12px] text-slate-100"
                               />
                             </label>
+                            <div className="space-y-4 rounded-xl border border-orange-400/35 bg-orange-950/18 p-4">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-orange-300/95">
+                                  Submit portal (learner-facing form)
+                                </p>
+                                <button
+                                  type="button"
+                                  className="rounded border border-white/20 px-2 py-1 text-[10px] text-slate-300 hover:bg-white/[0.04]"
+                                  onClick={() =>
+                                    setEditingDesk((d) =>
+                                      d
+                                        ? {
+                                            ...d,
+                                            portal: structuredClone(DEFAULT_PORTAL_FORM),
+                                          }
+                                        : null,
+                                    )
+                                  }
+                                >
+                                  Restore built-in wording
+                                </button>
+                              </div>
+                              <p className="text-[11px] leading-snug text-slate-400">
+                                Edit the numbered fields on your deck—the title next to each box,
+                                explanation under it, gray placeholder samples, and the short error hint if
+                                they leave something blank.
+                              </p>
+                              {STEPS_KEYS.map((step) => (
+                                <div
+                                  key={step}
+                                  className="space-y-2 rounded-lg border border-white/12 bg-black/35 p-3"
+                                >
+                                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange-400/95">
+                                    {FACILITATOR_PORTAL_GROUP_TITLE[step]}
+                                  </p>
+                                  <label className="block text-[11px] text-slate-500">
+                                    Label (top line)
+                                    <input
+                                      type="text"
+                                      value={editingDesk.portal[step].label}
+                                      onChange={(e) =>
+                                        setEditingDesk((d) =>
+                                          d
+                                            ? {
+                                                ...d,
+                                                portal: {
+                                                  ...d.portal,
+                                                  [step]: {
+                                                    ...d.portal[step],
+                                                    label: e.target.value,
+                                                  },
+                                                },
+                                              }
+                                            : null,
+                                        )
+                                      }
+                                      className="mt-1 w-full rounded border border-white/15 bg-[#07080d] px-2 py-1 font-sans text-xs text-white"
+                                    />
+                                  </label>
+                                  <label className="block text-[11px] text-slate-500">
+                                    Help text (shown under title)
+                                    <textarea
+                                      value={editingDesk.portal[step].hint}
+                                      onChange={(e) =>
+                                        setEditingDesk((d) =>
+                                          d
+                                            ? {
+                                                ...d,
+                                                portal: {
+                                                  ...d.portal,
+                                                  [step]: {
+                                                    ...d.portal[step],
+                                                    hint: e.target.value,
+                                                  },
+                                                },
+                                              }
+                                            : null,
+                                        )
+                                      }
+                                      rows={3}
+                                      className="mt-1 w-full rounded border border-white/15 bg-[#07080d] px-2 py-2 font-sans text-xs leading-relaxed text-slate-200"
+                                    />
+                                  </label>
+                                  <label className="block text-[11px] text-slate-500">
+                                    Placeholder (gray sample in empty box — long fields only)
+                                    <textarea
+                                      value={editingDesk.portal[step].placeholder}
+                                      onChange={(e) =>
+                                        setEditingDesk((d) =>
+                                          d
+                                            ? {
+                                                ...d,
+                                                portal: {
+                                                  ...d.portal,
+                                                  [step]: {
+                                                    ...d.portal[step],
+                                                    placeholder: e.target.value,
+                                                  },
+                                                },
+                                              }
+                                            : null,
+                                        )
+                                      }
+                                      rows={step === "name" ? 2 : 4}
+                                      className="mt-1 w-full rounded border border-white/15 bg-[#07080d] px-2 py-2 font-mono text-[11px] leading-relaxed text-slate-200"
+                                    />
+                                  </label>
+                                  <label className="block text-[11px] text-slate-500">
+                                    Error hint (one line shown if they skip this box)
+                                    <input
+                                      type="text"
+                                      value={editingDesk.portal[step].fieldError}
+                                      onChange={(e) =>
+                                        setEditingDesk((d) =>
+                                          d
+                                            ? {
+                                                ...d,
+                                                portal: {
+                                                  ...d.portal,
+                                                  [step]: {
+                                                    ...d.portal[step],
+                                                    fieldError: e.target.value,
+                                                  },
+                                                },
+                                              }
+                                            : null,
+                                        )
+                                      }
+                                      className="mt-1 w-full rounded border border-white/15 bg-[#07080d] px-2 py-1 font-sans text-xs text-white"
+                                    />
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
                             <div className="flex flex-wrap gap-2">
                               <button
                                 type="button"
@@ -783,7 +935,7 @@ export default function FacilitatorDashboard() {
                                 onClick={() => void saveDeskAndRubric()}
                                 className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-[#08120c] disabled:opacity-50"
                               >
-                                {deskSaveBusy ? "Saving…" : "Save desk + rubric"}
+                                {deskSaveBusy ? "Saving…" : "Save desk, rubric & submit portal"}
                               </button>
                               <button
                                 type="button"

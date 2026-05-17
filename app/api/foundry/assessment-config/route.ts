@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { mergePortalForm } from "@/lib/foundry-portal-form";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import { pgAssessmentBySlug, pgFacilitatorById } from "@/lib/training-pg";
 import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
@@ -20,6 +21,7 @@ export async function GET(req: NextRequest) {
         minOutputChars: 80,
         submissionsOpen: true,
         siteDefault: false,
+        portalForm: mergePortalForm({}),
       },
       { status: 200 },
     );
@@ -57,5 +59,6 @@ export async function GET(req: NextRequest) {
     minPromptChars: Math.max(0, a.min_prompt_chars),
     minOutputChars: Math.max(0, a.min_output_chars),
     submissionsOpen: a.submissions_open,
+    portalForm: mergePortalForm(a.portal_form_copy),
   });
 }

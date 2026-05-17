@@ -17,6 +17,8 @@ export type TrainingAssessmentRow = {
   min_output_chars: number;
   grader_instructions: string;
   assessment_intro: string;
+  /** Facilitator overrides for learner submit-portal labels/hints (merged client-side). */
+  portal_form_copy: Record<string, unknown>;
   /** False → learners cannot POST new grades for this slug (admin-managed). */
   submissions_open: boolean;
   /** When true, bare site URL (/) grades attach here without ?assessment=. */
@@ -30,6 +32,7 @@ const ASSESSMENT_SELECT = `
   min_prompt_chars, min_output_chars, assessment_intro,
   grader_instructions, submissions_open,
   COALESCE(is_site_default, false) AS is_site_default,
+  COALESCE(portal_form_copy, '{}'::jsonb) AS portal_form_copy,
   created_at, updated_at`;
 
 export type AssessmentLockSummary = {
@@ -103,6 +106,11 @@ export async function ensureTrainingSchema(pool: Pool): Promise<void> {
         `ALTER TABLE foundry_submissions ADD COLUMN assessment_id UUID REFERENCES training_assessments(id) ON DELETE SET NULL`,
       );
 
+      await execIgnoreDuplicateColumn(
+        pool,
+        `ALTER TABLE training_assessments ADD COLUMN portal_form_copy JSONB NOT NULL DEFAULT '{}'::jsonb`,
+      );
+
       await pool.query(`
         CREATE INDEX IF NOT EXISTS idx_foundry_submissions_assessment_id
           ON foundry_submissions (assessment_id);
@@ -121,6 +129,22 @@ function readSubmissionsOpen(row: Record<string, unknown>): boolean {
   return true;
 }
 
+function readPortalFormCopy(row: Record<string, unknown>): Record<string, unknown> {
+  const v = row.portal_form_copy as unknown;
+  if (typeof v === "object" && v !== null && !Array.isArray(v))
+    return v as Record<string, unknown>;
+  if (typeof v === "string" && v.trim().length > 0) {
+    try {
+      const p = JSON.parse(v) as unknown;
+      if (typeof p === "object" && p !== null && !Array.isArray(p))
+        return p as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
 function rowAssessment(row: Record<string, unknown>): TrainingAssessmentRow {
   const sg = row.subgroup_options as unknown;
   const subgroup_options = Array.isArray(sg)
@@ -136,6 +160,7 @@ function rowAssessment(row: Record<string, unknown>): TrainingAssessmentRow {
     min_output_chars: Number(row.min_output_chars ?? 80),
     grader_instructions: String(row.grader_instructions ?? ""),
     assessment_intro: String(row.assessment_intro ?? ""),
+    portal_form_copy: readPortalFormCopy(row),
     submissions_open: readSubmissionsOpen(row),
     is_site_default: row.is_site_default === true,
     created_at: row.created_at ? new Date(row.created_at as string).toISOString() : "",
@@ -307,6 +332,7 @@ export async function pgUpdateAssessment(
     assessment_intro: string;
     grader_instructions: string;
     submissions_open: boolean;
+    portal_form_copy: Record<string, unknown>;
   }>
 ): Promise<TrainingAssessmentRow | null> {
   const prev = await pool.query(
@@ -336,6 +362,8 @@ export async function pgUpdateAssessment(
   if (patch.grader_instructions != null) add("grader_instructions", patch.grader_instructions);
   if (patch.submissions_open !== undefined)
     add("submissions_open", patch.submissions_open);
+  if (patch.portal_form_copy !== undefined)
+    add("portal_form_copy", patch.portal_form_copy);
 
   if (!fields.length) {
     const cur = await pool.query(

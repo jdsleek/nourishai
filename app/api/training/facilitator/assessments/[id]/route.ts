@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { learnerDeckPath } from "@/lib/foundry-learner-course";
+import { mergePortalForm } from "@/lib/foundry-portal-form";
 import {
   facilitatorAuthFailureResponse,
   resolveFacilitatorRequest,
@@ -18,6 +19,8 @@ type PatchBody = {
   assessmentIntro?: string;
   graderInstructions?: string;
   submissionsOpen?: boolean;
+  /** Fully merged learner portal wording (validated + merged onto defaults server-side). */
+  portalForm?: unknown;
 };
 
 async function auth(): Promise<
@@ -48,6 +51,7 @@ export async function PATCH(
     assessment_intro?: string;
     grader_instructions?: string;
     submissions_open?: boolean;
+    portal_form_copy?: Record<string, unknown>;
   } = {};
   if (body.title !== undefined) patch.title = body.title;
   if (body.slug !== undefined)
@@ -67,6 +71,11 @@ export async function PATCH(
     patch.grader_instructions = body.graderInstructions.trim();
   if (body.submissionsOpen !== undefined)
     patch.submissions_open = Boolean(body.submissionsOpen);
+  if (body.portalForm !== undefined)
+    patch.portal_form_copy = mergePortalForm(body.portalForm) as unknown as Record<
+      string,
+      unknown
+    >;
 
   try {
     const next = await pgUpdateAssessment(ctx.pool, ctx.facilitatorId, id, patch);

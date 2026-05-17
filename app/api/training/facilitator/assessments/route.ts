@@ -1,4 +1,5 @@
 import { learnerDeckPath } from "@/lib/foundry-learner-course";
+import { mergePortalForm } from "@/lib/foundry-portal-form";
 import {
   facilitatorAuthFailureResponse,
   resolveFacilitatorRequest,
@@ -38,6 +39,7 @@ export async function GET() {
       submissionsOpen: a.submissions_open,
       assessmentIntro: a.assessment_intro ?? "",
       graderInstructions: a.grader_instructions ?? "",
+      portalForm: mergePortalForm(a.portal_form_copy),
       studentUrlHint: learnerDeckPath(a.slug),
       classHubPath: `/learn/${encodeURIComponent(a.slug)}`,
     })),

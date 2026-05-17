@@ -423,7 +423,7 @@ code{font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:3
   display:block;font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,11px);letter-spacing:0.16em;
   color:var(--orange);text-transform:uppercase;margin-bottom:10px;
 }
-.fhint{font-size:clamp(13px,2.2vmin,15px);color:var(--muted);margin-bottom:10px;line-height:1.6;}
+.fhint{font-size:clamp(13px,2.2vmin,15px);color:var(--muted);margin-bottom:10px;line-height:1.6;white-space:pre-wrap;}
 .field-err{font-size:clamp(13px,2.2vmin,14px);color:var(--red);margin-top:8px;display:none;}
 .field-err.on{display:block;}
 input[type="text"].fi,textarea.fi{
@@ -832,15 +832,15 @@ body.cohort-assessment-deck .slide[data-slide="0"] .hero{font-size:clamp(2rem,6v
 
     <!-- FORM -->
     <div class="fgroup">
-      <label class="flabel" for="sName">01 · Fellow / student name</label>
-      <p class="fhint"><strong>Fellow name</strong> · your <strong>full name</strong> as used on the roster.</p>
+      <label class="flabel" for="sName" id="portal-lbl-name">01 · Fellow / student name</label>
+      <p class="fhint" id="portal-hint-name">Fellow name · your full name as used on the roster.</p>
       <input type="text" id="sName" class="fi" placeholder="Your full name" autocomplete="name">
       <p class="field-err" id="err-name">Enter your fellow name and full name.</p>
     </div>
 
     <div class="fgroup">
-      <label class="flabel" for="subGroup">02 · Subgroup</label>
-      <p class="fhint">Pick the same subgroup you used on the <strong>product ideation</strong> form (cohort list).</p>
+      <label class="flabel" for="subGroup" id="portal-lbl-subgroup">02 · Subgroup</label>
+      <p class="fhint" id="portal-hint-subgroup">Pick the subgroup your facilitator assigned (often the same as on signup or ideation forms).</p>
       <select id="subGroup" class="fi" aria-required="true">
         <option value="">Loading subgroups…</option>
       </select>
@@ -848,15 +848,15 @@ body.cohort-assessment-deck .slide[data-slide="0"] .hero{font-size:clamp(2rem,6v
     </div>
 
     <div class="fgroup">
-      <label class="flabel" for="aPrompt">03 · Your architecture prompt</label>
-      <p class="fhint">Paste the <strong>exact</strong> prompt you sent. The grader looks for five labeled sections: Role, Task, Context, Constraints, Output Format (headings or bullet labels both count).</p>
+      <label class="flabel" for="aPrompt" id="portal-lbl-prompt">03 · Your architecture prompt</label>
+      <p class="fhint" id="portal-hint-prompt">Paste the exact prompt you sent. The Day 03 grader expects five labeled parts: Role, Task, Context, Constraints, Output Format (headings or bullet labels both count).</p>
       <textarea id="aPrompt" class="fi code" rows="9" placeholder="Role: You are a senior full-stack architect for early-stage products in Nigeria.&#10;&#10;Task: Design a complete system for...&#10;&#10;Context: I am building... for... (audience, region, constraints on users)...&#10;&#10;Constraints: Free-tier only, must integrate with..., no paid X unless...&#10;&#10;Output Format: Return sections: Frontend Stack, Backend API, Database Schema, Data Flow (with headings)."></textarea>
       <p class="field-err" id="err-prompt">Paste your full prompt.</p>
     </div>
 
     <div class="fgroup">
-      <label class="flabel" for="aOutput">04 · AI-generated architecture output</label>
-      <p class="fhint">Paste the model’s answer, at minimum the parts that cover <strong>Frontend</strong>, <strong>Backend/API</strong>, <strong>Database</strong>, and <strong>Data flow</strong>. Longer excerpts score more reliably than two vague sentences.</p>
+      <label class="flabel" for="aOutput" id="portal-lbl-output">04 · AI-generated architecture output</label>
+      <p class="fhint" id="portal-hint-output">Paste the model’s reply. Include Frontend, Backend/API, Database, and Data flow; longer excerpts usually score better than short vague blurbs.</p>
       <textarea id="aOutput" class="fi code" rows="11" placeholder="### Frontend Stack&#10;...&#10;&#10;### Backend API&#10;...&#10;&#10;### Database Schema&#10;...&#10;&#10;### Data Flow&#10;..."></textarea>
       <p class="field-err" id="err-output">Paste enough architecture output for all four areas.</p>
     </div>
@@ -1070,6 +1070,33 @@ function facilitatorPortalSuffix(cfg){
     return ' · Facilitator: '+local;
   }
   return '';
+}
+
+function applyPortalFormFromConfig(raw){
+  try{
+    if(!raw||typeof raw!=='object') return;
+    var rows=[
+      ['name','portal-lbl-name','portal-hint-name','sName','err-name'],
+      ['subgroup','portal-lbl-subgroup','portal-hint-subgroup','subGroup','err-sub'],
+      ['prompt','portal-lbl-prompt','portal-hint-prompt','aPrompt','err-prompt'],
+      ['output','portal-lbl-output','portal-hint-output','aOutput','err-output'],
+    ];
+    for(var i=0;i<rows.length;i++){
+      var key=rows[i][0];
+      var blob=raw[key];
+      if(!blob||typeof blob!=='object') continue;
+      var lbl=document.getElementById(rows[i][1]);
+      if(lbl&&blob.label!=null) lbl.textContent=String(blob.label);
+      var hint=document.getElementById(rows[i][2]);
+      if(hint&&blob.hint!=null) hint.textContent=String(blob.hint);
+      var fld=document.getElementById(rows[i][3]);
+      if(fld&&(fld.tagName==='TEXTAREA'||fld.tagName==='INPUT')&&blob.placeholder!=null){
+        fld.placeholder=String(blob.placeholder);
+      }
+      var er=document.getElementById(rows[i][4]);
+      if(er&&blob.fieldError!=null) er.textContent=String(blob.fieldError);
+    }
+  }catch(_){ /* ignore */ }
 }
 
 function syncFacilitatorDesk(){
@@ -1312,6 +1339,7 @@ async function ensureSubgroupsLoaded(force){
       applySubmissionLockUI();
       applyCohortDeckPresentation();
       applyDeckDocumentTitle();
+      applyPortalFormFromConfig(j.portalForm);
       sel.innerHTML='<option value="">—</option>';
       sel.dataset.slugKey=key;
       sel.dataset.ready='1';
@@ -1338,6 +1366,7 @@ async function ensureSubgroupsLoaded(force){
     applySubmissionLockUI();
     applyCohortDeckPresentation();
     applyDeckDocumentTitle();
+    applyPortalFormFromConfig(j.portalForm);
     const list=Array.isArray(j.subgroups)?j.subgroups:[];
     if(list.length){
       fill(list);

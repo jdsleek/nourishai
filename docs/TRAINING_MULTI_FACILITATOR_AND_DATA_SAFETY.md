@@ -86,6 +86,22 @@ Other clipping / admin envs: **`food-app/.env.example`**.
 5. Submissions tagged with `assessment_id`; organizer admin lists all incl. slug/title columns.
 6. **Close / reopen learner submits** — organizer **`/foundry/admin`** (“Assignment submission window”), or facilitator **`/training/facilitator`** on each assessment card **Close** / **Re-open** (`submissions_open` in Postgres).
 
+## Demo facilitator seed (optional)
+
+Creates or **resets password** for a known demo row (local / staging — **avoid on production**):
+
+```bash
+cd food-app
+# DATABASE_URL must point at Postgres (Railway Variables or food-app/.env.local)
+npm run facilitator:demo-seed
+```
+
+- Default email: `nourishai-demo-facilitator@example.local`
+- Default password when `DEMO_FACILITATOR_PASSWORD` unset: **`DemoCoach2026!`** (≥10 chars; override env for your own demo)
+- Optional: `DEMO_FACILITATOR_EMAIL`, `DEMO_FACILITATOR_DISPLAY`
+
+Then visit **`/training/facilitator/login`** while `FACILITATOR_SESSION_SECRET` is set (`npm run dev`).
+
 ## Local preview (before pushing to GitHub)
 
 ```bash
@@ -114,9 +130,7 @@ Smoke: `npm run foundry:smoke` (DB + optional API) and `npm run foundry:smoke-pr
 | Public subgroup/min-length manifest | [`app/api/foundry/assessment-config/route.ts`](../app/api/foundry/assessment-config/route.ts) |
 | Learner deck `?assessment=` hook | [`public/day03-ai-builder.html`](../public/day03-ai-builder.html) |
 | Organizer facilitator bootstrap UI + API | [`app/foundry/admin/page.tsx`](../app/foundry/admin/page.tsx) · POST [`/api/foundry/admin/facilitators`](../app/api/foundry/admin/facilitators/route.ts) |
-| Facilitator console | [`/training/facilitator`](../app/training/facilitator/page.tsx) · login [`/training/facilitator/login`](../app/training/facilitator/login/page.tsx) |
-
-## Known limitations (MVP)
+| Demo facilitator seed CLI | [`scripts/demo-facilitator-seed.mjs`](../scripts/demo-facilitator-seed.mjs) · `npm run facilitator:demo-seed` |
 
 - No facilitator password reset mail.
 - Assessments editable without draft/version pinning (risk if submissions already exist — operators should duplicate slug by creating a new slug if rubric materially changes).

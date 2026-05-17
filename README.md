@@ -18,6 +18,8 @@ All user data (profile, food logs, weight history) is stored in the **browser's 
 
 **Multi-facilitator assessments**: add **`FACILITATOR_SESSION_SECRET`** (long random) for facilitator session cookies. Organizers onboard trainers from `/foundry/admin` (includes **per-assignment submit lock** for facilitator assessments), trainers sign in at `/training/facilitator/login` and manage assessments at `/training/facilitator`. Foundry grading chains **Groq → OpenRouter → NVIDIA** (configure optional keys in `.env.example`) to ride through rate limits. Read `food-app/docs/TRAINING_MULTI_FACILITATOR_AND_DATA_SAFETY.md` before deploy (`pg_dump`, additive migrations only).
 
+**Demo facilitator (Postgres required):** from `food-app/` run `npm run facilitator:demo-seed` — creates `nourishai-demo-facilitator@example.local` (password **`DemoCoach2026!`** unless `DEMO_FACILITATOR_PASSWORD` is set). Do **not** use defaults in production; rotate immediately on shared DBs.
+
 ## Setup
 
 ### 1. Install dependencies

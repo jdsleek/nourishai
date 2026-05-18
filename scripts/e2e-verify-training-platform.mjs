@@ -102,7 +102,7 @@ async function main() {
     assert(r.ok, `status ${r.status}`);
     const t = await r.text();
     assert(
-      /Training home|training home|\/foundry\/day03|Facilitator sign-in/i.test(t),
+      /Qubators AI Foundry|THE FOUNDRY|\/foundry\/day03|Facilitator/i.test(t),
       "missing landing markers or deck link",
     );
   });

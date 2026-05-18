@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Qubators · NourishAI",
+  title: "Qubators AI Foundry",
   description:
-    "Class slides, workbook, and AI-powered nutrition tools — for educational use only.",
+    "Class slides, cohort hubs, and facilitator tools for Qubators AI Builder training.",
 };
 
 export default function RootLayout({

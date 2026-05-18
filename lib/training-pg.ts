@@ -460,29 +460,6 @@ export async function pgUpdateAssessment(
   return rowAssessment(rows[0] as Record<string, unknown>);
 }
 
-/** Attach orphan legacy rows to this facilitator's oldest-published assessment (stable main-course inbox). */
-export async function pgFacilitatorClaimLegacySubmissions(
-  pool: Pool,
-  facilitatorId: string,
-): Promise<{ moved: number; assessmentId: string | null }> {
-  const pick = await pool.query(
-    `SELECT id FROM training_assessments
-     WHERE facilitator_id = $1::uuid
-     ORDER BY created_at ASC
-     LIMIT 1`,
-    [facilitatorId.trim()],
-  );
-  if (!pick.rows.length) {
-    return { moved: 0, assessmentId: null };
-  }
-  const aid = String((pick.rows[0] as { id: string }).id);
-  const r = await pool.query(
-    `UPDATE foundry_submissions SET assessment_id = $1::uuid WHERE assessment_id IS NULL`,
-    [aid],
-  );
-  return { moved: r.rowCount ?? 0, assessmentId: aid };
-}
-
 export async function pgAdminListAssessmentLockSummaries(
   pool: Pool
 ): Promise<AssessmentLockSummary[]> {

@@ -8,8 +8,7 @@ const nextConfig = {
   async rewrites() {
     return {
       beforeFiles: [
-        /** Site index: Day 03 deck (URL stays `/`) */
-        { source: "/", destination: "/foundry/day03" },
+        /** Legacy filenames still map to deck; `/` serves `app/page.tsx` (training gateway). */
         { source: "/day03-ai-builder.html", destination: "/foundry/day03" },
       ],
     };

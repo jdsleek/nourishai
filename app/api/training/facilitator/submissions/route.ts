@@ -3,7 +3,7 @@ import {
   facilitatorAuthFailureResponse,
   resolveFacilitatorRequest,
 } from "@/lib/training-facilitator-auth";
-import { pgCountSubmissionsLegacyNoAssessment, pgListAssessmentsForFacilitator } from "@/lib/training-pg";
+import { pgListAssessmentsForFacilitator } from "@/lib/training-pg";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +15,6 @@ export async function GET() {
   const { pool, facilitatorId } = auth.ctx;
   const mine = await pgListAssessmentsForFacilitator(pool, facilitatorId);
   const allow = new Set(mine.map((a) => a.id));
-  const orphanLegacyCount = await pgCountSubmissionsLegacyNoAssessment(pool);
 
   const all = await readFoundrySubmissionsNewestFirst();
   const submissions = all.filter(
@@ -31,7 +30,6 @@ export async function GET() {
     stats: {
       submissionCount: submissions.length,
       assessmentCount: mine.length,
-      orphanLegacyCount,
     },
   });
 }

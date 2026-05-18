@@ -95,15 +95,15 @@ async function main() {
   await new Promise((r) => setTimeout(r, 500));
   console.log("ok");
 
-  await check("GET / (rewritten deck HTML)", async () => {
+  await check("GET / (training home landing)", async () => {
     const r = await fetchWithTimeout(`${BASE}/`, {
       headers: { Accept: "text/html" },
     });
     assert(r.ok, `status ${r.status}`);
     const t = await r.text();
     assert(
-      /FOUNDRY|Foundry|SUBMIT TO THE FOUNDRY|portal/i.test(t),
-      "missing deck markers",
+      /Training home|training home|\/foundry\/day03|Facilitator sign-in/i.test(t),
+      "missing landing markers or deck link",
     );
   });
 

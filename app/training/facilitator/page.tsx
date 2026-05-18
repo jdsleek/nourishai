@@ -60,7 +60,6 @@ type Submission = {
 type Stats = {
   submissionCount: number;
   assessmentCount: number;
-  orphanLegacyCount: number;
 };
 
 const FACILITATOR_PORTAL_GROUP_TITLE: Record<PortalFormStepKey, string> = {
@@ -405,8 +404,6 @@ export default function FacilitatorDashboard() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [lockBusy, setLockBusy] = useState<string | null>(null);
-  const [claimBusy, setClaimBusy] = useState(false);
-  const [claimMsg, setClaimMsg] = useState<string | null>(null);
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const [newCourseShare, setNewCourseShare] = useState<{
     title: string;
@@ -457,7 +454,6 @@ export default function FacilitatorDashboard() {
       assessments.some((a) => a.slug === cur) ? cur : "",
     );
   }, [assessments]);
-  const canClaimLegacy = assessments.length > 0;
   const openAssessmentCount = useMemo(
     () => assessments.filter((a) => a.submissionsOpen).length,
     [assessments],
@@ -510,29 +506,6 @@ export default function FacilitatorDashboard() {
     const st = (sj as { stats?: Stats }).stats;
     if (st) setStats(st);
   }, [router]);
-
-  const claimLegacy = useCallback(async () => {
-    setClaimBusy(true);
-    setClaimMsg(null);
-    try {
-      const res = await fetch("/api/training/facilitator/submissions/claim-legacy", {
-        method: "POST",
-        credentials: "include",
-      });
-      const data = (await res.json()) as {
-        error?: string;
-        moved?: number;
-      };
-      if (!res.ok) throw new Error(data.error || "Claim failed.");
-      setClaimMsg(`Attached ${data.moved ?? 0} prior class submission(s) to your course inbox.`);
-      await load();
-      setTab("submissions");
-    } catch (e) {
-      setClaimMsg(e instanceof Error ? e.message : "Claim failed.");
-    } finally {
-      setClaimBusy(false);
-    }
-  }, [load]);
 
   const setAssessmentOpens = useCallback(
     async (id: string, open: boolean) => {
@@ -744,14 +717,10 @@ export default function FacilitatorDashboard() {
                   onClick={() => setTab("assessments")}
                 />
                 <DashboardStatCard
-                  label="Pending attach"
-                  value={stats?.orphanLegacyCount ?? 0}
-                  hint={
-                    (stats?.orphanLegacyCount ?? 0) > 0
-                      ? "Class deck grades not in your inbox yet"
-                      : "All class work linked"
-                  }
-                  tone={(stats?.orphanLegacyCount ?? 0) > 0 ? "amber" : "emerald"}
+                  label="Correct links"
+                  value="/learn/…"
+                  hint="Students need your hub or deck URL or grades may not show in your inbox"
+                  tone="slate"
                   onClick={() => setTab("share")}
                 />
                 <DashboardStatCard
@@ -788,15 +757,6 @@ export default function FacilitatorDashboard() {
                 >
                   View submissions
                 </button>
-                {(stats?.orphanLegacyCount ?? 0) > 0 && canClaimLegacy ? (
-                  <button
-                    type="button"
-                    onClick={() => setTab("share")}
-                    className="rounded-lg border border-amber-400/40 px-4 py-2 text-sm text-amber-100 hover:bg-amber-950/30"
-                  >
-                    Attach {stats!.orphanLegacyCount} pending
-                  </button>
-                ) : null}
               </div>
             </section>
           ) : null}
@@ -884,51 +844,18 @@ export default function FacilitatorDashboard() {
                 {copyMsg ? <p className="mt-2 text-xs text-cyan-200/80">{copyMsg}</p> : null}
               </div>
 
-              {(stats?.orphanLegacyCount ?? 0) > 0 ? (
-                <div className="rounded-2xl border border-amber-500/35 bg-amber-950/25 p-5">
-                  <h3 className="font-semibold text-amber-100">
-                    {stats!.orphanLegacyCount} submission(s) from class not in your inbox yet
-                  </h3>
-                  <p className="mt-2 text-sm text-slate-300">
-                    These were graded on the deck before they were linked to your facilitator course.
-                    One click attaches them to your{" "}
-                    <strong>oldest-published course</strong> inbox (usually your live cohort, not the
-                    last draft you touched).
-                  </p>
-                  {!canClaimLegacy ? (
-                    <div className="mt-4 space-y-3">
-                      <p className="text-sm text-amber-100/95">
-                        This account has <strong>no assessments yet</strong>, so there is
-                        nowhere to attach these rows. Create one under{" "}
-                        <strong>Assessments</strong>, or ask the organizer to assign an
-                        existing course (e.g. sprint-architecture) assigned to your email
-                        by your program organizer.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setTab("assessments")}
-                        className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-[#1a1005]"
-                      >
-                        Go to Assessments
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={claimBusy}
-                      onClick={() => void claimLegacy()}
-                      className="mt-4 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-[#1a1005] disabled:opacity-45"
-                    >
-                      {claimBusy
-                        ? "Working…"
-                        : "Attach orphaned class submissions"}
-                    </button>
-                  )}
-                  {claimMsg ? (
-                    <p className="mt-3 text-xs text-amber-100/90">{claimMsg}</p>
-                  ) : null}
-                </div>
-              ) : stats && stats.submissionCount > 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-[#111520]/90 p-5">
+                <h3 className="font-semibold text-slate-200">If submissions are missing here</h3>
+                <p className="mt-2 text-sm text-slate-400">
+                  Ask learners to use your <strong className="text-slate-300">class hub</strong> or{" "}
+                  <strong className="text-slate-300">deck link</strong> with your course slug — not
+                  the generic home page deck. Very old rows that were never tied to a course can only
+                  be linked by your <strong className="text-slate-300">program organizer</strong>{" "}
+                  (bulk &quot;attach&quot; from facilitator accounts is turned off so one coach
+                  cannot pull in everyone else&apos;s work by mistake).
+                </p>
+              </div>
+              {stats && stats.submissionCount > 0 ? (
                 <p className="text-sm text-slate-400">
                   {stats.submissionCount} submission(s) in your inbox. Open{" "}
                   <button

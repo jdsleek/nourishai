@@ -1,0 +1,31 @@
+# Copy to .github/workflows/ci.yml in the repo root and commit from the GitHub UI
+# or via git with a token that has the "workflow" scope (OAuth tokens often omit it).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Deck script syntax check
+        run: npm run foundry:validate-deck
+
+      - name: TypeScript
+        run: npx tsc --noEmit

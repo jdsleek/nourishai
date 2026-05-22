@@ -33,7 +33,7 @@ export async function GET(
 
   const deckFile =
     slug.startsWith("qaf-day04") || slug.includes("day04")
-      ? "day04-build-day.html"
+      ? "day04-frontend.html"
       : "day03-ai-builder.html";
   const filePath = path.join(process.cwd(), "public", deckFile);
   const html = await readFile(filePath, "utf8");

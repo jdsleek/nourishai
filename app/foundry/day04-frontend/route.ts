@@ -4,7 +4,7 @@ import path from "path";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Day 04 default entry → Julius frontend deck (Part 1). Use /foundry/day04-backend for Deacon. */
+/** Day 04 Part 1 — Frontend & UI/UX (Julius · 90 min). */
 export async function GET() {
   const filePath = path.join(process.cwd(), "public", "day04-frontend.html");
   const html = await readFile(filePath, "utf8");

@@ -76,6 +76,9 @@ function filterRecords(records) {
   });
 }
 
+/** Id of the row to highlight after a fresh save (scroll + flash). */
+let highlightRecordId = null;
+
 function renderList(records) {
   const root = document.getElementById("list-root");
   if (!root) return;
@@ -203,21 +206,93 @@ function validateForm() {
   const role = document.getElementById("input-role")?.value.trim();
   const group = document.getElementById("input-class")?.value.trim();
   const date = document.getElementById("input-date")?.value.trim();
+  const formBanner = document.getElementById("form-success");
   if (!name || !role || !group || !date) {
-    alert("Please fill name, role, class/department, and date.");
+    if (formBanner) {
+      formBanner.textContent = "Fill in all fields before saving.";
+      formBanner.classList.add("is-visible");
+      formBanner.style.background = "rgba(224,62,62,.15)";
+      formBanner.style.borderColor = "rgba(224,62,62,.5)";
+      formBanner.style.color = "#fecaca";
+    } else {
+      alert("Please fill name, role, class/department, and date.");
+    }
     return null;
   }
+  if (formBanner) {
+    formBanner.classList.remove("is-visible");
+    formBanner.style.background = "";
+    formBanner.style.borderColor = "";
+    formBanner.style.color = "";
+  }
   return { name, role, group, date };
+}
+
+let toastHideTimer = null;
+let btnResetTimer = null;
+
+function showSaveFeedback(name, recordId) {
+  const toast = document.getElementById("save-toast");
+  const toastText = document.getElementById("save-toast-text");
+  const formBanner = document.getElementById("form-success");
+  const btn = document.getElementById("btn-primary");
+  const btnLabel = document.getElementById("btn-primary-label");
+
+  const msg = `${name} marked present`;
+  if (toastText) toastText.textContent = msg;
+  if (formBanner) {
+    formBanner.textContent = `✓ Saved — ${name} is in today's log below.`;
+    formBanner.classList.add("is-visible");
+  }
+  if (toast) {
+    toast.classList.add("is-visible");
+    clearTimeout(toastHideTimer);
+    toastHideTimer = setTimeout(() => toast.classList.remove("is-visible"), 4200);
+  }
+  if (btn && btnLabel) {
+    btn.classList.add("is-saved");
+    btn.classList.remove("is-saving");
+    const prev = btnLabel.textContent;
+    btnLabel.textContent = "Saved ✓";
+    clearTimeout(btnResetTimer);
+    btnResetTimer = setTimeout(() => {
+      btn.classList.remove("is-saved");
+      btnLabel.textContent = prev || "Mark Present";
+    }, 2200);
+  }
+
+  highlightRecordId = recordId;
+  renderAll();
+
+  requestAnimationFrame(() => {
+    const row = document.querySelector(
+      `[data-record-id="${String(recordId).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"]`,
+    );
+    const logHeading = document.getElementById("log-heading");
+    const target = row || logHeading || document.getElementById("list-root");
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    setTimeout(() => {
+      highlightRecordId = null;
+    }, 1200);
+  });
 }
 
 function markPresent() {
   const v = validateForm();
   if (!v) return;
 
+  const btn = document.getElementById("btn-primary");
+  const btnLabel = document.getElementById("btn-primary-label");
+  if (btn) btn.classList.add("is-saving");
+  if (btnLabel) btnLabel.textContent = "Saving…";
+
   const records = loadData();
   const now = new Date();
+  const recordId = `rec_${now.getTime()}`;
   records.push({
-    id: `rec_${now.getTime()}`,
+    id: recordId,
     fullName: v.name,
     role: v.role,
     group: v.group,
@@ -227,8 +302,13 @@ function markPresent() {
   });
   saveData(records);
 
-  document.getElementById("input-name")?.focus();
-  renderAll();
+  const nameInput = document.getElementById("input-name");
+  if (nameInput) {
+    nameInput.value = "";
+    nameInput.focus();
+  }
+
+  showSaveFeedback(v.name, recordId);
 }
 
 function wireForm() {

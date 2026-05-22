@@ -59,6 +59,56 @@ Return this exact JSON structure with no extra text:
 }`;
 }
 
+/** Day 04 — MVP build day (frontend prompt + app.js), not architecture. */
+export function buildDay04RubricPrompt(
+  name: string,
+  subgroup: string,
+  prompt: string,
+  output: string,
+  extraLearnerAnswers?: string,
+): string {
+  const addon = extraLearnerAnswers?.trim()
+    ? `\n\nADDITIONAL LEARNER ANSWERS:\n${extraLearnerAnswers.trim()}\n`
+    : "";
+
+  return `You are the AI grading assistant for Qubators AI Foundry, Day 04 "From Idea to Working Product."
+
+Evaluate the student MVP submission below. Return ONLY valid JSON — no markdown fences, no preamble.
+
+FELLOW NAME: ${name}
+SUBGROUP: ${subgroup}
+
+FRONTEND BUILD PROMPT (field 03):
+${prompt}
+
+APP.JS / DATA LOGIC (field 04):
+${output}${addon}
+
+---
+RUBRIC (total 20 points — two categories only):
+
+1. PROMPT QUALITY (/10) — UI craft from their frontend prompt and described intent:
+   Clear Role, Task, Context, Constraints, Format (~2 pts each). Product idea visible; mobile-first; not generic template slop.
+
+2. ARCHITECTURE VIABILITY (/10) — rename mentally to BACKEND LOGIC in feedback:
+   Primary button saves data (localStorage or equivalent); list or panel updates; refresh persists; optional insights/stat from stored rows.
+   Cap at 4/10 if app.js is missing, too short to judge, or no persistence pattern.
+
+Grade thresholds: GO = 15–20 | REVIEW = 10–14 | REBUILD = 0–9
+
+Return this exact JSON structure:
+{
+  "total_score": <integer 0-20>,
+  "grade": "<GO or REVIEW or REBUILD>",
+  "breakdown": {
+    "prompt_quality": { "score": <integer 0-10>, "feedback": "<one sentence on UI/prompt>" },
+    "architecture_viability": { "score": <integer 0-10>, "feedback": "<one sentence on app.js/data logic>" }
+  },
+  "level_up_tip": "<one actionable tip>",
+  "verdict": "<2-3 sentences, address student by first name>"
+}`;
+}
+
 export type FacilitatorGradingBlock = {
   assessmentTitle: string;
   facilitatorInstructions: string;

@@ -5,10 +5,15 @@ import {
 } from "@/lib/foundry-grading-llm";
 import {
   buildAssessmentRubricPrompt,
+  buildDay04RubricPrompt,
   buildFoundryRubricPrompt,
   normalizeGraderResult,
   parseGraderJson,
 } from "@/lib/foundry-grade";
+import {
+  DAY04_EXTRA_SLOTS,
+  isDay04AssessmentSlug,
+} from "@/lib/foundry-day04-defaults";
 import { clipFoundryBodiesForGroq } from "@/lib/foundry-grade-clip";
 import { insertFoundryLlmUsageEvent } from "@/lib/foundry-llm-usage";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
@@ -106,20 +111,23 @@ export async function POST(req: NextRequest) {
 
     const pool = getFoundryPgPool();
     let facilitatorAssessment: TrainingAssessmentRow | null = null;
+    const isDay04Slug = slugRaw ? isDay04AssessmentSlug(slugRaw) : false;
 
     if (slugRaw) {
-      if (!pool) {
-        return Response.json(
-          {
-            error:
-              "This assessment is not available right now. Try again later or contact your facilitator.",
-          },
-          { status: 503 },
-        );
+      if (pool) {
+        await ensureFoundrySubmissionsSchema(pool);
+        facilitatorAssessment = await pgAssessmentBySlug(pool, slugRaw);
       }
-      await ensureFoundrySubmissionsSchema(pool);
-      facilitatorAssessment = await pgAssessmentBySlug(pool, slugRaw);
-      if (!facilitatorAssessment) {
+      if (!facilitatorAssessment && !isDay04Slug) {
+        if (!pool) {
+          return Response.json(
+            {
+              error:
+                "This assessment is not available right now. Try again later or contact your facilitator.",
+            },
+            { status: 503 },
+          );
+        }
         return Response.json({ error: "Unknown assessment." }, { status: 404 });
       }
     }
@@ -194,6 +202,54 @@ export async function POST(req: NextRequest) {
             ? a.assessment_intro
             : undefined,
         },
+        name,
+        subgroup,
+        clipped.promptForModel,
+        clipped.outputForModel,
+        extraMarkdown.trim()
+          ? extraMarkdown.slice(0, EXTRA_BLOCK_MAX_FOR_MODEL_CHARS)
+          : undefined,
+      );
+    } else if (isDay04Slug) {
+      if (!QAF_COHORT_SUBGROUPS.includes(subgroup)) {
+        return Response.json(
+          { error: "Select a valid subgroup from the list." },
+          { status: 400 },
+        );
+      }
+      const minP = 40;
+      const minO = 60;
+      if (prompt.length < minP) {
+        return Response.json(
+          { error: `Frontend prompt is too short (need at least ${minP} characters).` },
+          { status: 400 },
+        );
+      }
+      if (output.length < minO) {
+        return Response.json(
+          {
+            error: `app.js excerpt is too short — include save/load and button logic (need at least ${minO} characters).`,
+          },
+          { status: 400 },
+        );
+      }
+
+      const extraSlots = DAY04_EXTRA_SLOTS;
+      const extrasMap = coerceExtraAnswersMap(
+        body.extraAnswers,
+        new Set(extraSlots.map((s) => s.id)),
+      );
+      const extraErr = validateRequiredExtras(extraSlots, extrasMap);
+      if (extraErr) {
+        return Response.json({ error: extraErr }, { status: 400 });
+      }
+
+      const extraMarkdown = formatExtraAnswersForGrader(extraSlots, extrasMap);
+      if (extraMarkdown.trim()) {
+        promptForPersistence = `${prompt}\n\n--- Extra learner answers ---\n${extraMarkdown}`;
+      }
+
+      rubricPrompt = buildDay04RubricPrompt(
         name,
         subgroup,
         clipped.promptForModel,

@@ -1067,6 +1067,13 @@ const FALLBACK_QAF_SUBGROUPS = [
 ];
 
 const FOUNDRY_COURSE_SLUG_KEY = 'foundry.courseSlug.v1';
+const DAY04_DEFAULT_SLUG = 'qaf-day04-idea-to-product';
+
+function isDay04DeckPath(){
+  if(typeof location==='undefined') return false;
+  const p=(location.pathname||'').replace(/\/$/,'')||'';
+  return p==='/foundry/day04' || /^\/foundry\/day04-(frontend|backend)$/i.test(p);
+}
 
 function resolveAssessmentSlug(){
   if(typeof location==='undefined') return '';
@@ -1080,6 +1087,9 @@ function resolveAssessmentSlug(){
       try{ slug=decodeURIComponent(m[1]||''); }catch(__){ slug=m[1]||''; }
       slug=String(slug).trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
     }
+  }
+  if((!slug||slug.length<3) && isDay04DeckPath()){
+    slug=DAY04_DEFAULT_SLUG;
   }
   if(slug&&slug.length>=3){
     try{ sessionStorage.setItem(FOUNDRY_COURSE_SLUG_KEY, slug); }catch(_){}
@@ -1439,8 +1449,8 @@ function finishDeckPresentationNav(){
   syncDeckConfigBanner();
   var vis=visibleSlideIndices();
   if(vis.indexOf(cur)<0) cur=vis.length?vis[0]:0;
-  if(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK && deckStepSubmitRequested() && vis.indexOf(6)>=0){
-    cur=6;
+  if(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK && deckStepSubmitRequested() && vis.indexOf(SUBMIT_SLIDE_INDEX_BACKEND)>=0){
+    cur=SUBMIT_SLIDE_INDEX_BACKEND;
   }
   reconcileDeckSlideClasses();
   updateUI();
@@ -1679,12 +1689,59 @@ async function ensureSubgroupsLoaded(force){
   };
 
   try{
-    const q = ASSESSMENT_SLUG
-      ? ('?slug='+encodeURIComponent(ASSESSMENT_SLUG))
-      : '';
-    const r=await fetch('/api/foundry/assessment-config'+q);
-    const j=await r.json().catch(()=>({}));
-    if(ASSESSMENT_SLUG && !r.ok){
+    function assessmentConfigQuery(){
+      if(ASSESSMENT_SLUG){
+        var qs='?slug='+encodeURIComponent(ASSESSMENT_SLUG);
+        if(isDay04DeckPath()) qs+='&deck=day04';
+        return qs;
+      }
+      return isDay04DeckPath() ? '?deck=day04' : '';
+    }
+    function applyConfigJson(j, rOk){
+      CFG_SUBMISSIONS_OPEN = j.submissionsOpen !== false;
+      SITE_DEFAULT_MODE = !ASSESSMENT_SLUG && j.siteDefault === true;
+      if(j.deck==='day04' && j.slug && (!ASSESSMENT_SLUG || !rOk)){
+        ASSESSMENT_SLUG = String(j.slug).trim().toLowerCase();
+        try{
+          var params=new URLSearchParams(location.search);
+          params.set('assessment', ASSESSMENT_SLUG);
+          history.replaceState(null,'',location.pathname+'?'+params.toString());
+        }catch(_){}
+        syncDeckClassHubLink();
+      }
+      CFG_COHORT_CONFIG_OK = !!ASSESSMENT_SLUG || j.deck==='day04';
+      CFG_MIN_PROMPT = typeof j.minPromptChars==='number' ? Math.max(0,j.minPromptChars):40;
+      CFG_MIN_OUTPUT = typeof j.minOutputChars==='number' ? Math.max(0,j.minOutputChars):80;
+      CURRENT_ASSESSMENT_TITLE = typeof j.title==='string'? j.title:'';
+      CURRENT_ASSESSMENT_INTRO = typeof j.intro==='string' ? j.intro : '';
+      const banner=document.getElementById('portal-assessment-label');
+      if(banner){
+        const fac=facilitatorPortalSuffix(j);
+        if(ASSESSMENT_SLUG){
+          banner.textContent = 'Assessment · '+CURRENT_ASSESSMENT_TITLE+' ('+ASSESSMENT_SLUG+')'+fac;
+        }else if(SITE_DEFAULT_MODE){
+          banner.textContent = 'Class course · '+CURRENT_ASSESSMENT_TITLE+fac;
+        }else{
+          banner.textContent = 'Day 04 Build Day'+fac;
+        }
+      }
+      CFG_CONFIG_LOAD_DONE = true;
+      syncDeckConfigBanner();
+      applySubmissionLockUI();
+      applyDeckDocumentTitle();
+      applyPortalFormFromConfig(j.portalForm);
+      ingestAssessmentConfigPayload(j);
+      rebuildPortalExtraAnswerSlots(Array.isArray(j.extraAnswerSlots)?j.extraAnswerSlots:[]);
+      applyCohortDeckPresentation();
+    }
+
+    var r=await fetch('/api/foundry/assessment-config'+assessmentConfigQuery());
+    var j=await r.json().catch(()=>({}));
+    if(ASSESSMENT_SLUG && !r.ok && isDay04DeckPath()){
+      r=await fetch('/api/foundry/assessment-config?deck=day04&slug='+encodeURIComponent(ASSESSMENT_SLUG));
+      j=await r.json().catch(()=>({}));
+    }
+    if(ASSESSMENT_SLUG && !r.ok && !isDay04DeckPath()){
       CFG_COHORT_CONFIG_OK = false;
       CFG_SUBMISSIONS_OPEN = false;
       CFG_MIN_PROMPT = typeof j.minPromptChars==='number' ? Math.max(0,j.minPromptChars):40;
@@ -1710,32 +1767,7 @@ async function ensureSubgroupsLoaded(force){
       if(btnEarly) btnEarly.style.display=lastGradeForCurrentAssessment()?'':'none';
       return;
     }
-    CFG_SUBMISSIONS_OPEN = j.submissionsOpen !== false;
-    SITE_DEFAULT_MODE = !ASSESSMENT_SLUG && j.siteDefault === true;
-    CFG_COHORT_CONFIG_OK = !!ASSESSMENT_SLUG;
-    CFG_MIN_PROMPT = typeof j.minPromptChars==='number' ? Math.max(0,j.minPromptChars):40;
-    CFG_MIN_OUTPUT = typeof j.minOutputChars==='number' ? Math.max(0,j.minOutputChars):80;
-    CURRENT_ASSESSMENT_TITLE = typeof j.title==='string'? j.title:'';
-    CURRENT_ASSESSMENT_INTRO = typeof j.intro==='string' ? j.intro : '';
-    const banner=document.getElementById('portal-assessment-label');
-    if(banner){
-      const fac=facilitatorPortalSuffix(j);
-      if(ASSESSMENT_SLUG){
-        banner.textContent = 'Assessment · '+CURRENT_ASSESSMENT_TITLE+' ('+ASSESSMENT_SLUG+')'+fac;
-      }else if(SITE_DEFAULT_MODE){
-        banner.textContent = 'Class course · '+CURRENT_ASSESSMENT_TITLE+fac;
-      }else{
-        banner.textContent = 'Day 03 AI Builder'+fac;
-      }
-    }
-    CFG_CONFIG_LOAD_DONE = true;
-    syncDeckConfigBanner();
-    applySubmissionLockUI();
-    applyDeckDocumentTitle();
-    applyPortalFormFromConfig(j.portalForm);
-    ingestAssessmentConfigPayload(j);
-    rebuildPortalExtraAnswerSlots(Array.isArray(j.extraAnswerSlots)?j.extraAnswerSlots:[]);
-    applyCohortDeckPresentation();
+    applyConfigJson(j, r.ok);
     const list=Array.isArray(j.subgroups)?j.subgroups:[];
     if(list.length){
       fill(list);
@@ -1840,7 +1872,7 @@ async function grade(){
   if(!prompt||prompt.length<CFG_MIN_PROMPT){showErr('aPrompt','err-prompt');ok=false;}
   if(!output||output.length<CFG_MIN_OUTPUT){showErr('aOutput','err-output');ok=false;}
   var extrasPayload=null;
-  if(ASSESSMENT_SLUG && CFG_EXTRA_ANSWER_SLOTS.length){
+  if((ASSESSMENT_SLUG || isDay04DeckPath()) && CFG_EXTRA_ANSWER_SLOTS.length){
     extrasPayload={};
     for(var ei=0;ei<CFG_EXTRA_ANSWER_SLOTS.length;ei++){
       var slot=CFG_EXTRA_ANSWER_SLOTS[ei];
@@ -1867,6 +1899,9 @@ async function grade(){
     };
     if(ASSESSMENT_SLUG){
       body.assessmentSlug=ASSESSMENT_SLUG;
+      if(extrasPayload) body.extraAnswers=extrasPayload;
+    }else if(isDay04DeckPath()){
+      body.assessmentSlug=DAY04_DEFAULT_SLUG;
       if(extrasPayload) body.extraAnswers=extrasPayload;
     }
     const res=await fetch('/api/foundry/grade',{

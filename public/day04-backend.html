@@ -611,11 +611,7 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
 .facilitator-desk-panel[hidden]{display:none;}
 
 /* Cohort deck (/foundry/deck/slug): facilitator assignment is the deck — not stacked on full Day 03 curriculum. */
-body.cohort-assessment-deck .slide[data-slide="1"],
-body.cohort-assessment-deck .slide[data-slide="2"],
-body.cohort-assessment-deck .slide[data-slide="3"],
-body.cohort-assessment-deck .slide[data-slide="4"],
-body.cohort-assessment-deck .slide[data-slide="5"]{display:none!important;}
+body.cohort-assessment-deck .slide[data-slide]:not([data-slide="0"]):not([data-slide="4"]){display:none!important;}
 body.cohort-assessment-deck #facilitator-desk-banner{display:none!important;}
 body.cohort-assessment-deck .slide[data-slide="0"] .cohort-intro-body{
   max-width:min(52rem,92vw);margin:1.5rem auto 0;padding:1.25rem 1.5rem;text-align:left;
@@ -860,7 +856,8 @@ body.deck-config-alert-on.deck-config-alert-tall .deck{
 </div><!-- /portal -->
 
 <script>
-const TOTAL = 7;
+const TOTAL = 5;
+var SUBMIT_SLIDE_INDEX_BACKEND = 4;
 let cur = 0;
 
 document.body.classList.add('deck-mode');
@@ -896,7 +893,7 @@ function visibleSlideIndices(){
   var cohort=document.body.classList.contains('cohort-assessment-deck');
   /** If URL has a facilitator slug and config succeeded, cohort mode hides slides 1–5 — keep navigation in sync even if JS state is stale. */
   if(cohort||isFacilitatorCohortDeckMode())
-    return [0, 6];
+    return [0, SUBMIT_SLIDE_INDEX_BACKEND];
   var out=[];
   for(var si=0;si<TOTAL;si++) out.push(si);
   return out;

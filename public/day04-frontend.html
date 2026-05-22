@@ -1047,9 +1047,11 @@ function deckSlideCount(){
   return getDeckSlideEls().length;
 }
 
-/** Mirrors applyCohortDeckPresentation — cohort hides all slides except 0 + submit. */
+/** Mirrors applyCohortDeckPresentation — cohort hides all slides except 0 + submit. Day 04 class decks always show the full curriculum. */
 function isFacilitatorCohortDeckMode(){
-  return !!(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK);
+  if(!ASSESSMENT_SLUG || !CFG_COHORT_CONFIG_OK) return false;
+  if(isDay04DeckPath()) return false;
+  return true;
 }
 
 function buildDotPips(){
@@ -1557,10 +1559,9 @@ function finishDeckPresentationNav(){
   syncDeckConfigBanner();
   var vis=visibleSlideIndices();
   if(vis.indexOf(cur)<0) cur=vis.length?vis[0]:0;
-  if(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK && deckStepSubmitRequested() && vis.indexOf(SUBMIT_SLIDE_INDEX)>=0){
-    cur=SUBMIT_SLIDE_INDEX;
-  }else if(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK && deckStepSubmitRequested() && vis.indexOf(6)>=0){
-    cur=6;
+  if(deckStepSubmitRequested()){
+    if(vis.indexOf(SUBMIT_SLIDE_INDEX)>=0) cur=SUBMIT_SLIDE_INDEX;
+    else if(vis.indexOf(6)>=0) cur=6;
   }
   reconcileDeckSlideClasses();
   updateUI();
@@ -1598,7 +1599,7 @@ function attachPortalStepListeners(){
 /** Cohort URL: one assignment deck (title + intro) + submit slide — not generic Day 03 slides on top. */
 function applyCohortDeckPresentation(){
   captureDefaultSlideHtml();
-  const isCohort = !!(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK);
+  const isCohort = !!(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK && !isDay04DeckPath());
   document.body.classList.toggle('cohort-assessment-deck', isCohort);
   if(!isCohort){
     const slide0r=document.querySelector('.slide[data-slide="0"]');

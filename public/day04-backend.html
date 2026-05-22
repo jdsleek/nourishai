@@ -942,7 +942,9 @@ function deckSlideCount(){
 }
 
 function isFacilitatorCohortDeckMode(){
-  return !!(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK);
+  if(!ASSESSMENT_SLUG || !CFG_COHORT_CONFIG_OK) return false;
+  if(isDay04DeckPath()) return false;
+  return true;
 }
 
 function buildDotPips(){
@@ -1449,7 +1451,7 @@ function finishDeckPresentationNav(){
   syncDeckConfigBanner();
   var vis=visibleSlideIndices();
   if(vis.indexOf(cur)<0) cur=vis.length?vis[0]:0;
-  if(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK && deckStepSubmitRequested() && vis.indexOf(SUBMIT_SLIDE_INDEX_BACKEND)>=0){
+  if(deckStepSubmitRequested() && vis.indexOf(SUBMIT_SLIDE_INDEX_BACKEND)>=0){
     cur=SUBMIT_SLIDE_INDEX_BACKEND;
   }
   reconcileDeckSlideClasses();
@@ -1488,7 +1490,7 @@ function attachPortalStepListeners(){
 /** Cohort URL: one assignment deck (title + intro) + submit slide — not generic Day 03 slides on top. */
 function applyCohortDeckPresentation(){
   captureDefaultSlideHtml();
-  const isCohort = !!(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK);
+  const isCohort = !!(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK && !isDay04DeckPath());
   document.body.classList.toggle('cohort-assessment-deck', isCohort);
   if(!isCohort){
     const slide0r=document.querySelector('.slide[data-slide="0"]');

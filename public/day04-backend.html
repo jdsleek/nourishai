@@ -1014,16 +1014,8 @@ function goTo(n){
   const slides=getDeckSlideEls();
   const target=typeof n === 'number' && Number.isFinite(n) ? Math.floor(n) : 0;
   if(!slides.length||target < 0 || target>=slides.length) return;
-  if(typeof cur === 'number' && cur>=0 && cur<slides.length){
-    slides[cur].classList.remove('active');
-    slides[cur].classList.add('exit');
-  }
-  const prev=(typeof cur==='number'&&cur>=0)?cur:0;
   cur=target;
-  setTimeout(()=>{
-    try{slides[prev] && slides[prev].classList.remove('exit')}catch(__){/**/}
-  },500);
-  slides[cur].classList.add('active');
+  reconcileDeckSlideClasses();
   updateUI();
 }
 

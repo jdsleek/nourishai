@@ -1,121 +1,25 @@
 import { NextRequest } from "next/server";
 import {
-  day04ClassHubPayload,
-  isDay04AssessmentSlug,
-} from "@/lib/foundry-day04-defaults";
-import { learnerChecklistFromRows } from "@/lib/foundry-learner-checklist";
-import { learnerDeckPath } from "@/lib/foundry-learner-course";
-import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
-import { QAF_COHORT_SUBGROUPS } from "@/lib/foundry-subgroups";
-import { pgAssessmentBySlug, pgFacilitatorById } from "@/lib/training-pg";
+  isClassHubError,
+  resolveClassHubConfig,
+} from "@/lib/foundry-class-hub-resolve";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function deckWithAssessment(slug: string): string {
-  return learnerDeckPath(slug.trim().toLowerCase());
-}
+const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 
-/** Public learner hub — returns a cohort-specific deck path (`/foundry/deck/<slug>`) plus legacy `/foundry/day03` when unset. */
+/** Public learner hub — returns a cohort-specific deck path plus legacy defaults when unset. */
 export async function GET(req: NextRequest) {
-  const pool = getFoundryPgPool();
-  const workbookPath = "/class-workbook";
+  const slugRequested = req.nextUrl.searchParams.get("slug")?.trim() || null;
+  const result = await resolveClassHubConfig(slugRequested);
 
-  const baseFallback = {
-    programName: "Qubators AI Foundry",
-    deckHref: "/foundry/day04-frontend",
-    workbookPath,
-    assessmentSlug: null as string | null,
-    assessmentTitle: null as string | null,
-    submissionsOpen: true,
-    subgroups: [...QAF_COHORT_SUBGROUPS],
-    minPromptChars: 40,
-    minOutputChars: 80,
-    siteDefaultActive: false,
-    mode: "builtin" as const,
-    studentChecklist: learnerChecklistFromRows([]),
-    levelUpUrl: null as string | null,
-  };
-
-  const slugRequested = req.nextUrl.searchParams.get("slug")?.trim();
-
-  if (!pool) {
-    if (slugRequested && isDay04AssessmentSlug(slugRequested)) {
-      const fallback = day04ClassHubPayload();
-      return Response.json({
-        ...fallback,
-        subgroups: [...QAF_COHORT_SUBGROUPS],
-      });
-    }
-    if (slugRequested) {
-      return Response.json(
-        {
-          error: "DATABASE_UNAVAILABLE",
-          message:
-            "Course lookup requires the live database. Open this link on the deployed site.",
-        },
-        { status: 503 },
-      );
-    }
-    return Response.json(baseFallback);
+  if (isClassHubError(result)) {
+    return Response.json(
+      { error: result.error, message: result.message },
+      { status: result.status, headers: NO_STORE },
+    );
   }
 
-  await ensureFoundrySubmissionsSchema(pool);
-
-  if (slugRequested) {
-    const a = await pgAssessmentBySlug(pool, slugRequested);
-    if (!a) {
-      if (isDay04AssessmentSlug(slugRequested)) {
-        const fallback = day04ClassHubPayload();
-        return Response.json({
-          ...fallback,
-          subgroups: [...QAF_COHORT_SUBGROUPS],
-        });
-      }
-      return Response.json(
-        {
-          error: "UNKNOWN_COURSE",
-          message:
-            "This course link does not exist on the server yet, or the address was pasted incorrectly.",
-        },
-        { status: 404 },
-      );
-    }
-
-    const subgroups =
-      a.subgroup_options.length > 0 ? a.subgroup_options : [...QAF_COHORT_SUBGROUPS];
-
-    const fac = await pgFacilitatorById(pool, a.facilitator_id);
-    const facilitatorEmail =
-      typeof fac?.email === "string" && fac.email.trim().length > 0 ? fac.email.trim() : null;
-    const facilitatorDisplayName =
-      typeof fac?.display_name === "string" && fac.display_name.trim().length > 0
-        ? fac.display_name.trim()
-        : null;
-
-    return Response.json({
-      programName: "Qubators AI Foundry",
-      deckHref: deckWithAssessment(a.slug),
-      workbookPath,
-      facilitatorEmail,
-      facilitatorDisplayName,
-      assessmentSlug: a.slug,
-      assessmentTitle: a.title,
-      assessmentIntro: a.assessment_intro ?? "",
-      submissionsOpen: a.submissions_open,
-      subgroups,
-      minPromptChars: Math.max(0, a.min_prompt_chars),
-      minOutputChars: Math.max(0, a.min_output_chars),
-      siteDefaultActive: false,
-      mode: "course" as const,
-      studentChecklist: learnerChecklistFromRows(a.student_checklist),
-      levelUpUrl: a.level_up_url.trim().length > 0 ? a.level_up_url.trim() : null,
-    });
-  }
-
-  /** No ministry-wide hub binding — share /learn/[slug], /class?course=, or ?assessment= on the deck. */
-  return Response.json({
-    ...baseFallback,
-    mode: "builtin" as const,
-  });
+  return Response.json(result, { headers: NO_STORE });
 }

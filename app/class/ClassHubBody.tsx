@@ -8,23 +8,16 @@ import {
   learnerDeckSubmitPath,
   persistLearnerCourseSlug,
 } from "@/lib/foundry-learner-course";
+import {
+  clientClassHubFallback,
+  type ClassHubPayload,
+} from "@/lib/foundry-class-hub-types";
+import {
+  day04CohortPickerPayload,
+  isDay04AssessmentSlug,
+} from "@/lib/foundry-day04-defaults";
 
-type HubConfig = {
-  programName: string;
-  deckHref: string;
-  workbookPath: string;
-  facilitatorEmail?: string | null;
-  facilitatorDisplayName?: string | null;
-  assessmentSlug: string | null;
-  assessmentTitle: string | null;
-  assessmentIntro?: string | null;
-  submissionsOpen: boolean;
-  siteDefaultActive: boolean;
-  mode?: "builtin" | "course";
-  /** Curated facilitator lines merged with programmatic defaults server-side */
-  studentChecklist?: string[];
-  levelUpUrl?: string | null;
-};
+type HubConfig = ClassHubPayload;
 
 type SavedGrade = {
   submissionId?: string;
@@ -71,15 +64,22 @@ function readStore(): { lastGrade?: SavedGrade } {
 export default function ClassHubBody({
   courseSlug,
   canonicalHubPath,
+  initialHub = null,
+  initialHubError = null,
 }: {
   /** From ?course=facilitator-slug or /learn/[slug] — THAT assessment only */
   courseSlug: string | null;
   /** Stable share path (preferred over ?course); e.g. /learn/my-course-slug */
   canonicalHubPath?: string | null;
+  /** Server-rendered hub config for /learn/[slug] — avoids blank/error flash */
+  initialHub?: ClassHubPayload | null;
+  initialHubError?: string | null;
 }) {
-  const [hub, setHub] = useState<HubConfig | null>(null);
+  const [hub, setHub] = useState<HubConfig | null>(initialHub);
   const [err, setErr] = useState<string | null>(null);
-  const [hubLoadFailed, setHubLoadFailed] = useState<string | null>(null);
+  const [hubLoadFailed, setHubLoadFailed] = useState<string | null>(
+    initialHub ? null : initialHubError,
+  );
   const [lastGrade, setLastGrade] = useState<SavedGrade | null>(null);
   const [lookupId, setLookupId] = useState("");
   const [lookupBusy, setLookupBusy] = useState(false);
@@ -119,12 +119,20 @@ export default function ClassHubBody({
     const q = courseSlug
       ? `/api/foundry/class-hub?slug=${encodeURIComponent(courseSlug)}`
       : "/api/foundry/class-hub";
-    const res = await fetch(q);
+    const res = await fetch(q, { cache: "no-store" });
     const data = (await res.json()) as HubConfig & {
       error?: string;
       message?: string;
     };
     if (!res.ok) {
+      const fallback =
+        courseSlug && clientClassHubFallback(courseSlug);
+      if (fallback) {
+        setHub(fallback);
+        setHubLoadFailed(null);
+        persistLearnerCourseSlug(courseSlug);
+        return;
+      }
       if (data.error === "DATABASE_UNAVAILABLE") {
         setHubLoadFailed(
           data.message ||
@@ -160,10 +168,21 @@ export default function ClassHubBody({
 
   useEffect(() => {
     setLastGrade(readStore().lastGrade ?? null);
-    void loadHub().catch((e) =>
-      setErr(e instanceof Error ? e.message : "Load failed."),
-    );
-  }, [loadHub]);
+    if (initialHub) {
+      if (courseSlug) persistLearnerCourseSlug(courseSlug);
+      return;
+    }
+    void loadHub().catch((e) => {
+      const fallback = courseSlug ? clientClassHubFallback(courseSlug) : null;
+      if (fallback) {
+        setHub(fallback);
+        setHubLoadFailed(null);
+        persistLearnerCourseSlug(courseSlug!);
+        return;
+      }
+      setErr(e instanceof Error ? e.message : "Load failed.");
+    });
+  }, [loadHub, initialHub, courseSlug]);
 
   useEffect(() => {
     let cancelled = false;
@@ -228,6 +247,13 @@ export default function ClassHubBody({
           error?: string;
         };
         if (!res.ok) {
+          if (courseSlug && isDay04AssessmentSlug(courseSlug)) {
+            if (!cancelled) {
+              setCatalog(day04CohortPickerPayload());
+              setCatalogErr(null);
+            }
+            return;
+          }
           if (!cancelled) setCatalogErr(data.error || "Could not load cohort list.");
           return;
         }
@@ -241,7 +267,14 @@ export default function ClassHubBody({
           });
         }
       } catch {
-        if (!cancelled) setCatalogErr("Could not load cohort list.");
+        if (!cancelled) {
+          if (courseSlug && isDay04AssessmentSlug(courseSlug)) {
+            setCatalog(day04CohortPickerPayload());
+            setCatalogErr(null);
+          } else {
+            setCatalogErr("Could not load cohort list.");
+          }
+        }
       }
     })();
     return () => {

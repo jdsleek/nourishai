@@ -597,11 +597,20 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
 
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 
-/* Facilitator "class desk" — assignment brief surfaced from Postgres (same text the grader sees as intro). */
+/* Facilitator desk: fixed under chrome; deck shifts down when visible (cohort /deck/ links only). */
 .facilitator-desk{
-  margin:0 16px 10px;font-family:'JetBrains Mono',monospace;font-size:clamp(11px,2vmin,13px);
-  border:1px solid rgba(34,211,238,0.28);border-radius:10px;background:rgba(17,21,32,0.92);
-  box-shadow:0 8px 28px rgba(0,0,0,0.35);max-height:min(38vh,320px);display:flex;flex-direction:column;
+  position:fixed;left:var(--pad-x);right:var(--pad-x);z-index:40;
+  top:calc(env(safe-area-inset-top,0px) + var(--chrome-h) + var(--progress-h));
+  margin:0;font-family:'JetBrains Mono',monospace;font-size:clamp(11px,2vmin,13px);
+  border:1px solid rgba(34,211,238,0.28);border-radius:10px;background:rgba(17,21,32,0.96);
+  box-shadow:0 8px 28px rgba(0,0,0,0.35);max-height:min(28vh,240px);display:flex;flex-direction:column;
+}
+body.facilitator-desk-on .deck{
+  top:calc(env(safe-area-inset-top,0px) + var(--chrome-h) + var(--progress-h) + min(28vh,240px) + 12px);
+}
+body.day04-class-deck #facilitator-desk-banner{display:none!important;}
+body.day04-class-deck .deck{
+  top:calc(env(safe-area-inset-top,0px) + var(--chrome-h) + var(--progress-h));
 }
 .facilitator-desk[hidden]{display:none!important;}
 .facilitator-desk-head{
@@ -933,6 +942,7 @@ let cur = 0;
 let TOTAL = 0;
 
 document.body.classList.add('deck-mode');
+if(isDay04DeckPath()) document.body.classList.add('day04-class-deck');
 
 function getDeckSlideEls(){
   return document.querySelectorAll('.deck > .slide[data-slide]');
@@ -1391,13 +1401,21 @@ function syncFacilitatorDesk(){
   const panel=document.getElementById('facilitator-desk-panel');
   const btn=document.getElementById('facilitator-desk-toggle');
   if(!wrap||!bodyEl||!panel)return;
+  if(isDay04DeckPath()){
+    wrap.hidden=true;
+    bodyEl.textContent='';
+    document.body.classList.remove('facilitator-desk-on');
+    return;
+  }
   const text=(CURRENT_ASSESSMENT_INTRO||'').trim();
   if(!ASSESSMENT_SLUG||!text){
     wrap.hidden=true;
     bodyEl.textContent='';
+    document.body.classList.remove('facilitator-desk-on');
     return;
   }
   wrap.hidden=false;
+  document.body.classList.add('facilitator-desk-on');
   bodyEl.textContent=text;
   if(btn){
     const open=!panel.hidden;

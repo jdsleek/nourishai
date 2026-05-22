@@ -373,6 +373,16 @@ code{font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:3
   font-size:clamp(13px,2.3vmin,15px);color:var(--muted);line-height:1.6;text-align:center;
 }
 .callout-strip strong{color:var(--text);font-weight:600;}
+.prompt-block{
+  max-width:min(52rem,96vw);width:100%;margin:clamp(14px,2vh,20px) auto 0;
+  background:#0c0e14;border:1px solid rgba(34,211,238,0.35);border-radius:12px;
+  padding:clamp(14px,2.5vw,18px);text-align:left;
+  font-family:'JetBrains Mono',monospace;font-size:clamp(10px,1.9vmin,12px);
+  line-height:1.55;color:#cbd5e1;white-space:pre-wrap;max-height:min(36vh,320px);overflow-y:auto;
+}
+.hook-table{max-width:40rem;width:100%;margin:1rem auto 0;font-size:clamp(12px,2.2vmin,14px);border-collapse:collapse;}
+.hook-table th,.hook-table td{border:1px solid var(--border);padding:8px 10px;text-align:left;}
+.hook-table th{font-family:'JetBrains Mono',monospace;color:var(--cyan);font-size:11px;text-transform:uppercase;}
 
 /* ── SLIDE 6 — SCORING ── */
 .score-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(12px,2.5vw,20px);max-width:52rem;width:100%;}
@@ -611,7 +621,7 @@ textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmi
 .facilitator-desk-panel[hidden]{display:none;}
 
 /* Cohort deck (/foundry/deck/slug): facilitator assignment is the deck — not stacked on full Day 03 curriculum. */
-body.cohort-assessment-deck .slide[data-slide]:not([data-slide="0"]):not([data-slide="4"]){display:none!important;}
+body.cohort-assessment-deck .slide[data-slide]:not([data-slide="0"]):not([data-slide="6"]){display:none!important;}
 body.cohort-assessment-deck #facilitator-desk-banner{display:none!important;}
 body.cohort-assessment-deck .slide[data-slide="0"] .cohort-intro-body{
   max-width:min(52rem,92vw);margin:1.5rem auto 0;padding:1.25rem 1.5rem;text-align:left;
@@ -713,40 +723,101 @@ body.deck-config-alert-on.deck-config-alert-tall .deck{
 <div class="deck" role="region" aria-label="Lesson slides">
 
   <div class="slide active" data-slide="0">
-    <div class="badge">Day 04 · Part 2</div>
+    <div class="badge">Day 04 · Part 2 · Deacon Gift</div>
     <h1 class="hero">BACKEND<br><span class="or">&amp; DATA</span></h1>
-    <div class="subtitle">// Deacon Gift · Wire <code>app.js</code> · localStorage · insights</div>
+    <div class="subtitle">// 90 minutes · Make the UI <strong>actually work</strong> · <code>app.js</code> + <code>localStorage</code></div>
   </div>
-  <div class="slide" data-slide="1">
-    <div class="tag">Pattern</div>
-    <h2 class="head">SAVE →<br><span class="or">RENDER</span></h2>
-    <div class="steps">
-      <div class="step"><span class="s-num">01</span><div class="s-body"><h3>loadData()</h3><p>Read JSON array from <code>localStorage</code> on page load.</p></div></div>
-      <div class="step"><span class="s-num">02</span><div class="s-body"><h3>On primary click</h3><p>Validate → push record → saveData() → renderList().</p></div></div>
-      <div class="step"><span class="s-num">03</span><div class="s-body"><h3>renderInsights()</h3><p>Count rows or group by one field — data-driven track.</p></div></div>
-    </div>
-  </div>
-  <div class="slide" data-slide="2">
-    <div class="tag">AI prompt</div>
-    <h2 class="head">5 PILLARS<br><span class="or">app.js ONLY</span></h2>
-    <p class="callout-strip">Do not let AI rewrite your HTML layout — <strong>implement app.js only</strong>.</p>
-    <p class="pillar-hint">Role: junior backend engineer · Task: wire #btn-primary · Context: handoff card · Constraints: no frameworks · Format: full app.js</p>
-  </div>
-  <div class="slide" data-slide="3">
-    <div class="tag">Demo</div>
-    <h2 class="head">CLICK<br><span class="or">TEST</span></h2>
-    <ul class="checklist">
-      <li><span class="chk-box" aria-hidden="true"></span>Add 3 items via your UI</li>
-      <li><span class="chk-box" aria-hidden="true"></span>Refresh — data persists</li>
-      <li><span class="chk-box" aria-hidden="true"></span>Insights panel shows a stat</li>
+
+  <div class="slide slide-mindset" data-slide="1">
+    <div class="tag">Mandatory deliverable (end of day)</div>
+    <h2 class="head">CLICK →<br><span class="or">SAVES</span></h2>
+    <ul class="bullets bullets-mindset">
+      <li><span class="pip" aria-hidden="true"></span><div class="bullet-body"><p class="bullet-lead">Primary button writes a record</p><p class="bullet-detail"><code>#btn-primary</code> validates inputs, saves to <code>localStorage</code>, re-renders the list.</p></div></li>
+      <li><span class="pip" aria-hidden="true"></span><div class="bullet-body"><p class="bullet-lead">Refresh still shows data</p><p class="bullet-detail">Add 3 marks → reload browser → rows remain.</p></div></li>
+      <li><span class="pip" aria-hidden="true"></span><div class="bullet-body"><p class="bullet-lead">Insights update from real rows</p><p class="bullet-detail"><code>#insights-panel</code> + hero stats reflect stored records (not hard-coded samples).</p></div></li>
     </ul>
-    <a href="/foundry/day04" class="cta-secondary" style="text-decoration:none;display:inline-block;margin-top:12px">← Full day slides</a>
+    <p class="callout-strip">Do <strong>not</strong> rewrite <code>index.html</code> — only <code>app.js</code>. Paste your student&apos;s hook ids if different from AttendNow.</p>
   </div>
+
+  <div class="slide" data-slide="2">
+    <div class="tag">Reference · AttendNow hooks</div>
+    <h2 class="head">WIRE THESE<br><span class="or">IDS</span></h2>
+    <p class="pillar-hint">Class example UI (Julius frontend). Your app may differ — map the same jobs.</p>
+    <table class="hook-table">
+      <tr><th>Element</th><th>Job in app.js</th></tr>
+      <tr><td><code>#btn-primary</code></td><td>Submit mark · prevent default</td></tr>
+      <tr><td><code>#input-name</code> · role · class · date</td><td>Read → validate → save</td></tr>
+      <tr><td><code>#list-root</code></td><td>Rebuild &lt;li class="att-item"&gt; rows</td></tr>
+      <tr><td><code>#insights-panel</code></td><td>Rate, streak, absent, mini-bars</td></tr>
+      <tr><td><code>#stat-total</code> · present · absent</td><td>Today&apos;s counts in hero</td></tr>
+      <tr><td><code>#input-search</code> · filter</td><td>Client-side filter (stretch)</td></tr>
+    </table>
+    <p class="callout-strip">Storage key suggestion: <code>attendnow_records_v1</code></p>
+  </div>
+
+  <div class="slide" data-slide="3">
+    <div class="tag">Copy into Cursor · AttendNow</div>
+    <h2 class="head">BACKEND<br><span class="or">PROMPT</span></h2>
+    <p class="pillar-hint">5 pillars · returns <strong>app.js only</strong></p>
+    <div class="prompt-block" id="backendPromptAttendnow">Role: You are a junior JavaScript engineer. Implement client-side data logic only in app.js. Do not change index.html or CSS.
+
+Task: Build complete app.js for the AttendNow attendance MVP:
+1) localStorage key attendnow_records_v1 — array of records.
+2) On #btn-primary click (and hero form submit): preventDefault; read #input-name, #input-role, #input-class, #input-date; validate; push { id, fullName, role, group, date, status: "present", timeMarked }; saveData().
+3) renderList(): replace #list-root contents with &lt;li class="att-item"&gt; rows (avatar initials, att-badge--present, meta line). Remove static demo rows on first render.
+4) renderInsights(): update #insight-rate, #insight-streak, #insight-absent, #insight-bars from stored data (today + last 5 days).
+5) updateHeroStats(): set #stat-total, #stat-present, #stat-absent for today.
+6) DOMContentLoaded: loadData(), render all, set #footer-year to current year.
+7) Optional: #input-search and #input-filter-status filter the rendered list without deleting storage.
+8) Empty state message in #list-root when zero records.
+
+Context: index.html is already built (AttendNow — students/workers attendance in Nigeria). Product copy and layout must stay. Handoff from frontend block.
+
+Constraints: Vanilla JS only. No React, no fetch/API, no npm. Never edit HTML/CSS files. ES6+.
+
+Format: Output the full app.js source only, with short comments on loadData, saveData, renderList, renderInsights, updateHeroStats, init.</div>
+    <button type="button" class="cta-secondary" style="margin-top:12px" onclick="nextSlide()">Next: generic prompt →</button>
+  </div>
+
   <div class="slide" data-slide="4">
+    <div class="tag">Not AttendNow? · Generic prompt</div>
+    <h2 class="head">YOUR<br><span class="or">HOOKS</span></h2>
+    <div class="prompt-block">Role: Junior JavaScript engineer — app.js only.
+
+Task: Wire my MVP index.html:
+- localStorage key: qaf_mvp_records
+- #btn-primary: validate inputs, push one object, saveData(), renderList(), renderInsights()
+- #list-root: dynamic rows from data
+- #insights-panel: at least one computed stat (count, sum, or top group)
+- On load: loadData() and render everything
+- Refresh must persist data
+
+Context: [PASTE your handoff card + list your input ids and button id from YOUR html]
+
+Constraints: Vanilla JS; do not modify index.html/CSS; no frameworks.
+
+Format: Full app.js only.</div>
+  </div>
+
+  <div class="slide" data-slide="5">
+    <div class="tag">90-min run sheet · Deacon</div>
+    <h2 class="head">DEMO<br><span class="or">CHECKLIST</span></h2>
+    <ul class="checklist">
+      <li><span class="chk-box" aria-hidden="true"></span>0–15 · Open student folder · read handoff card + hook ids</li>
+      <li><span class="chk-box" aria-hidden="true"></span>15–45 · Paste backend prompt → generate <code>app.js</code> → fix errors in browser console</li>
+      <li><span class="chk-box" aria-hidden="true"></span>45–60 · Mark 3 people present · list updates · stats move</li>
+      <li><span class="chk-box" aria-hidden="true"></span>60–75 · Refresh page — data still there</li>
+      <li><span class="chk-box" aria-hidden="true"></span>75–90 · Insights show real numbers · pair demo · submit portal</li>
+    </ul>
+    <a href="/foundry/day04-frontend" class="cta-secondary" style="text-decoration:none;display:inline-block;margin-top:12px">← Julius frontend slides</a>
+  </div>
+
+  <div class="slide" data-slide="6">
     <div class="tag">Submit</div>
     <h2 class="head">HAND<br><span class="or">IN</span></h2>
     <button type="button" class="cta-main" onclick="void openPortal()">SUBMIT DAY 04 MVP ↓</button>
-    <p class="cta-sub">Same portal as Part 1 · use ?assessment=your cohort slug</p>
+    <p class="cta-sub">Portal field 03 = frontend prompt · field 04 = paste your <code>app.js</code></p>
+    <button type="button" class="cta-secondary" id="btnLastGrade" onclick="void viewLastGradeOnDevice()">See my last grade on this device</button>
   </div>
 
 </div><!-- /deck -->
@@ -856,48 +927,54 @@ body.deck-config-alert-on.deck-config-alert-tall .deck{
 </div><!-- /portal -->
 
 <script>
-const TOTAL = 5;
-var SUBMIT_SLIDE_INDEX_BACKEND = 4;
+var SUBMIT_SLIDE_INDEX_BACKEND = 6;
 let cur = 0;
+let TOTAL = 0;
 
 document.body.classList.add('deck-mode');
 
-function setProgressA11y(){
-  const bar=document.getElementById('progressBar');
-  bar.setAttribute('aria-valuenow',String(cur+1));
-  bar.setAttribute('aria-valuemax',String(TOTAL));
-}
-/** Slides shown in lesson deck only (avoid matching unrelated `.slide` if markup grows). */
 function getDeckSlideEls(){
   return document.querySelectorAll('.deck > .slide[data-slide]');
 }
 
-/** Mirrors applyCohortDeckPresentation — two-step deck hides slides 1–5 via CSS when slug + loaded config succeeded. */
+function deckSlideCount(){
+  return getDeckSlideEls().length;
+}
+
 function isFacilitatorCohortDeckMode(){
   return !!(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK);
 }
 
-// ── DOTS ──
-const dotsEl = document.getElementById('dots');
-for(let i=0;i<TOTAL;i++){
-  const d = document.createElement('button');
-  d.type='button';
-  d.className='dot-pip'+(i===0?' active':'');
-  d.setAttribute('role','tab');
-  d.setAttribute('aria-label','Go to slide '+(i+1));
-  d.onclick=()=>goTo(i);
-  dotsEl.appendChild(d);
+function buildDotPips(){
+  const dotsEl = document.getElementById('dots');
+  if(!dotsEl) return;
+  dotsEl.innerHTML='';
+  TOTAL = deckSlideCount();
+  for(let i=0;i<TOTAL;i++){
+    const d = document.createElement('button');
+    d.type='button';
+    d.className='dot-pip'+(i===0?' active':'');
+    d.setAttribute('role','tab');
+    d.setAttribute('aria-label','Go to slide '+(i+1));
+    d.onclick=()=>goTo(i);
+    dotsEl.appendChild(d);
+  }
 }
 
 function visibleSlideIndices(){
   var cohort=document.body.classList.contains('cohort-assessment-deck');
-  /** If URL has a facilitator slug and config succeeded, cohort mode hides slides 1–5 — keep navigation in sync even if JS state is stale. */
-  if(cohort||isFacilitatorCohortDeckMode())
-    return [0, SUBMIT_SLIDE_INDEX_BACKEND];
+  if(cohort||isFacilitatorCohortDeckMode()){
+    var submit=SUBMIT_SLIDE_INDEX_BACKEND;
+    if(submit>=deckSlideCount()) submit=Math.max(0,deckSlideCount()-1);
+    return [0, submit];
+  }
   var out=[];
-  for(var si=0;si<TOTAL;si++) out.push(si);
+  var n=deckSlideCount();
+  for(var si=0;si<n;si++) out.push(si);
   return out;
 }
+
+buildDotPips();
 
 function reconcileDeckSlideClasses(){
   var slides=getDeckSlideEls();
@@ -1064,7 +1141,7 @@ function captureDefaultSlideHtml(){
     if(s0) SLIDE_0_DEFAULT_HTML=s0.innerHTML;
   }
   if(!SLIDE_6_DEFAULT_HTML){
-    const s6=document.querySelector(".slide[data-slide=\"6\"]");
+    const s6=document.querySelector('.slide[data-slide="6"]')||document.querySelector('.slide[data-slide="4"]');
     if(s6) SLIDE_6_DEFAULT_HTML=s6.innerHTML;
   }
 }
@@ -1336,7 +1413,7 @@ function deckStepSubmitRequested(){
 /** Go to submit slide (6) — safe for cohort two-step deck and full Day 03 deck. */
 function goToSubmitSlide(){
   var vis=visibleSlideIndices();
-  if(vis.indexOf(6)>=0){ goTo(6); return; }
+  if(vis.indexOf(SUBMIT_SLIDE_INDEX_BACKEND)>=0){ goTo(SUBMIT_SLIDE_INDEX_BACKEND); return; }
   if(vis.length) goTo(vis[vis.length-1]);
 }
 

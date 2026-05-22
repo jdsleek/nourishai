@@ -47,7 +47,7 @@ export default function OurClassesPage() {
           </p>
           <h2 className="mt-2 text-lg font-semibold text-white">Backend logic block</h2>
           <p className="mt-2 text-sm text-slate-400">
-            localStorage, wire primary button, insights panel — after break.
+            AttendNow-style <code>app.js</code> prompt on slide 4 · localStorage · insights · 7 slides.
           </p>
           <Link
             href="/foundry/day04-backend"

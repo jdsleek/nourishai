@@ -428,7 +428,7 @@ export default function ClassHubBody({
                 {courseSlug ? "Your course" : siteDefaultBanner(hub)}
               </p>
               <p className="mt-2 text-lg font-semibold text-white">
-                {hub.assessmentTitle ?? "Day 03 — AI Builder"}
+                {hub.assessmentTitle ?? "Day 04 — From Idea to Working Product"}
               </p>
               {hub.assessmentSlug ? (
                 <p className="mt-1 font-mono text-xs text-slate-500">
@@ -519,7 +519,7 @@ export default function ClassHubBody({
                   }}
                   className="block rounded-xl border border-white/15 px-5 py-4 text-center text-sm font-medium text-slate-200 hover:bg-white/5"
                 >
-                  View full Day 03 lesson slides first
+                  View full Day 04 lesson slides first
                 </a>
               ) : null}
               <Link

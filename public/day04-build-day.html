@@ -1,0 +1,2039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Day 04 · From Idea to Working Product | Qubators AI Foundry</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#090a0e;
+  --surface:#10111a;
+  --surface2:#181923;
+  --border:rgba(255,255,255,0.09);
+  --border-hi:rgba(255,255,255,0.14);
+  --orange:#f97316;
+  --orange-dim:rgba(249,115,22,0.12);
+  --orange-glow:rgba(249,115,22,0.2);
+  --cyan:#22d3ee;
+  --cyan-dim:rgba(34,211,238,0.08);
+  --text:#f7f6f2;
+  --muted:#9c9a94;
+  --muted2:#6b6963;
+  --green:#4ade80;
+  --red:#f87171;
+  --amber:#fbbf24;
+  /* Zoom / device safe gaps */
+  --chrome-h:56px;
+  --progress-h:4px;
+  --pad-x:clamp(16px,4vw,56px);
+  --pad-bottom-slide:max(108px,calc(96px + env(safe-area-inset-bottom,0px)));
+}
+html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;-webkit-text-size-adjust:100%;text-size-adjust:100%;}
+body.deck-mode{height:100%;height:100dvh;overflow:hidden;}
+/* Lock root scroll while portal is showing — avoids scrollIntoView/wheel chaining moving the deck behind the overlay */
+html.portal-open,body.portal-open{
+  height:100%;
+  height:100dvh;
+  overflow:hidden;
+  overscroll-behavior:none;
+  -webkit-overflow-scrolling:touch;
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;}
+}
+
+.ambient{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 60% 50% at 10% 15%, rgba(249,115,22,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 90% 85%, rgba(34,211,238,0.03) 0%, transparent 60%);
+}
+.grid-dots{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:radial-gradient(circle,rgba(255,255,255,0.04) 1px,transparent 1px);
+  background-size:40px 40px;
+  mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black,transparent);
+}
+
+/* ── CHROME ── */
+.chrome-top{
+  position:fixed;top:0;left:0;right:0;z-index:50;
+  box-sizing:border-box;
+  height:calc(var(--chrome-h) + env(safe-area-inset-top,0px));
+  padding:env(safe-area-inset-top,0px) var(--pad-x) 0 var(--pad-x);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  border-bottom:1px solid var(--border);
+  background:rgba(9,10,14,0.94);backdrop-filter:blur(14px);
+}
+.logo{
+  font-family:'JetBrains Mono',monospace;
+  font-size:clamp(10px,2.5vmin,12px);
+  letter-spacing:0.12em;color:var(--muted);line-height:1.25;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;
+}
+.chrome-actions{display:flex;align-items:center;gap:clamp(8px,1.6vw,14px);flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
+.facilitator-link{
+  font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,11px);color:var(--cyan);text-decoration:none;
+  border:1px solid rgba(34,211,238,0.45);padding:6px 12px;border-radius:6px;white-space:nowrap;
+  transition:border-color .2s,color .2s,background .2s;
+}
+.facilitator-link:hover{color:#ecfeff;border-color:var(--cyan);background:var(--cyan-dim);}
+.facilitator-link:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+
+.fi:focus-visible,.select-fi:focus-visible{
+  outline:2px solid var(--cyan);
+  outline-offset:3px;
+  background:rgba(34,211,238,0.06);
+}
+.portal-checklist-wrap{
+  margin:16px 0;
+  padding:14px 16px;
+  border-radius:12px;
+  border:1px solid var(--border-hi);
+  background:rgba(16,17,26,0.65);
+}
+.portal-checklist-wrap h4{
+  font-family:'JetBrains Mono',monospace;
+  font-size:clamp(11px,2vmin,12px);
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:var(--amber);
+}
+.portal-checklist-wrap ul{
+  margin:10px 0 0;
+  padding-left:1.25rem;
+  font-size:clamp(13px,2.35vmin,15px);
+  line-height:1.55;
+  color:var(--text);
+}
+.portal-checklist-wrap li{margin-bottom:8px;color:var(--text);}
+.bookmark-lite{
+  font-family:'JetBrains Mono',monospace;
+  font-size:clamp(11px,2vmin,12px);
+  color:var(--amber);
+  line-height:1.55;
+}
+.grading-provider-note{
+  margin-top:12px;
+  font-size:clamp(13px,2.3vmin,15px);
+  color:var(--muted);
+  line-height:1.55;
+}
+.level-up-link{
+  display:inline-flex;
+  margin-top:14px;
+  margin-bottom:4px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:clamp(13px,2.4vmin,16px);
+  padding:12px 16px;
+  border-radius:10px;
+  border:1px solid rgba(74,222,128,0.45);
+  background:rgba(74,222,128,0.1);
+  color:var(--green);
+  text-decoration:none;
+}
+.level-up-link:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+.chrome-contrast{
+  font-family:'JetBrains Mono',monospace;
+  font-size:clamp(10px,2vmin,11px);
+  color:var(--orange);
+  border:1px solid rgba(249,115,22,0.45);
+  padding:6px 10px;
+  border-radius:6px;
+  background:transparent;
+  cursor:pointer;
+}
+.chrome-contrast[data-on="true"]{
+  border-color:var(--orange);
+  background:var(--orange-dim);
+}
+html[data-high-contrast="1"]{--bg:#030306;}
+html[data-high-contrast="1"] .ambient{opacity:0.35;}
+html[data-high-contrast="1"] .portal{background:rgba(5,6,12,0.98);}
+html[data-high-contrast="1"] .fi{border-color:rgba(255,255,255,0.24);}
+.logo strong{color:var(--orange);}
+.registry-link{
+  font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,11px);color:var(--muted2);
+  border:1px solid rgba(100,116,139,0.35);padding:6px 12px;border-radius:6px;
+  white-space:nowrap;cursor:default;opacity:0.95;
+}
+.kbd-hints{display:none;gap:8px;align-items:center;font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,11px);color:var(--muted);flex-shrink:0;}
+@media (min-width:720px) and (min-height:500px){.kbd-hints{display:flex;}}
+.key{background:var(--surface);border:1px solid var(--border-hi);padding:2px 8px;border-radius:4px;font-size:clamp(10px,2vmin,11px);}
+
+.progress-bar{
+  position:fixed;top:calc(env(safe-area-inset-top,0px) + var(--chrome-h));left:0;
+  height:var(--progress-h);
+  background:linear-gradient(90deg,var(--orange),var(--cyan));
+  transition:width 0.45s cubic-bezier(.4,0,.2,1);
+  z-index:51;
+}
+
+/* ── DECK ── */
+.deck{
+  position:fixed;
+  left:0;right:0;bottom:0;
+  top:calc(env(safe-area-inset-top,0px) + var(--chrome-h) + var(--progress-h));
+  z-index:1;
+}
+
+.slide{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:clamp(20px,3vh,40px) var(--pad-x) var(--pad-bottom-slide);
+  opacity:0;
+  transform:translateX(48px);
+  transition:opacity 0.45s cubic-bezier(.4,0,.2,1),transform 0.45s cubic-bezier(.4,0,.2,1);
+  pointer-events:none;
+  z-index:1;
+  box-sizing:border-box;
+  overflow-y:auto;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-gutter:stable;
+}
+@media (max-height:820px){
+  .slide{justify-content:flex-start;padding-top:clamp(16px,4vh,32px);}
+}
+@media (max-height:520px){
+  h1.hero{font-size:clamp(40px,12vmin,88px)!important;margin-bottom:8px;}
+  h2.head{font-size:clamp(32px,9vmin,64px)!important;margin-bottom:10px;}
+  .badge{margin-bottom:10px;padding:6px 12px;}
+}
+@media (max-width:900px){
+  .pillars,.two-col,.score-grid,.score-grid--dual{grid-template-columns:1fr!important;}
+}
+@media (min-width:901px) and (max-width:1200px){
+  .pillars{grid-template-columns:repeat(3,1fr)!important;}
+  .score-grid{grid-template-columns:1fr!important;}
+}
+.slide.active{opacity:1;transform:translateX(0);pointer-events:all;z-index:2;}
+.slide.exit{opacity:0;transform:translateX(-48px);z-index:1;}
+
+/* ── NAV (thumb-sized for touch + visible on Zoom) ── */
+.nav{
+  position:fixed;bottom:max(14px,calc(12px + env(safe-area-inset-bottom,0px)));left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:clamp(8px,2vw,14px);
+  background:rgba(16,17,26,0.95);border:1px solid var(--border-hi);border-radius:50px;padding:10px 18px;z-index:50;
+  box-shadow:0 8px 32px rgba(0,0,0,0.45);max-width:calc(100vw - var(--pad-x) * 2);
+}
+.nav-btn{
+  background:none;border:1px solid var(--border);color:var(--text);min-width:44px;min-height:44px;width:44px;height:44px;border-radius:50%;
+  cursor:pointer;font-size:clamp(16px,4vmin,20px);display:flex;align-items:center;justify-content:center;transition:all 0.2s;font-family:inherit;
+}
+.nav-btn:hover{border-color:var(--orange);color:var(--orange);}
+.nav-btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+.slide-dots{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:min(200px,35vw);}
+.dot-pip{
+  min-width:8px;min-height:8px;width:8px;height:8px;border-radius:50%;background:var(--muted2);transition:all 0.3s;cursor:pointer;
+  border:none;padding:0;flex-shrink:0;-webkit-appearance:none;appearance:none;
+}
+.dot-pip:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
+.dot-pip.active{background:var(--orange);transform:scale(1.25);}
+.slide-num{font-family:'JetBrains Mono',monospace;font-size:clamp(11px,2.5vmin,13px);color:var(--muted);min-width:3.2em;text-align:center;font-weight:500;}
+
+/* ── SHARED TYPOGRAPHY (sized for Zoom / legibility) ── */
+.tag{
+  font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2.2vmin,11px);letter-spacing:0.2em;color:var(--orange);text-transform:uppercase;
+  margin-bottom:clamp(12px,2vh,18px);display:flex;align-items:center;gap:10px;text-align:center;justify-content:center;width:100%;max-width:52rem;
+}
+.tag::before{content:'';display:none;}
+@media (min-width:540px){
+  .tag{justify-content:flex-start;text-align:left;}
+  .tag::before{display:block;width:20px;height:2px;background:var(--orange);opacity:0.65;flex-shrink:0;}
+}
+
+h1.hero{
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(52px,min(15vmin,22vw),156px);
+  line-height:0.9;letter-spacing:0.02em;text-align:center;margin-bottom:clamp(12px,2vh,24px);
+  max-width:100%;padding:0 4px;text-wrap:balance;
+}
+h2.head{
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(40px,min(10vmin,18vw),108px);
+  line-height:0.95;letter-spacing:0.02em;text-align:center;margin-bottom:clamp(16px,2.5vh,28px);
+  max-width:100%;padding:0 4px;text-wrap:balance;
+}
+.or{color:var(--orange);}
+.cy{color:var(--cyan);}
+.mu{color:var(--muted);}
+
+/* cursor blink */
+.cur{display:inline-block;width:4px;height:.82em;background:var(--orange);vertical-align:middle;margin-left:6px;animation:blink 1.1s step-end infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+.badge{
+  font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2.2vmin,11px);letter-spacing:0.16em;
+  background:var(--orange-dim);border:1px solid rgba(249,115,22,0.35);color:var(--orange);
+  padding:8px 16px;border-radius:6px;text-transform:uppercase;margin-bottom:clamp(14px,2vh,22px);
+}
+.subtitle{
+  font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.5vmin,14px);color:var(--muted);letter-spacing:0.08em;
+  margin-top:clamp(10px,2vh,18px);max-width:36rem;text-align:center;line-height:1.65;padding:0 8px;
+}
+
+/* ── SLIDE 2 — BULLET LIST ── */
+.bullets{list-style:none;max-width:42rem;width:100%;}
+.bullets li{
+  font-size:clamp(17px,2.8vmin,21px);line-height:1.6;padding:clamp(14px,2vh,18px) 0;border-bottom:1px solid var(--border);
+  display:flex;gap:clamp(12px,2vw,18px);align-items:flex-start;color:var(--text);
+}
+.bullets li:last-child{border:none;}
+.bullets-mindset{max-width:38rem;width:100%;margin:0 auto;}
+.bullets-mindset > li{
+  border:1px solid var(--border);border-radius:14px;
+  background:var(--surface);padding:clamp(16px,2.4vw,22px) clamp(18px,3vw,24px);
+  margin-bottom:clamp(12px,1.8vh,16px);align-items:flex-start;
+}
+.bullets-mindset > li:last-child{margin-bottom:0;}
+.bullet-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:0.5em;text-align:left;}
+.bullet-lead{
+  font-size:clamp(15px,2.45vmin,18px);font-weight:600;color:var(--text);
+  line-height:1.35;margin:0;letter-spacing:-0.01em;
+}
+.bullet-detail{
+  font-size:clamp(14px,2.25vmin,17px);color:var(--muted);line-height:1.6;margin:0;
+}
+.bullet-detail strong{color:var(--text);font-weight:500;}
+.verb-trio{
+  display:inline-flex;flex-wrap:wrap;align-items:center;gap:0.2em 0.55em;
+  font-weight:600;color:var(--orange);font-style:normal;
+}
+.verb-trio em{font-style:normal;font-weight:inherit;color:inherit;}
+.verb-trio .sep{color:var(--muted2);font-weight:400;user-select:none;}
+.bullets-mindset + .big-q{margin-top:clamp(22px,3.5vh,32px);}
+/* Mindset slide: headline + stack share one column */
+.slide-mindset h2.head{margin-bottom:clamp(12px,2vh,20px);}
+.slide-mindset .tag{align-self:stretch;max-width:38rem;margin-left:auto;margin-right:auto;}
+.slide-mindset .big-q{
+  align-self:stretch;max-width:38rem;margin-left:auto;margin-right:auto;text-align:left;
+  font-size:clamp(20px,3.6vmin,34px);line-height:1.2;padding:clamp(14px,2vw,18px) clamp(18px,3vw,24px);
+  background:rgba(24,25,35,0.65);border:1px solid var(--border);border-radius:12px;color:var(--muted);
+}
+.pip{width:7px;height:7px;border-radius:50%;background:var(--orange);margin-top:0.55em;flex-shrink:0;}
+.bullets-mindset .pip{margin-top:0.5em;}
+.big-q{
+  font-family:'Bebas Neue',cursive;font-size:clamp(24px,4.5vmin,46px);text-align:center;
+  color:var(--muted);max-width:40rem;line-height:1.12;margin-top:clamp(18px,3vh,28px);padding:0 8px;text-wrap:balance;
+}
+.big-q em{color:var(--text);font-style:normal;}
+
+/* ── SLIDE 3 — TWO COL ── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:clamp(14px,3vw,22px);max-width:52rem;width:100%;align-items:stretch;}
+.col-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:clamp(20px,3vw,28px);}
+.col-card.old{border-color:rgba(248,113,113,0.28);}
+.col-card.new{border-color:rgba(74,222,128,0.28);}
+.col-lbl{font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2.2vmin,11px);letter-spacing:0.18em;text-transform:uppercase;margin-bottom:14px;}
+.col-lbl.r{color:var(--red);}
+.col-lbl.g{color:var(--green);}
+.col-card ul{list-style:none;}
+.col-card ul li{font-size:clamp(14px,2.4vmin,17px);color:var(--muted);padding:10px 0;border-bottom:1px solid var(--border);line-height:1.5;}
+.col-card ul li:last-child{border:none;}
+.dir-stmt{
+  font-family:'Bebas Neue',cursive;font-size:clamp(22px,4vmin,40px);
+  text-align:center;margin-top:clamp(16px,3vh,26px);color:var(--muted);padding:0 8px;line-height:1.05;text-wrap:balance;
+}
+.dir-stmt span{color:var(--orange);}
+
+/* ── SLIDE 4 — STEPS ── */
+.steps{max-width:40rem;width:100%;}
+.step{display:flex;align-items:flex-start;gap:clamp(14px,3vw,22px);padding:clamp(14px,2vh,18px) 0;border-bottom:1px solid var(--border);}
+.step:last-child{border:none;}
+.s-num{
+  font-family:'Bebas Neue',cursive;font-size:clamp(32px,6vmin,44px);color:var(--orange);line-height:1;min-width:1.2em;text-align:center;
+}
+.s-body h3{font-size:clamp(16px,2.6vmin,19px);font-weight:600;margin-bottom:6px;line-height:1.25;}
+.s-body p{font-size:clamp(14px,2.3vmin,16px);color:var(--muted);line-height:1.6;}
+code{font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:3px 9px;border-radius:4px;font-size:0.92em;color:var(--cyan);}
+
+/* ── SLIDE 5 — PILLARS ── */
+.pillars{display:grid;grid-template-columns:repeat(5,1fr);gap:clamp(10px,2vw,14px);max-width:56rem;width:100%;}
+.pillar{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:clamp(16px,2.5vw,22px) 12px;text-align:center;
+  transition:border-color 0.2s,transform 0.2s;
+}
+.pillar:hover{border-color:var(--orange);transform:translateY(-3px);}
+.p-lbl{font-family:'Bebas Neue',cursive;font-size:clamp(22px,4.5vmin,34px);color:var(--orange);display:block;margin-bottom:8px;line-height:1;}
+.p-desc{font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,12px);color:var(--muted);line-height:1.6;}
+.p-pts{font-family:'JetBrains Mono',monospace;font-size:clamp(9px,1.8vmin,11px);color:var(--muted2);margin-top:10px;
+  border-top:1px solid var(--border);padding-top:8px;}
+.pillar-hint{
+  font-family:'JetBrains Mono',monospace;font-size:clamp(11px,2.1vmin,12px);color:var(--muted2);margin-top:clamp(14px,2vh,20px);
+  text-align:center;max-width:44rem;line-height:1.55;padding:0 8px;
+}
+
+.callout-strip{
+  margin-top:clamp(14px,2vh,20px);max-width:52rem;width:100%;
+  background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.22);
+  border-radius:12px;padding:clamp(14px,2.5vw,18px) clamp(16px,3vw,22px);
+  font-size:clamp(13px,2.3vmin,15px);color:var(--muted);line-height:1.6;text-align:center;
+}
+.callout-strip strong{color:var(--text);font-weight:600;}
+
+/* ── SLIDE 6 — SCORING ── */
+.score-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(12px,2.5vw,20px);max-width:52rem;width:100%;}
+.score-grid--dual{grid-template-columns:repeat(2,1fr);max-width:40rem;margin-inline:auto;}
+.s-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:clamp(20px,3vw,30px) clamp(16px,2.5vw,24px);text-align:center;
+}
+.s-pts{font-family:'Bebas Neue',cursive;font-size:clamp(44px,10vmin,72px);color:var(--orange);line-height:1;display:block;}
+.s-title{font-size:clamp(14px,2.4vmin,17px);font-weight:600;margin:10px 0 8px;line-height:1.25;}
+.s-desc{font-size:clamp(13px,2.2vmin,15px);color:var(--muted);line-height:1.6;}
+.grade-row{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(8px,2vw,12px);margin-top:clamp(18px,3vh,26px);}
+.g-badge{
+  font-family:'JetBrains Mono',monospace;font-size:clamp(11px,2vmin,12px);padding:8px 16px;border-radius:6px;font-weight:600;
+}
+.g-badge.go{background:rgba(74,222,128,0.12);color:var(--green);border:1px solid rgba(74,222,128,0.35);}
+.g-badge.rv{background:rgba(251,191,36,0.12);color:var(--amber);border:1px solid rgba(251,191,36,0.35);}
+.g-badge.rb{background:rgba(248,113,113,0.12);color:var(--red);border:1px solid rgba(248,113,113,0.35);}
+.grader-note{
+  font-size:clamp(13px,2.2vmin,15px);color:var(--muted2);margin-top:clamp(16px,2.5vh,22px);max-width:40rem;
+  text-align:center;line-height:1.65;padding:0 8px;
+}
+
+/* ── SLIDE 7 — CTA ── */
+.checklist{list-style:none;max-width:36rem;width:100%;margin-bottom:clamp(16px,2vh,24px);}
+.checklist li{
+  padding:clamp(12px,2vh,16px) 0;border-bottom:1px solid var(--border);
+  font-size:clamp(16px,2.6vmin,19px);line-height:1.45;
+}
+.checklist li:last-child{border:none;}
+.checklist-row{
+  display:flex;align-items:flex-start;gap:clamp(12px,2vw,18px);
+  width:100%;margin:0;cursor:pointer;
+  color:inherit;font:inherit;
+}
+.checklist-row:focus-within{outline:none;}
+.checklist-cb{
+  appearance:none;-webkit-appearance:none;
+  width:22px;min-width:22px;height:22px;margin:0.2em 0 0 0;
+  border:2px solid rgba(249,115,22,0.55);border-radius:5px;
+  background:transparent;flex-shrink:0;cursor:pointer;
+  display:grid;place-content:center;
+  transition:border-color 0.15s,background 0.15s,box-shadow 0.15s;
+}
+.checklist-cb:hover{border-color:rgba(249,115,22,0.85);}
+.checklist-cb:focus-visible{
+  outline:2px solid var(--cyan);outline-offset:3px;
+}
+.checklist-cb:checked{
+  background:rgba(249,115,22,0.22);border-color:var(--orange);
+  box-shadow:inset 0 0 0 1px rgba(249,115,22,0.35);
+}
+.checklist-cb:checked::after{
+  content:'';width:5px;height:10px;border:solid var(--orange);
+  border-width:0 2.5px 2.5px 0;transform:rotate(45deg);margin-bottom:2px;
+}
+.checklist-row .chk-text{flex:1;min-width:0;}
+.submit-prep{
+  max-width:36rem;width:100%;margin-bottom:clamp(16px,2vh,22px);
+  background:var(--surface2);border:1px solid var(--border);border-radius:12px;
+  padding:clamp(16px,3vw,22px) clamp(18px,3vw,24px);
+  font-size:clamp(14px,2.3vmin,16px);color:var(--muted);line-height:1.6;
+}
+.submit-prep h4{
+  font-size:clamp(11px,2vmin,12px);font-family:'JetBrains Mono',monospace;letter-spacing:0.14em;color:var(--orange);text-transform:uppercase;margin-bottom:12px;
+}
+.submit-prep ul{margin:0 0 0 1.1em;}
+.submit-prep li{margin:8px 0;}
+.submit-prep a{color:var(--cyan);text-underline-offset:3px;}
+.cta-main{
+  background:var(--orange);color:#0a0a0c;border:none;
+  padding:clamp(16px,3vw,20px) clamp(36px,8vw,56px);
+  font-family:'Bebas Neue',cursive;font-size:clamp(20px,3.8vmin,26px);letter-spacing:0.12em;border-radius:10px;
+  cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;
+  display:block;max-width:min(28rem,100%);width:fit-content;margin-inline:auto;
+  min-height:52px;text-align:center;
+}
+.cta-main:hover{transform:scale(1.02);box-shadow:0 0 40px rgba(249,115,22,0.3);}
+.cta-main:focus-visible{outline:3px solid var(--cyan);outline-offset:3px;}
+.cta-sub{
+  font-family:'JetBrains Mono',monospace;font-size:clamp(11px,2vmin,12px);color:var(--muted);margin-top:clamp(12px,2vh,16px);
+  max-width:36rem;margin-inline:auto;text-align:center;line-height:1.6;padding:0 8px;
+}
+
+/* ── PORTAL (readable on phone + shared screen) ── */
+.portal{
+  position:fixed;inset:0;background:var(--bg);z-index:200;
+  overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain;
+  transform:translateY(100%);
+  transition:transform 0.5s cubic-bezier(.4,0,.2,1);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+.portal.open{transform:translateY(0);}
+.portal-inner{
+  max-width:40rem;margin:0 auto;
+  padding:max(28px,env(safe-area-inset-top,0px)) var(--pad-x) max(48px,calc(32px + env(safe-area-inset-bottom,0px)));
+}
+.p-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:clamp(28px,4vh,40px);flex-wrap:wrap;gap:clamp(12px,3vw,18px);}
+.p-title{
+  font-family:'Bebas Neue',cursive;font-size:clamp(36px,8vmin,56px);letter-spacing:0.04em;line-height:1.05;max-width:100%;
+}
+.back-btn{
+  background:var(--surface);border:1px solid var(--border-hi);color:var(--muted);
+  padding:12px 22px;border-radius:8px;cursor:pointer;font-size:clamp(14px,2.4vmin,15px);font-family:'DM Sans',sans-serif;
+  transition:all 0.2s;margin-top:4px;min-height:44px;
+}
+.back-btn:hover{border-color:var(--orange);color:var(--orange);}
+.back-btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+
+.privacy-banner{
+  background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.28);border-radius:12px;
+  padding:clamp(14px,3vw,18px) clamp(16px,3vw,20px);margin-bottom:clamp(20px,3vh,28px);
+  font-size:clamp(13px,2.3vmin,15px);color:var(--muted);line-height:1.65;
+}
+.privacy-banner strong{color:var(--amber);}
+
+.fgroup{margin-bottom:clamp(20px,3vh,28px);}
+.flabel{
+  display:block;font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,11px);letter-spacing:0.16em;
+  color:var(--orange);text-transform:uppercase;margin-bottom:10px;
+}
+.fhint{font-size:clamp(13px,2.2vmin,15px);color:var(--muted);margin-bottom:10px;line-height:1.6;white-space:pre-wrap;}
+.field-err{font-size:clamp(13px,2.2vmin,14px);color:var(--red);margin-top:8px;display:none;}
+.field-err.on{display:block;}
+input[type="text"].fi,textarea.fi{
+  width:100%;max-width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  color:var(--text);font-family:'DM Sans',sans-serif;font-size:clamp(15px,2.5vmin,17px);padding:14px 16px;
+  outline:none;transition:border-color 0.2s;line-height:1.5;
+}
+textarea.fi{resize:vertical;min-height:3.25rem;}
+select.fi{
+  width:100%;max-width:100%;box-sizing:border-box;
+  min-height:52px;display:block;background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  color:var(--text);font-family:'DM Sans',sans-serif;font-size:clamp(15px,2.5vmin,17px);padding:14px 36px 14px 16px;
+  outline:none;line-height:1.4;
+  cursor:pointer;appearance:auto;-webkit-appearance:menulist;
+  resize:none;color-scheme:dark;
+}
+input[type="text"].fi:focus,textarea.fi:focus,select.fi:focus{border-color:var(--orange);box-shadow:0 0 0 1px rgba(249,115,22,0.25);}
+textarea.code{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmin,14px);line-height:1.5;}
+.fi.invalid{border-color:rgba(248,113,113,0.65);}
+
+.submit-btn{
+  width:100%;background:var(--orange);color:#0a0a0c;border:none;padding:18px;
+  font-family:'Bebas Neue',cursive;font-size:clamp(20px,3.6vmin,24px);letter-spacing:0.1em;border-radius:10px;
+  cursor:pointer;margin-top:12px;transition:opacity 0.2s;min-height:52px;
+}
+.submit-btn:hover:not(:disabled){opacity:0.9;}
+.submit-btn:disabled{opacity:0.45;cursor:not-allowed;}
+.submit-btn:focus-visible{outline:3px solid var(--cyan);outline-offset:2px;}
+
+/* loading */
+.loading{display:none;text-align:center;padding:clamp(28px,5vh,40px) 0;}
+.loading.on{display:block;}
+.spinner{width:40px;height:40px;border:3px solid var(--border-hi);border-top-color:var(--orange);
+  border-radius:50%;animation:spin 0.75s linear infinite;margin:0 auto 16px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin-lbl{font-family:'JetBrains Mono',monospace;font-size:clamp(13px,2.3vmin,14px);color:var(--orange);}
+.spin-sub{font-size:clamp(13px,2.2vmin,15px);color:var(--muted);margin-top:8px;line-height:1.5;}
+
+/* result */
+.result{display:none;margin-top:clamp(28px,4vh,40px);background:var(--surface);border:1px solid var(--border-hi);border-radius:16px;padding:clamp(24px,4vw,36px);}
+.result.on{display:block;}
+.r-score{font-family:'Bebas Neue',cursive;font-size:clamp(56px,14vmin,96px);line-height:1;text-align:center;margin-bottom:8px;}
+.r-grade{
+  text-align:center;font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2.2vmin,13px);letter-spacing:0.18em;
+  padding:10px 12px;border-radius:8px;margin-bottom:clamp(22px,3vh,28px);
+}
+.r-grade.GO{color:var(--green);background:rgba(74,222,128,0.1);}
+.r-grade.REVIEW{color:var(--amber);background:rgba(251,191,36,0.1);}
+.r-grade.REBUILD{color:var(--red);background:rgba(248,113,113,0.1);}
+
+.b-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(10px,2vw,14px);margin-bottom:clamp(18px,3vh,24px);}
+@media (max-width:800px){.b-grid{grid-template-columns:1fr;}}
+.b-item{background:var(--surface2);border-radius:12px;padding:clamp(14px,3vw,18px);}
+.b-cat{font-family:'JetBrains Mono',monospace;font-size:clamp(10px,1.9vmin,11px);color:var(--muted2);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px;}
+.b-pts{font-family:'Bebas Neue',cursive;font-size:clamp(32px,8vmin,44px);color:var(--orange);line-height:1;margin-bottom:8px;}
+.b-pts small{font-size:clamp(15px,3vmin,18px);color:var(--muted);}
+.b-fb{font-size:clamp(13px,2.2vmin,14px);color:var(--muted);line-height:1.55;}
+
+.lu-box{
+  background:rgba(249,115,22,0.09);border:1px solid rgba(249,115,22,0.22);border-radius:12px;
+  padding:clamp(16px,3vw,20px);margin-bottom:clamp(14px,2vh,18px);
+}
+.lu-lbl{font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,11px);color:var(--orange);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:10px;}
+.lu-txt{font-size:clamp(14px,2.4vmin,16px);line-height:1.65;}
+.verdict{font-size:clamp(14px,2.4vmin,15px);color:var(--muted);line-height:1.75;text-align:center;}
+
+/* reset btn */
+.reset-btn{
+  display:block;margin:clamp(20px,3vh,28px) auto 0;background:none;border:1px solid var(--border-hi);
+  color:var(--muted);padding:12px 28px;border-radius:8px;font-size:clamp(14px,2.3vmin,15px);cursor:pointer;font-family:'DM Sans',sans-serif;
+  transition:all 0.2s;min-height:44px;
+}
+.reset-btn:hover{border-color:var(--cyan);color:var(--cyan);}
+.reset-btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+.receipt-box{
+  margin-top:clamp(16px,2vh,20px);padding:clamp(14px,3vw,16px);border-radius:10px;
+  background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.22);
+  font-size:clamp(12px,2.2vmin,14px);color:var(--muted);line-height:1.55;
+}
+.receipt-box strong{color:var(--cyan);}
+.receipt-id{font-family:'JetBrains Mono',monospace;font-size:clamp(10px,1.9vmin,11px);color:var(--muted2);word-break:break-all;margin-top:8px;}
+.cta-secondary{
+  margin-top:12px;background:transparent;border:1px solid var(--border-hi);color:var(--muted);
+  padding:14px 22px;border-radius:10px;cursor:pointer;font-family:'DM Sans',sans-serif;
+  font-size:clamp(14px,2.4vmin,15px);min-height:48px;width:100%;max-width:28rem;
+}
+.cta-secondary:hover{border-color:var(--cyan);color:var(--cyan);}
+
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
+
+/* Facilitator "class desk" — assignment brief surfaced from Postgres (same text the grader sees as intro). */
+.facilitator-desk{
+  margin:0 16px 10px;font-family:'JetBrains Mono',monospace;font-size:clamp(11px,2vmin,13px);
+  border:1px solid rgba(34,211,238,0.28);border-radius:10px;background:rgba(17,21,32,0.92);
+  box-shadow:0 8px 28px rgba(0,0,0,0.35);max-height:min(38vh,320px);display:flex;flex-direction:column;
+}
+.facilitator-desk[hidden]{display:none!important;}
+.facilitator-desk-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.facilitator-desk-head strong{color:#a5f3fc;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;}
+.facilitator-desk-head button{
+  background:rgba(251,146,60,0.15);border:1px solid rgba(251,146,60,0.45);color:#fdba74;
+  padding:6px 10px;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit;
+}
+.facilitator-desk-head button:hover{background:rgba(251,146,60,0.28);}
+.facilitator-desk-lead{margin:0 12px 8px;color:#94a3b8;font-size:11px;line-height:1.45;padding-top:8px;}
+.facilitator-desk-body{
+  margin:0 12px 12px;padding:12px;border-radius:8px;background:rgba(10,11,14,0.65);
+  color:#e2e8f0;white-space:pre-wrap;word-break:break-word;overflow-y:auto;flex:1;min-height:0;
+  line-height:1.55;border:1px solid rgba(255,255,255,0.05);font-family:'DM Sans',sans-serif;font-size:clamp(13px,2.2vmin,15px);
+}
+.facilitator-desk-panel[hidden]{display:none;}
+
+/* Cohort deck (/foundry/deck/slug): facilitator assignment is the deck — not stacked on full Day 03 curriculum. */
+body.cohort-assessment-deck .slide[data-slide="1"],
+body.cohort-assessment-deck .slide[data-slide="2"],
+body.cohort-assessment-deck .slide[data-slide="3"],
+body.cohort-assessment-deck .slide[data-slide="4"],
+body.cohort-assessment-deck .slide[data-slide="5"]{display:none!important;}
+body.cohort-assessment-deck #facilitator-desk-banner{display:none!important;}
+body.cohort-assessment-deck .slide[data-slide="0"] .cohort-intro-body{
+  max-width:min(52rem,92vw);margin:1.5rem auto 0;padding:1.25rem 1.5rem;text-align:left;
+  background:rgba(6,10,18,0.78);border:1px solid rgba(251,146,60,0.35);border-radius:12px;
+  color:#e2e8f0;font-size:clamp(14px,2.4vmin,16px);line-height:1.65;font-family:'DM Sans',sans-serif;
+}
+body.cohort-assessment-deck .slide[data-slide="0"] .hero{font-size:clamp(2rem,6vmin,3.2rem);}
+
+/* Config / link problems — fixed under top chrome */
+.deck-config-alert{
+  position:fixed;left:0;right:0;z-index:45;
+  top:calc(env(safe-area-inset-top,0px) + var(--chrome-h) + var(--progress-h));
+  margin:0;padding:12px var(--pad-x);
+  background:rgba(127,29,29,0.94);border-bottom:1px solid rgba(248,113,113,0.45);
+  color:#fecaca;font-size:clamp(13px,2.35vmin,15px);line-height:1.55;
+  font-family:'DM Sans',sans-serif;
+  box-shadow:0 8px 24px rgba(0,0,0,0.35);
+}
+.deck-config-alert[hidden]{display:none!important;}
+body.deck-config-alert-on .deck{
+  top:calc(env(safe-area-inset-top,0px) + var(--chrome-h) + var(--progress-h) + 52px);
+}
+body.deck-config-alert-on.deck-config-alert-tall .deck{
+  top:calc(env(safe-area-inset-top,0px) + var(--chrome-h) + var(--progress-h) + 72px);
+}
+.cohort-step-hint{
+  font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,11px);
+  letter-spacing:0.12em;text-transform:uppercase;color:var(--cyan);margin-top:1rem;
+}
+.portal-steps{
+  display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px;
+}
+.portal-step{
+  font-family:'JetBrains Mono',monospace;font-size:clamp(10px,2vmin,11px);
+  letter-spacing:0.08em;text-transform:uppercase;
+  padding:6px 10px;border-radius:999px;border:1px solid var(--border);
+  color:var(--muted);background:rgba(16,17,26,0.6);
+}
+.portal-step.active{border-color:rgba(249,115,22,0.55);color:var(--orange);background:var(--orange-dim);}
+.portal-step.done{border-color:rgba(74,222,128,0.35);color:var(--green);}
+</style>
+</head>
+<body class="deck-mode">
+
+<div class="ambient"></div>
+<div class="grid-dots"></div>
+
+<!-- TOP CHROME -->
+<div class="chrome-top">
+  <div class="logo"><strong>QUBATORS</strong> AI FOUNDRY · DAY 04</div>
+  <div class="chrome-actions">
+    <button type="button" id="deckContrastToggle" class="chrome-contrast" title="Higher contrast palette" aria-pressed="false">Contrast</button>
+    <a href="/class" id="deckClassHubLink" class="facilitator-link" style="margin-right:12px">Class hub</a>
+    <a href="/training/facilitator/login" class="facilitator-link">Trainer login</a>
+    <span class="registry-link" title="Cohort summaries are instructor-only">Ideation summaries (instructors only)</span>
+    <div class="kbd-hints" aria-hidden="true">
+      <span class="key">←</span><span class="key">→</span> navigate
+      &nbsp;&nbsp;
+      <span class="key">ESC</span> close portal
+    </div>
+  </div>
+</div>
+<script>
+(function hubLinkFromQuery(){
+ try{
+ var slug=String(new URLSearchParams(location.search).get('assessment')||'').trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
+ if(slug.length<3){
+   var path0=String(location.pathname||'').replace(/\/$/,'')||'';
+   var mm=path0.match(/^\/foundry\/deck\/([^/]+)$/);
+   if(mm){
+     try{ slug=decodeURIComponent(mm[1]||''); }catch(__){ slug=mm[1]||''; }
+     slug=String(slug).trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
+   }
+ }
+ if(slug.length<3) return;
+ var a=document.getElementById('deckClassHubLink');
+ if(!a) return;
+ a.setAttribute('href','/learn/'+encodeURIComponent(slug));
+ a.textContent='Cohort hub';
+ a.setAttribute('title','Open your learner hub (workbook, links) — this page is slides + portal');
+ }catch(_){}})();
+</script>
+<div class="progress-bar" id="progressBar" role="progressbar" aria-valuemin="1" aria-valuemax="7" aria-valuenow="1" aria-label="Slide progress"></div>
+
+<div id="deckConfigAlert" class="deck-config-alert" role="alert" hidden></div>
+
+<div id="facilitator-desk-banner" class="facilitator-desk" hidden>
+  <div class="facilitator-desk-head">
+    <strong>Your facilitator&apos;s class desk</strong>
+    <button type="button" id="facilitator-desk-toggle" aria-expanded="true">Collapse</button>
+  </div>
+  <div id="facilitator-desk-panel" class="facilitator-desk-panel">
+    <p class="facilitator-desk-lead">Assignment brief, links, or reading — your facilitator wrote this for <em>your</em> cohort. It is shown on the slides and passed to the grader with your submission.</p>
+    <pre id="facilitator-desk-body" class="facilitator-desk-body"></pre>
+  </div>
+</div>
+
+<!-- ══ SLIDES ══ -->
+<div class="deck" role="region" aria-label="Lesson slides">
+
+  <!-- SLIDE 1: TITLE -->
+  <div class="slide active" data-slide="0">
+    <div class="badge">Day 04 · From Idea to Working Product</div>
+    <h1 class="hero">IDEA → <span class="or">CLICKABLE</span><br>MVP</h1>
+    <div class="subtitle">// Part 1 · Frontend &amp; UI/UX (Julius) · Part 2 · Backend &amp; data (Deacon Gift) · <strong>3-hour build day</strong></div>
+  </div>
+
+  <!-- SLIDE 2: DELIVERABLE -->
+  <div class="slide slide-mindset" data-slide="1">
+    <div class="tag">North star</div>
+    <h2 class="head">ONE SCREEN<br><span class="or">REAL DATA</span></h2>
+    <ul class="bullets bullets-mindset">
+      <li><span class="pip" aria-hidden="true"></span><div class="bullet-body"><p class="bullet-lead">Mandatory deliverable by end of class</p><p class="bullet-detail">Clickable frontend <strong>connected</strong> to basic backend logic — button saves, list updates, <strong>refresh still shows data</strong>.</p></div></li>
+      <li><span class="pip" aria-hidden="true"></span><div class="bullet-body"><p class="bullet-lead">Scope knife</p><p class="bullet-detail"><strong>1 user · 1 primary action · 1 data entity</strong> — not the whole platform today.</p></div></li>
+      <li><span class="pip" aria-hidden="true"></span><div class="bullet-body"><p class="bullet-lead">Stack</p><p class="bullet-detail"><code>index.html</code> + <code>app.js</code> + <code>localStorage</code> — no deploy required; open folder in Cursor.</p></div></li>
+    </ul>
+    <div class="big-q">Ask → spec → build → <span class="or">review</span> → iterate — same director mindset as Day 03.</div>
+  </div>
+
+  <!-- SLIDE 3: PART 1 UI -->
+  <div class="slide" data-slide="2">
+    <div class="tag">Part 1 · Frontend (90 min)</div>
+    <h2 class="head">UI THAT<br><span class="or">USERS GET</span></h2>
+    <div class="two-col">
+      <div class="col-card new">
+        <div class="col-lbl g">// Checklist</div>
+        <ul>
+          <li>One H1 + one primary CTA</li>
+          <li>Mobile-first (phone width first)</li>
+          <li>Trust line: what / for whom</li>
+          <li>Max 3 sections: Hero · Main · Footer</li>
+        </ul>
+      </div>
+      <div class="col-card old">
+        <div class="col-lbl r">// Hooks for Part 2</div>
+        <ul>
+          <li><code>id="btn-primary"</code></li>
+          <li>Input ids on every field</li>
+          <li><code>id="list-root"</code></li>
+          <li><code>id="insights-panel"</code></li>
+          <li>Link <code>app.js</code> at bottom</li>
+        </ul>
+      </div>
+    </div>
+    <p class="callout-strip"><strong>Context:</strong> Reuse your QAF idea + Day 03 architecture Frontend section in your Cursor prompt.</p>
+  </div>
+
+  <!-- SLIDE 4: BUILD -->
+  <div class="slide" data-slide="3">
+    <div class="tag">Build now</div>
+    <h2 class="head">GENERATE<br><span class="or">index.html</span></h2>
+    <div class="steps">
+      <div class="step"><span class="s-num">01</span><div class="s-body"><h3>New folder in Cursor</h3><p><code>qaf-[subgroup]-[name]-mvp</code> — open as project.</p></div></div>
+      <div class="step"><span class="s-num">02</span><div class="s-body"><h3>5-pillar frontend prompt</h3><p>Role · Task · Context · Constraints · Format — <strong>single HTML file</strong>, no React.</p></div></div>
+      <div class="step"><span class="s-num">03</span><div class="s-body"><h3>Two iterations (timed)</h3><p>A: clarity &amp; CTA · B: your specific user (labels, empty state).</p></div></div>
+      <div class="step"><span class="s-num">04</span><div class="s-body"><h3>Stub app.js</h3><p>Primary button logs <em>Wire me in Part 2</em> — do not delete before break.</p></div></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 5: HANDOFF -->
+  <div class="slide" data-slide="4">
+    <div class="tag">Break handoff</div>
+    <h2 class="head">HANDOFF<br><span class="or">CARD</span></h2>
+    <ul class="checklist">
+      <li><span class="chk-box" aria-hidden="true"></span>User + primary button action written down</li>
+      <li><span class="chk-box" aria-hidden="true"></span>All hook ids present in HTML</li>
+      <li><span class="chk-box" aria-hidden="true"></span>app.js linked; folder stays open</li>
+    </ul>
+    <p class="pillar-hint">Deacon wires save/load + insights — you keep the same folder.</p>
+    <a href="/foundry/day04-backend" class="cta-main" style="text-decoration:none;display:inline-block">Part 2 slides →</a>
+  </div>
+
+  <!-- SLIDE 6: PART 2 PREVIEW -->
+  <div class="slide" data-slide="5">
+    <div class="tag">Part 2 · Backend (90 min)</div>
+    <h2 class="head">DATA<br><span class="or">ENGINE</span></h2>
+    <div class="score-grid score-grid--dual">
+      <div class="s-card"><span class="s-pts">save</span><div class="s-title">localStorage</div><p class="s-desc">Array of records — load on start, save on click.</p></div>
+      <div class="s-card"><span class="s-pts">insight</span><div class="s-title">Data-driven</div><p class="s-desc">Count, top 3, or simple stat in #insights-panel.</p></div>
+    </div>
+    <p class="grader-note">Demo: add 3 items → refresh → still there → explain what is stored.</p>
+  </div>
+
+  <!-- SLIDE 7: SUBMIT -->
+  <div class="slide" data-slide="6">
+    <div class="tag">Submit · Day 04</div>
+    <h2 class="head">PROVE<br><span class="or">IT WORKS</span></h2>
+    <ul class="checklist" id="missionChecklist">
+      <li><label class="checklist-row"><input type="checkbox" class="checklist-cb" autocomplete="off"><span class="chk-text">Primary button saves and updates the list</span></label></li>
+      <li><label class="checklist-row"><input type="checkbox" class="checklist-cb" autocomplete="off"><span class="chk-text">Refresh keeps data visible</span></label></li>
+      <li><label class="checklist-row"><input type="checkbox" class="checklist-cb" autocomplete="off"><span class="chk-text">Ready to paste prompt + app.js + demo checklist</span></label></li>
+    </ul>
+    <button type="button" class="cta-main" onclick="void openPortal()">SUBMIT DAY 04 MVP ↓</button>
+    <p class="cta-sub">// Graded: UI craft /10 + backend logic /10</p>
+    <button type="button" class="cta-secondary" id="btnLastGrade" onclick="void viewLastGradeOnDevice()">See my last grade on this device</button>
+  </div>
+
+</div><!-- /deck -->
+
+<!-- NAV BAR -->
+<nav class="nav" aria-label="Slide navigation">
+  <button type="button" class="nav-btn" onclick="prevSlide()" title="Previous slide" aria-label="Previous slide">&#8592;</button>
+  <div class="slide-dots" id="dots" role="tablist" aria-label="Slides"></div>
+  <button type="button" class="nav-btn" onclick="nextSlide()" title="Next slide" aria-label="Next slide">&#8594;</button>
+  <span class="slide-num" id="slideNum" aria-live="polite">01 / 07</span>
+</nav>
+
+<!-- ══ PORTAL ══ -->
+<div class="portal" id="portal" role="dialog" aria-modal="true" aria-labelledby="portalTitle" aria-hidden="true">
+  <div class="portal-inner">
+
+    <div class="p-header">
+      <div>
+        <div class="tag" style="margin-bottom:10px;">AI Grader Agent</div>
+        <div class="p-title" id="portalTitle">FOUNDRY <span class="or">PORTAL</span></div>
+      </div>
+      <button type="button" class="back-btn" onclick="closePortal()">← Back to Slides</button>
+    </div>
+
+    <div class="privacy-banner">
+      <strong>Foundry portal.</strong> Your work is graded automatically when you submit. It is saved for your facilitator and program staff only — not visible to other students. Paste only coursework you are comfortable sharing for class.
+      <div id="portal-assessment-label" class="fhint" style="margin-top:10px;color:#bef264;font-family:JetBrains Mono,monospace;"></div>
+      <p id="portal-submissions-closed" class="fhint" role="alert" style="display:none;margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.35);color:#fca5a5;font-weight:600;font-family:JetBrains Mono, monospace;"></p>
+      <div id="portalBookmarkHint" class="bookmark-lite" role="note" style="margin-top:10px;display:none"></div>
+    </div>
+
+    <div id="portalLearnerChecklistWrap" class="portal-checklist-wrap" hidden>
+      <h4>Before you submit</h4>
+      <ul id="portalLearnerChecklistUl"></ul>
+    </div>
+
+    <nav class="portal-steps" id="portalSteps" aria-label="Submit steps">
+      <span class="portal-step active" data-portal-step="1" id="portalStep1">1 · You</span>
+      <span class="portal-step" data-portal-step="2" id="portalStep2">2 · Your work</span>
+      <span class="portal-step" data-portal-step="3" id="portalStep3">3 · Submit</span>
+    </nav>
+
+    <!-- FORM -->
+    <div class="fgroup">
+      <label class="flabel" for="sName" id="portal-lbl-name">01 · Fellow / student name</label>
+      <p class="fhint" id="portal-hint-name">Fellow name · your full name as used on the roster.</p>
+      <input type="text" id="sName" class="fi" placeholder="Your full name" autocomplete="name">
+      <p class="field-err" id="err-name">Enter your fellow name and full name.</p>
+    </div>
+
+    <div class="fgroup">
+      <label class="flabel" for="subGroup" id="portal-lbl-subgroup">02 · Subgroup</label>
+      <p class="fhint" id="portal-hint-subgroup">Pick the subgroup your facilitator assigned (often the same as on signup or ideation forms).</p>
+      <select id="subGroup" class="fi select-fi" aria-required="true">
+        <option value="">Loading subgroups…</option>
+      </select>
+      <p class="field-err" id="err-sub">Select your subgroup from the dropdown.</p>
+    </div>
+
+    <div class="fgroup">
+      <label class="flabel" for="aPrompt" id="portal-lbl-prompt">03 · Frontend build prompt (5 pillars)</label>
+      <p class="fhint" id="portal-hint-prompt">Paste the exact Cursor prompt for index.html — Role, Task, Context, Constraints, Format.</p>
+      <textarea id="aPrompt" class="fi code" rows="9" placeholder="Role: Senior product UI engineer...&#10;Task: One index.html + embedded CSS...&#10;Context: [your QAF product idea]...&#10;Constraints: mobile-first, single file, no frameworks...&#10;Format: Hero / Main / Footer + hook ids for app.js"></textarea>
+      <p class="field-err" id="err-prompt">Paste your full prompt.</p>
+    </div>
+
+    <div class="fgroup">
+      <label class="flabel" for="aOutput" id="portal-lbl-output">04 · app.js + data logic</label>
+      <p class="fhint" id="portal-hint-output">Paste app.js (save/load, primary button, render list/insights). Say what happens after refresh.</p>
+      <textarea id="aOutput" class="fi code" rows="11" placeholder="// loadData / saveData / renderList&#10;// btn-primary click handler&#10;// localStorage key: qaf_mvp_records"></textarea>
+      <p class="field-err" id="err-output">Paste enough app.js to show persistence and the primary action.</p>
+    </div>
+
+    <div id="portalExtraAnswersMount" aria-live="polite"></div>
+
+    <button type="button" class="submit-btn" id="subBtn" onclick="grade()">SUBMIT FOR GRADING →</button>
+
+    <!-- LOADING -->
+    <div class="loading" id="loading" aria-live="polite">
+      <div class="spinner" role="status" aria-label="Loading"></div>
+      <div class="spin-lbl">Agent reviewing your blueprint...</div>
+      <p class="spin-sub">Checking pillars · Validating architecture · Scoring logic</p>
+    </div>
+
+    <!-- RESULT -->
+    <div class="result" id="result" aria-live="polite">
+      <div class="r-score" id="rScore">—</div>
+      <div class="r-grade" id="rGrade">PROCESSING</div>
+      <div class="b-grid" id="bGrid"></div>
+      <div class="lu-box">
+        <div class="lu-lbl">⚡ Level Up Tip</div>
+        <div class="lu-txt" id="luTip">—</div>
+      </div>
+      <div class="verdict" id="verdict">—</div>
+      <p id="gradingProviderNote" class="grading-provider-note" style="display:none" aria-live="polite"></p>
+      <a id="levelUpLink" class="level-up-link" target="_blank" rel="noopener noreferrer" style="display:none">Next facilitator step →</a>
+      <div class="receipt-box" id="receiptBox" style="display:none" aria-live="polite">
+        <strong>Saved for your facilitator</strong>
+        <p id="receiptWhen" style="margin-top:6px"></p>
+        <p class="receipt-id" id="receiptId"></p>
+        <p style="margin-top:8px;font-size:12px">Screenshot or copy the reference if you need proof of submission.</p>
+      </div>
+      <button type="button" class="reset-btn" onclick="resetForm()">Submit Another →</button>
+    </div>
+
+  </div>
+</div><!-- /portal -->
+
+<script>
+const TOTAL = 7;
+let cur = 0;
+
+document.body.classList.add('deck-mode');
+
+function setProgressA11y(){
+  const bar=document.getElementById('progressBar');
+  bar.setAttribute('aria-valuenow',String(cur+1));
+  bar.setAttribute('aria-valuemax',String(TOTAL));
+}
+/** Slides shown in lesson deck only (avoid matching unrelated `.slide` if markup grows). */
+function getDeckSlideEls(){
+  return document.querySelectorAll('.deck > .slide[data-slide]');
+}
+
+/** Mirrors applyCohortDeckPresentation — two-step deck hides slides 1–5 via CSS when slug + loaded config succeeded. */
+function isFacilitatorCohortDeckMode(){
+  return !!(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK);
+}
+
+// ── DOTS ──
+const dotsEl = document.getElementById('dots');
+for(let i=0;i<TOTAL;i++){
+  const d = document.createElement('button');
+  d.type='button';
+  d.className='dot-pip'+(i===0?' active':'');
+  d.setAttribute('role','tab');
+  d.setAttribute('aria-label','Go to slide '+(i+1));
+  d.onclick=()=>goTo(i);
+  dotsEl.appendChild(d);
+}
+
+function visibleSlideIndices(){
+  var cohort=document.body.classList.contains('cohort-assessment-deck');
+  /** If URL has a facilitator slug and config succeeded, cohort mode hides slides 1–5 — keep navigation in sync even if JS state is stale. */
+  if(cohort||isFacilitatorCohortDeckMode())
+    return [0, 6];
+  var out=[];
+  for(var si=0;si<TOTAL;si++) out.push(si);
+  return out;
+}
+
+function reconcileDeckSlideClasses(){
+  var slides=getDeckSlideEls();
+  if(!slides.length) return;
+  for(var j=0;j<slides.length;j++){
+    slides[j].classList.toggle('active',j===cur);
+    slides[j].classList.remove('exit');
+  }
+}
+
+function updateUI(){
+  const visRaw=visibleSlideIndices();
+  if(visRaw.indexOf(cur)<0){
+    cur=visRaw.length?visRaw[0]:0;
+    reconcileDeckSlideClasses();
+  }
+  const vis=visibleSlideIndices();
+  const pos=Math.max(0,vis.indexOf(cur));
+  const displayTotal=vis.length;
+  const displayNum=pos>=0?pos+1:1;
+  document.querySelectorAll('.dot-pip').forEach((d,i)=>{
+    const show=vis.includes(i);
+    d.style.display=show?'':'none';
+    d.classList.toggle('active',i===cur);
+  });
+  document.getElementById('slideNum').textContent=String(displayNum).padStart(2,'0')+' / '+String(displayTotal).padStart(2,'0');
+  document.getElementById('progressBar').style.width=(displayNum/displayTotal*100)+'%';
+  const bar=document.getElementById('progressBar');
+  if(bar) bar.setAttribute('aria-valuenow',String(displayNum));
+  if(bar) bar.setAttribute('aria-valuemax',String(displayTotal));
+}
+
+function goTo(n){
+  const slides=getDeckSlideEls();
+  const target=typeof n === 'number' && Number.isFinite(n) ? Math.floor(n) : 0;
+  if(!slides.length||target < 0 || target>=slides.length) return;
+  if(typeof cur === 'number' && cur>=0 && cur<slides.length){
+    slides[cur].classList.remove('active');
+    slides[cur].classList.add('exit');
+  }
+  const prev=(typeof cur==='number'&&cur>=0)?cur:0;
+  cur=target;
+  setTimeout(()=>{
+    try{slides[prev] && slides[prev].classList.remove('exit')}catch(__){/**/}
+  },500);
+  slides[cur].classList.add('active');
+  updateUI();
+}
+
+function nextSlide(){
+  const vis=visibleSlideIndices();
+  var i=vis.indexOf(cur);
+  if(i<0){
+    cur=vis.length?vis[0]:0;
+    reconcileDeckSlideClasses();
+    updateUI();
+    return;
+  }
+  if(i>=0&&i<vis.length-1) goTo(vis[i+1]);
+}
+function prevSlide(){
+  const vis=visibleSlideIndices();
+  var i=vis.indexOf(cur);
+  if(i<0){
+    cur=vis.length?vis[0]:0;
+    reconcileDeckSlideClasses();
+    updateUI();
+    return;
+  }
+  if(i>0) goTo(vis[i-1]);
+}
+
+document.addEventListener('keydown',e=>{
+  if(document.getElementById('portal').classList.contains('open')){
+    if(e.key==='Escape')closePortal();
+    return;
+  }
+  const t=e.target;
+  const tag=t&&t.tagName;
+  const typing=tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(t&&t.isContentEditable);
+  if(typing)return;
+  if(e.key==='ArrowRight'||e.key===' ')nextSlide();
+  if(e.key==='ArrowLeft')prevSlide();
+});
+
+// ── PORTAL ──
+/** Same list as lib/foundry-subgroups.ts — used when no DB / default deck. */
+const FALLBACK_QAF_SUBGROUPS = [
+  'Bethel','Carmel','Eden','Gilead','Goshen','Hebron','Israel','Zion','Other / not listed',
+];
+
+const FOUNDRY_COURSE_SLUG_KEY = 'foundry.courseSlug.v1';
+
+function resolveAssessmentSlug(){
+  if(typeof location==='undefined') return '';
+  let slug='';
+  const qRaw=(new URLSearchParams(location.search).get('assessment')||'').trim().toLowerCase();
+  slug=qRaw.replace(/[^a-z0-9-]/g,'');
+  if(!slug||slug.length<3){
+    const pathClean=(location.pathname||'').replace(/\/$/,'')||'';
+    const m=pathClean.match(/^\/foundry\/deck\/([^/]+)$/);
+    if(m){
+      try{ slug=decodeURIComponent(m[1]||''); }catch(__){ slug=m[1]||''; }
+      slug=String(slug).trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
+    }
+  }
+  if(slug&&slug.length>=3){
+    try{ sessionStorage.setItem(FOUNDRY_COURSE_SLUG_KEY, slug); }catch(_){}
+    const deckPath='/foundry/deck/'+encodeURIComponent(slug);
+    const pathNow=(location.pathname||'').replace(/\/$/,'')||'';
+    if(pathNow.startsWith('/foundry/deck/')){
+      if(pathNow!==deckPath){
+        history.replaceState(null,'',deckPath+(location.search||''));
+      }
+    }else{
+      const params=new URLSearchParams(location.search);
+      if(params.get('assessment')!==slug){
+        params.set('assessment',slug);
+        const q=params.toString();
+        history.replaceState(null,'',location.pathname+(q?('?'+q):''));
+      }
+    }
+    return slug;
+  }
+  /** Do NOT read sessionStorage into the deck URL — that forced the last lab slug onto “/” and bare /foundry/day03 so students graded the wrong cohort. Persisted slug is still used by /learn/… + workbook outbound links via Class hub. */
+  return '';
+}
+
+let ASSESSMENT_SLUG = resolveAssessmentSlug();
+
+function syncDeckClassHubLink(){
+  const a = document.getElementById('deckClassHubLink');
+  if(!a) return;
+  if(ASSESSMENT_SLUG){
+    a.href = '/learn/' + encodeURIComponent(ASSESSMENT_SLUG);
+    a.textContent = 'Cohort hub';
+    a.title = 'Open your learner hub (workbook, links) — this page is slides + portal';
+  }else{
+    a.href = '/class';
+    a.textContent = 'Class hub';
+    a.title = 'Generic program hub — your facilitator\'s cohort uses /learn/your-course';
+  }
+}
+
+/** Server-driven min lengths (facilitator assessment or legacy defaults). */
+let CFG_MIN_PROMPT = 40;
+let CFG_MIN_OUTPUT = 80;
+let CURRENT_ASSESSMENT_TITLE = '';
+let CURRENT_ASSESSMENT_INTRO = '';
+let CFG_COHORT_CONFIG_OK = false;
+/** True after first assessment-config fetch finishes (avoids error banner flash while loading). */
+let CFG_CONFIG_LOAD_DONE = false;
+let CURRENT_LEVEL_UP_URL = '';
+let CURRENT_STUDENT_CHECKLIST = [];
+/** Faculty-defined textarea questions beyond portal fields 03/04 — rebuilt from GET /api/foundry/assessment-config */
+let CFG_EXTRA_ANSWER_SLOT_COUNT = 0;
+let CFG_EXTRA_ANSWER_SLOTS = [];
+let SLIDE_0_DEFAULT_HTML = "";
+let SLIDE_6_DEFAULT_HTML = "";
+
+function captureDefaultSlideHtml(){
+  if(!SLIDE_0_DEFAULT_HTML){
+    const s0=document.querySelector(".slide[data-slide=\"0\"]");
+    if(s0) SLIDE_0_DEFAULT_HTML=s0.innerHTML;
+  }
+  if(!SLIDE_6_DEFAULT_HTML){
+    const s6=document.querySelector(".slide[data-slide=\"6\"]");
+    if(s6) SLIDE_6_DEFAULT_HTML=s6.innerHTML;
+  }
+}
+
+function escapeHtml(s){
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+function attrEscQuotes(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+/** DOM id prefix for facilitator extra textarea (must match rebuildPortalExtraAnswerSlots). */
+function portalExtraFieldGid(slotId){
+  return 'extraTa_'+String(slotId||'').replace(/[^a-zA-Z0-9_-]/g,'_');
+}
+
+function sanitizeExtraSlotsClient(raw){
+  if(!Array.isArray(raw)||!raw.length)return [];
+  var out=[];
+  for(var i=0;i<raw.length&&out.length<6;i++){
+    var it=raw[i];
+    if(!it||typeof it!=='object')continue;
+    var label=String(it.label||'').trim();
+    if(!label)continue;
+    var idRaw=String(it.id||'').trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
+    var id=idRaw.length>=2?idRaw.slice(0,40):('x'+Math.random().toString(36).slice(2,10));
+    out.push({
+      id:id,
+      label:label.slice(0,200),
+      hint:String(it.hint||'').trim().slice(0,600),
+      placeholder:String(it.placeholder||'').trim().slice(0,2000),
+      required:it.required===true
+    });
+  }
+  return out;
+}
+
+function rebuildPortalExtraAnswerSlots(raw){
+  var slots=sanitizeExtraSlotsClient(raw||[]);
+  CFG_EXTRA_ANSWER_SLOTS=slots;
+  CFG_EXTRA_ANSWER_SLOT_COUNT=slots.length;
+  var mount=document.getElementById('portalExtraAnswersMount');
+  if(!mount)return;
+  mount.innerHTML='';
+  for(var i=0;i<slots.length;i++){
+    var s=slots[i];
+    var gid=portalExtraFieldGid(s.id);
+    var wrap=document.createElement('div');
+    wrap.className='fgroup portal-extra-slot';
+    var ht=s.hint?('<p class="fhint" id="'+gid+'_hint">'+escapeHtml(s.hint)+'</p>'):'';
+    wrap.innerHTML='<label class="flabel" for="'+gid+'">'+escapeHtml(s.label)+(s.required?' · required':' · optional')+'</label>'
+      +ht
+      +'<textarea id="'+gid+'" class="fi code portal-extra-input" rows="5" data-extra-id="'+escapeHtml(s.id)+'" placeholder="'+attrEscQuotes(s.placeholder||'')+'"></textarea>'
+      +'<p class="field-err" id="'+gid+'_err">'+(s.required?escapeHtml('Please complete this field.'):escapeHtml('Optional — add detail if helpful.'))+'</p>';
+    mount.appendChild(wrap);
+    var ta=document.getElementById(gid);
+    if(ta&&s.hint) ta.setAttribute('aria-describedby', gid+'_hint');
+  }
+}
+
+function facilitatorPortalSuffix(cfg){
+  const dn=typeof cfg.facilitatorDisplayName==='string'?cfg.facilitatorDisplayName.trim():'';
+  if(dn) return ' · Facilitator: '+dn;
+  const em=typeof cfg.facilitatorEmail==='string'?cfg.facilitatorEmail.trim():'';
+  if(em){
+    const local=em.split('@')[0]||em;
+    return ' · Facilitator: '+local;
+  }
+  return '';
+}
+
+function applyPortalFormFromConfig(raw){
+  try{
+    if(raw&&typeof raw==='object'){
+      var rows=[
+        ['name','portal-lbl-name','portal-hint-name','sName','err-name'],
+        ['subgroup','portal-lbl-subgroup','portal-hint-subgroup','subGroup','err-sub'],
+        ['prompt','portal-lbl-prompt','portal-hint-prompt','aPrompt','err-prompt'],
+        ['output','portal-lbl-output','portal-hint-output','aOutput','err-output'],
+      ];
+      for(var i=0;i<rows.length;i++){
+        var key=rows[i][0];
+        var blob=raw[key];
+        if(!blob||typeof blob!=='object') continue;
+        var lbl=document.getElementById(rows[i][1]);
+        if(lbl&&blob.label!=null) lbl.textContent=String(blob.label);
+        var hint=document.getElementById(rows[i][2]);
+        if(hint&&blob.hint!=null) hint.textContent=String(blob.hint);
+        var fld=document.getElementById(rows[i][3]);
+        if(fld&&(fld.tagName==='TEXTAREA'||fld.tagName==='INPUT')&&blob.placeholder!=null){
+          fld.placeholder=String(blob.placeholder);
+        }
+        var er=document.getElementById(rows[i][4]);
+        if(er&&blob.fieldError!=null) er.textContent=String(blob.fieldError);
+      }
+    }
+  }catch(_){ /* ignore */ }
+  syncPortalInputAria();
+}
+
+function syncPortalBookmarkHint(){
+  try{
+    const el=document.getElementById('portalBookmarkHint');
+    if(!el) return;
+    if(location.protocol==='file:'){
+      el.style.display='block';
+      el.textContent='This page was opened offline from a saved file — grading cannot run. Ask your facilitator for the hosted link.';
+      return;
+    }
+    el.style.display='block';
+    el.textContent='Use your facilitator\'s hosted link (not an old saved copy); bookmark this page on the live site so /api stays reachable.';
+  }catch(_){}
+}
+
+/** Level-up URL + learner checklist bullets from GET /api/foundry/assessment-config */
+function ingestAssessmentConfigPayload(j){
+  try{
+    j=j||{};
+    const u = typeof j.levelUpUrl === 'string' ? j.levelUpUrl.trim() : '';
+    CURRENT_LEVEL_UP_URL = /^https?:\/\//i.test(u) ? u : '';
+    const list = Array.isArray(j.studentChecklist) ? j.studentChecklist : [];
+    CURRENT_STUDENT_CHECKLIST = list.map(function(x){ return String(x||'').trim(); }).filter(Boolean);
+    syncPortalMiniChecklist();
+  }catch(_){
+    CURRENT_LEVEL_UP_URL='';
+    CURRENT_STUDENT_CHECKLIST=[];
+    syncPortalMiniChecklist();
+  }
+  syncPortalBookmarkHint();
+}
+
+function syncPortalMiniChecklist(){
+  try{
+    const wrap=document.getElementById('portalLearnerChecklistWrap');
+    const ul=document.getElementById('portalLearnerChecklistUl');
+    if(!wrap||!ul) return;
+    if(!CURRENT_STUDENT_CHECKLIST.length){
+      wrap.hidden=true;
+      ul.innerHTML='';
+      return;
+    }
+    wrap.hidden=false;
+    ul.innerHTML=CURRENT_STUDENT_CHECKLIST.map(function(line){
+      return '<li>'+escapeHtml(line)+'</li>';
+    }).join('');
+  }catch(_){}
+}
+
+function syncPortalInputAria(){
+  try{
+    const n=document.getElementById('sName'); if(n) n.setAttribute('aria-describedby','portal-hint-name');
+    const sg=document.getElementById('subGroup'); if(sg) sg.setAttribute('aria-describedby','portal-hint-subgroup');
+    const pr=document.getElementById('aPrompt'); if(pr) pr.setAttribute('aria-describedby','portal-hint-prompt');
+    const ou=document.getElementById('aOutput'); if(ou) ou.setAttribute('aria-describedby','portal-hint-output');
+  }catch(_){}
+}
+
+var __portalDraftT=null;
+const PORTAL_DRAFT_LS='foundry.portalDraft.v2';
+
+function portalDraftSlot(){ return ASSESSMENT_SLUG || '__builtin__'; }
+
+function readPortalDraftBag(){
+  try{ return JSON.parse(localStorage.getItem(PORTAL_DRAFT_LS)||'{}'); }
+  catch(_){ return {}; }
+}
+
+function writePortalDraftBag(bag){ try{ localStorage.setItem(PORTAL_DRAFT_LS, JSON.stringify(bag)); }catch(_){} }
+
+function clearPortalDraftSlot(){
+  try{
+    const bag=readPortalDraftBag();
+    delete bag[portalDraftSlot()];
+    writePortalDraftBag(bag);
+  }catch(_){}
+}
+
+function savePortalDraftSnapshot(){
+  try{
+    const n=document.getElementById('sName'); const g=document.getElementById('subGroup'); const p=document.getElementById('aPrompt'); const o=document.getElementById('aOutput');
+    if(!n||!g||!p||!o) return;
+    const bag=readPortalDraftBag();
+    bag[portalDraftSlot()]={
+      name:n.value||'',
+      subgroup:g.value||'',
+      prompt:p.value||'',
+      output:o.value||'',
+      savedAt:Date.now(),
+      extraAnswers:(function(){
+        var ex={};
+        document.querySelectorAll('#portalExtraAnswersMount textarea[data-extra-id]').forEach(function(el){
+          var sid=el.getAttribute('data-extra-id');
+          if(sid) ex[sid]=el.value||'';
+        });
+        return ex;
+      })(),
+    };
+    writePortalDraftBag(bag);
+  }catch(_){}
+}
+
+function schedulePortalDraftSave(){
+  clearTimeout(__portalDraftT);
+  __portalDraftT=setTimeout(savePortalDraftSnapshot,520);
+}
+
+function tryRestorePortalDraft(){
+  try{
+    const bag=readPortalDraftBag()[portalDraftSlot()];
+    if(!bag||typeof bag!=='object') return;
+    var maxAge = 14*24*60*60*1000;
+    if(Date.now()-(bag.savedAt||0) > maxAge){ clearPortalDraftSlot(); return; }
+    var n=document.getElementById('sName'); var p=document.getElementById('aPrompt'); var o=document.getElementById('aOutput'); var g=document.getElementById('subGroup');
+    if(!n||!p||!o)return;
+    var hasTyped=n.value.trim()||p.value.trim()||o.value.trim();
+    if(hasTyped) return;
+    if(typeof bag.name==='string') n.value=bag.name;
+    if(typeof bag.prompt==='string') p.value=bag.prompt;
+    if(typeof bag.output==='string') o.value=bag.output;
+    if(g && g.dataset.ready==='1' && typeof bag.subgroup==='string' && bag.subgroup){
+      for(var i=0;i<g.options.length;i++){ if(g.options[i].value===bag.subgroup){ g.selectedIndex=i; break; } }
+    }
+    if(bag.extraAnswers&&typeof bag.extraAnswers==='object'&&!Array.isArray(bag.extraAnswers)){
+      document.querySelectorAll('#portalExtraAnswersMount textarea[data-extra-id]').forEach(function(el){
+        var sid=el.getAttribute('data-extra-id');
+        if(!sid)return;
+        var v=bag.extraAnswers[sid];
+        if(typeof v==='string') el.value=v;
+      });
+    }
+  }catch(_){}
+}
+
+function syncFacilitatorDesk(){
+  const wrap=document.getElementById('facilitator-desk-banner');
+  const bodyEl=document.getElementById('facilitator-desk-body');
+  const panel=document.getElementById('facilitator-desk-panel');
+  const btn=document.getElementById('facilitator-desk-toggle');
+  if(!wrap||!bodyEl||!panel)return;
+  const text=(CURRENT_ASSESSMENT_INTRO||'').trim();
+  if(!ASSESSMENT_SLUG||!text){
+    wrap.hidden=true;
+    bodyEl.textContent='';
+    return;
+  }
+  wrap.hidden=false;
+  bodyEl.textContent=text;
+  if(btn){
+    const open=!panel.hidden;
+    btn.setAttribute('aria-expanded',open?'true':'false');
+    btn.textContent=open?'Collapse':'Expand';
+  }
+}
+
+function deckStepSubmitRequested(){
+  try{
+    var p=new URLSearchParams(location.search);
+    if(p.get('step')==='submit'||p.get('submit')==='1') return true;
+    var h=(location.hash||'').replace(/^#/,'').toLowerCase();
+    return h==='submit'||h==='portal';
+  }catch(_){ return false; }
+}
+
+/** Go to submit slide (6) — safe for cohort two-step deck and full Day 03 deck. */
+function goToSubmitSlide(){
+  var vis=visibleSlideIndices();
+  if(vis.indexOf(6)>=0){ goTo(6); return; }
+  if(vis.length) goTo(vis[vis.length-1]);
+}
+
+function syncDeckConfigBanner(){
+  var el=document.getElementById('deckConfigAlert');
+  if(!el) return;
+  var show=false;
+  var msg='';
+  if(typeof location!=='undefined' && location.protocol==='file:'){
+    show=true;
+    msg='You opened a saved copy of this page on your computer. Grading will not work. Ask your facilitator for the live https link.';
+  }else if(ASSESSMENT_SLUG && CFG_CONFIG_LOAD_DONE && !CFG_COHORT_CONFIG_OK){
+    show=true;
+    msg='We could not load course settings for “'+ASSESSMENT_SLUG+'”. Use the full link your facilitator sent (/foundry/deck/'+ASSESSMENT_SLUG+' or /learn/'+ASSESSMENT_SLUG+'). If this keeps happening, contact your facilitator.';
+  }
+  el.hidden=!show;
+  el.textContent=msg;
+  document.body.classList.toggle('deck-config-alert-on',show);
+  document.body.classList.toggle('deck-config-alert-tall',show && msg.length>120);
+}
+
+function finishDeckPresentationNav(){
+  syncDeckConfigBanner();
+  var vis=visibleSlideIndices();
+  if(vis.indexOf(cur)<0) cur=vis.length?vis[0]:0;
+  if(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK && deckStepSubmitRequested() && vis.indexOf(6)>=0){
+    cur=6;
+  }
+  reconcileDeckSlideClasses();
+  updateUI();
+}
+
+function setPortalStepActive(stepNum){
+  var n=Number(stepNum);
+  if(!n||n<1||n>3) return;
+  document.querySelectorAll('.portal-step').forEach(function(el){
+    var s=Number(el.getAttribute('data-portal-step'));
+    el.classList.remove('active','done');
+    if(s<n) el.classList.add('done');
+    else if(s===n) el.classList.add('active');
+  });
+}
+
+function syncPortalStepFromFocus(){
+  var sub=document.getElementById('subGroup');
+  var pr=document.getElementById('aPrompt');
+  var ou=document.getElementById('aOutput');
+  var active=document.activeElement;
+  if(ou&&(active===ou||document.getElementById('subBtn')===active)) setPortalStepActive(3);
+  else if(pr&&active===pr) setPortalStepActive(2);
+  else if(sub&&(active===sub||(document.getElementById('sName')===active))) setPortalStepActive(1);
+}
+
+function attachPortalStepListeners(){
+  var portal=document.getElementById('portal');
+  if(!portal||portal.dataset.stepListeners==='1') return;
+  portal.dataset.stepListeners='1';
+  portal.addEventListener('focusin',function(){ syncPortalStepFromFocus(); },true);
+  portal.addEventListener('input',function(){ syncPortalStepFromFocus(); },true);
+}
+
+/** Cohort URL: one assignment deck (title + intro) + submit slide — not generic Day 03 slides on top. */
+function applyCohortDeckPresentation(){
+  captureDefaultSlideHtml();
+  const isCohort = !!(ASSESSMENT_SLUG && CFG_COHORT_CONFIG_OK);
+  document.body.classList.toggle('cohort-assessment-deck', isCohort);
+  if(!isCohort){
+    const slide0r=document.querySelector('.slide[data-slide="0"]');
+    const slide6r=document.querySelector('.slide[data-slide="6"]')||document.querySelector('.slide[data-slide="4"]');
+    if(slide0r&&SLIDE_0_DEFAULT_HTML) slide0r.innerHTML=SLIDE_0_DEFAULT_HTML;
+    if(slide6r&&SLIDE_6_DEFAULT_HTML) slide6r.innerHTML=SLIDE_6_DEFAULT_HTML;
+    const logor=document.querySelector('.chrome-top .logo');
+    if(logor) logor.innerHTML='<strong>QUBATORS</strong> AI FOUNDRY · DAY 04';
+    syncFacilitatorDesk();
+  }else{
+  const wrap=document.getElementById('facilitator-desk-banner');
+  if(wrap) wrap.hidden=true;
+  const slide0=document.querySelector('.slide[data-slide="0"]');
+  if(slide0){
+    const title=CURRENT_ASSESSMENT_TITLE.trim()||('Course · '+ASSESSMENT_SLUG);
+    const intro=(CURRENT_ASSESSMENT_INTRO||'').trim();
+    const introBlock=intro
+      ? '<div class="cohort-intro-body">'+escapeHtml(intro).replace(/\n/g,'<br>')+'</div>'
+      : '<p class="subtitle" style="margin-top:1.25rem">Your facilitator will add assignment details here. Use the next slide to submit when ready.</p>';
+    slide0.innerHTML=
+      '<div class="badge">Your course · '+escapeHtml(ASSESSMENT_SLUG)+'</div>'+
+      '<h1 class="hero">'+escapeHtml(title)+'</h1>'+
+      introBlock+
+      '<p class="subtitle" style="margin-top:1.25rem">Grading uses your facilitator&apos;s rubric for this cohort.</p>'+
+      '<p class="cohort-step-hint">Step 1 of 2 · read your assignment</p>'+
+      '<button type="button" class="cta-main" style="margin-top:1.25rem" onclick="goToSubmitSlide()">Continue to submit →</button>';
+  }
+  const logo=document.querySelector('.chrome-top .logo');
+  if(logo&&CURRENT_ASSESSMENT_TITLE.trim()){
+    logo.innerHTML='<strong>QUBATORS</strong> · '+escapeHtml(CURRENT_ASSESSMENT_TITLE.trim());
+  }
+  const slide6=document.querySelector('.slide[data-slide="6"]')||document.querySelector('.slide[data-slide="4"]');
+  if(slide6){
+    const submitTitle=CURRENT_ASSESSMENT_TITLE.trim()||ASSESSMENT_SLUG;
+    const checklistLines=CURRENT_STUDENT_CHECKLIST.slice();
+    checklistLines.push('Paste lengths · at least '+CFG_MIN_PROMPT+' characters in the first portal box and '+CFG_MIN_OUTPUT+' in the second unless your facilitator said otherwise.');
+    if(CFG_EXTRA_ANSWER_SLOT_COUNT>0){
+      checklistLines.push('Answer '+CFG_EXTRA_ANSWER_SLOT_COUNT+' additional facilitator question(s) in the portal (below the usual two paste boxes).');
+    }
+    const prepBody=checklistLines.map(function(l){ return '<li>'+escapeHtml(l)+'</li>'; }).join('');
+    slide6.innerHTML=
+      '<div class="tag">Submit assignment</div>'+
+      '<h2 class="head">'+escapeHtml(submitTitle)+'</h2>'+
+      '<p class="cohort-step-hint">Step 2 of 2 · submit your work</p>'+
+      '<p class="subtitle" style="max-width:36rem;margin:0.75rem auto 0">When your work is ready, open the portal below. Use the arrow keys or dots to return to the assignment brief on the previous screen.</p>'+
+      '<div class="submit-prep">'+
+      '<h4>Before you submit</h4>'+
+      '<ul>'+prepBody+'</ul></div>'+
+      '<button type="button" class="cta-main" onclick="void openPortal()">SUBMIT FOR GRADING →</button>'+
+      '<p class="cta-sub">// Graded with your facilitator&apos;s rubric · saved to their inbox only</p>'+
+      '<button type="button" class="cta-secondary" id="btnLastGrade" onclick="void viewLastGradeOnDevice()">See my last grade on this device</button>';
+    const btnLast=document.getElementById('btnLastGrade');
+    if(btnLast) btnLast.style.display=lastGradeForCurrentAssessment()?'':'none';
+  }
+  }
+
+  finishDeckPresentationNav();
+}
+
+/** Facilitator assessments can be closed to block repeat submissions server-side too. */
+let CFG_SUBMISSIONS_OPEN = true;
+/** When the deck has no ?assessment=, the server returns legacy built‑in subgroup limits (global site‑default grading was removed). */
+let SITE_DEFAULT_MODE = false;
+function applyDeckDocumentTitle(){
+  try{
+    if(typeof document==='undefined') return;
+    if(ASSESSMENT_SLUG && CURRENT_ASSESSMENT_TITLE.trim()){
+      document.title = CURRENT_ASSESSMENT_TITLE.trim()+' · Foundry · Qubators AI';
+      return;
+    }
+    document.title = 'Day 04 · Build Day | Qubators AI Foundry';
+  }catch(_){/* ignore */}
+}
+const STUDENT_STORE_KEY = 'foundry.student.v1';
+function readStudentStore(){
+  try{ return JSON.parse(localStorage.getItem(STUDENT_STORE_KEY)||'{}'); }
+  catch(_){ return {}; }
+}
+function writeStudentStore(patch){
+  try{
+    const next = Object.assign({}, readStudentStore(), patch);
+    localStorage.setItem(STUDENT_STORE_KEY, JSON.stringify(next));
+  }catch(_){}
+}
+function loadStudentProfileIntoForm(){
+  const s = readStudentStore();
+  const n = document.getElementById('sName');
+  const g = document.getElementById('subGroup');
+  if(n && s.name) n.value = s.name;
+  if(g && s.subgroup && g.dataset.ready==='1'){
+    for(let i=0;i<g.options.length;i++){
+      if(g.options[i].value===s.subgroup){ g.selectedIndex=i; break; }
+    }
+  }
+}
+function saveStudentProfileFromForm(){
+  const n = document.getElementById('sName');
+  const g = document.getElementById('subGroup');
+  writeStudentStore({
+    name: n ? n.value.trim() : '',
+    subgroup: g ? g.value.trim() : '',
+  });
+}
+function lastGradeForCurrentAssessment(){
+  const lg=readStudentStore().lastGrade;
+  if(!lg||!lg.result) return null;
+  const savedSlug=typeof lg.assessmentSlug==='string'?lg.assessmentSlug:'';
+  if(ASSESSMENT_SLUG){
+    if(savedSlug!==ASSESSMENT_SLUG) return null;
+  }else if(savedSlug){
+    return null;
+  }
+  return lg;
+}
+
+function saveLastGradeOnDevice(payload){
+  writeStudentStore({
+    lastGrade: Object.assign({}, payload, {
+      assessmentSlug: ASSESSMENT_SLUG||'',
+    }),
+  });
+  const btn = document.getElementById('btnLastGrade');
+  if(btn) btn.style.display = lastGradeForCurrentAssessment() ? '' : 'none';
+}
+function formatReceiptTime(iso){
+  try{
+    return new Date(iso).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});
+  }catch(_){ return iso||''; }
+}
+function showReceipt(meta){
+  const box = document.getElementById('receiptBox');
+  const when = document.getElementById('receiptWhen');
+  const rid = document.getElementById('receiptId');
+  if(!box) return;
+  if(meta && meta.submissionId){
+    box.style.display='block';
+    if(when) when.textContent = 'Submitted '+formatReceiptTime(meta.submittedAt||'');
+    if(rid) rid.textContent = 'Reference: '+meta.submissionId;
+  }else{
+    box.style.display='none';
+  }
+}
+async function viewLastGradeOnDevice(){
+  const lg = lastGradeForCurrentAssessment();
+  if(!lg || !lg.result){
+    alert('No saved grade on this device yet. Submit once through the portal first.');
+    return;
+  }
+  await openPortal();
+  render(lg.result, {
+    submissionId: lg.submissionId,
+    submittedAt: lg.submittedAt,
+    assessmentTitle: lg.assessmentTitle,
+    fromCache: true,
+  });
+}
+
+
+function applySubmissionLockUI(){
+  const btn = document.getElementById('subBtn');
+  const bar = document.getElementById('portal-submissions-closed');
+  if(!btn || !bar) return;
+  if((ASSESSMENT_SLUG || SITE_DEFAULT_MODE) && !CFG_SUBMISSIONS_OPEN){
+    bar.style.display='block';
+    bar.textContent = 'Closed for submissions — this assessment no longer accepts new grades. Contact your facilitator if you need access.';
+    btn.disabled = true;
+    btn.style.opacity='0.5';
+    btn.style.cursor='not-allowed';
+  }else{
+    bar.style.display='none';
+    bar.textContent='';
+    btn.disabled = false;
+    btn.style.opacity='';
+    btn.style.cursor='';
+  }
+}
+
+async function ensureSubgroupsLoaded(force){
+  const sel=document.getElementById('subGroup');
+  if(!sel) return;
+
+  const key = ASSESSMENT_SLUG || '__default__';
+  if(!force && sel.dataset.slugKey===key && sel.dataset.ready==='1') return;
+
+  sel.innerHTML='<option value="">Loading subgroups…</option>';
+  sel.dataset.ready='';
+
+  const fill=(list)=>{
+    sel.innerHTML='<option value="">Select subgroup…</option>';
+    list.forEach(s=>{
+      const o=document.createElement('option');
+      o.value=s;
+      o.textContent=s;
+      sel.appendChild(o);
+    });
+    sel.dataset.slugKey=key;
+    sel.dataset.ready='1';
+  };
+
+  try{
+    const q = ASSESSMENT_SLUG
+      ? ('?slug='+encodeURIComponent(ASSESSMENT_SLUG))
+      : '';
+    const r=await fetch('/api/foundry/assessment-config'+q);
+    const j=await r.json().catch(()=>({}));
+    if(ASSESSMENT_SLUG && !r.ok){
+      CFG_COHORT_CONFIG_OK = false;
+      CFG_SUBMISSIONS_OPEN = false;
+      CFG_MIN_PROMPT = typeof j.minPromptChars==='number' ? Math.max(0,j.minPromptChars):40;
+      CFG_MIN_OUTPUT = typeof j.minOutputChars==='number' ? Math.max(0,j.minOutputChars):80;
+      CURRENT_ASSESSMENT_TITLE = typeof j.title==='string' ? j.title : 'Assessment unavailable';
+      CURRENT_ASSESSMENT_INTRO = '';
+      const banner=document.getElementById('portal-assessment-label');
+      if(banner){
+        banner.textContent='Assessment · could not load config ('+ASSESSMENT_SLUG+')'+facilitatorPortalSuffix(j);
+      }
+      rebuildPortalExtraAnswerSlots([]);
+      CFG_CONFIG_LOAD_DONE = true;
+      syncDeckConfigBanner();
+      applySubmissionLockUI();
+      applyDeckDocumentTitle();
+      applyPortalFormFromConfig(j.portalForm);
+      ingestAssessmentConfigPayload(j);
+      applyCohortDeckPresentation();
+      sel.innerHTML='<option value="">—</option>';
+      sel.dataset.slugKey=key;
+      sel.dataset.ready='1';
+      const btnEarly=document.getElementById('btnLastGrade');
+      if(btnEarly) btnEarly.style.display=lastGradeForCurrentAssessment()?'':'none';
+      return;
+    }
+    CFG_SUBMISSIONS_OPEN = j.submissionsOpen !== false;
+    SITE_DEFAULT_MODE = !ASSESSMENT_SLUG && j.siteDefault === true;
+    CFG_COHORT_CONFIG_OK = !!ASSESSMENT_SLUG;
+    CFG_MIN_PROMPT = typeof j.minPromptChars==='number' ? Math.max(0,j.minPromptChars):40;
+    CFG_MIN_OUTPUT = typeof j.minOutputChars==='number' ? Math.max(0,j.minOutputChars):80;
+    CURRENT_ASSESSMENT_TITLE = typeof j.title==='string'? j.title:'';
+    CURRENT_ASSESSMENT_INTRO = typeof j.intro==='string' ? j.intro : '';
+    const banner=document.getElementById('portal-assessment-label');
+    if(banner){
+      const fac=facilitatorPortalSuffix(j);
+      if(ASSESSMENT_SLUG){
+        banner.textContent = 'Assessment · '+CURRENT_ASSESSMENT_TITLE+' ('+ASSESSMENT_SLUG+')'+fac;
+      }else if(SITE_DEFAULT_MODE){
+        banner.textContent = 'Class course · '+CURRENT_ASSESSMENT_TITLE+fac;
+      }else{
+        banner.textContent = 'Day 04 Build Day'+fac;
+      }
+    }
+    CFG_CONFIG_LOAD_DONE = true;
+    syncDeckConfigBanner();
+    applySubmissionLockUI();
+    applyDeckDocumentTitle();
+    applyPortalFormFromConfig(j.portalForm);
+    ingestAssessmentConfigPayload(j);
+    rebuildPortalExtraAnswerSlots(Array.isArray(j.extraAnswerSlots)?j.extraAnswerSlots:[]);
+    applyCohortDeckPresentation();
+    const list=Array.isArray(j.subgroups)?j.subgroups:[];
+    if(list.length){
+      fill(list);
+      const btnEarly2=document.getElementById('btnLastGrade');
+      if(btnEarly2) btnEarly2.style.display=lastGradeForCurrentAssessment()?'':'none';
+      return;
+    }
+    fill(FALLBACK_QAF_SUBGROUPS);
+  }catch(_){
+    CFG_COHORT_CONFIG_OK = false;
+    CURRENT_ASSESSMENT_INTRO = '';
+    ingestAssessmentConfigPayload({});
+    rebuildPortalExtraAnswerSlots([]);
+    CFG_CONFIG_LOAD_DONE = true;
+    syncDeckConfigBanner();
+    applyCohortDeckPresentation();
+    applyDeckDocumentTitle();
+    CFG_SUBMISSIONS_OPEN = !ASSESSMENT_SLUG;
+    applySubmissionLockUI();
+    fill(FALLBACK_QAF_SUBGROUPS);
+  }
+  CFG_CONFIG_LOAD_DONE = true;
+  syncDeckConfigBanner();
+  const btnLast=document.getElementById('btnLastGrade');
+  if(btnLast) btnLast.style.display=lastGradeForCurrentAssessment()?'':'none';
+}
+function syncPortalAriaOpen(open){
+  const el=document.documentElement;
+  if(open) el.classList.add('portal-open');
+  else el.classList.remove('portal-open');
+}
+
+/** Applies slide deck classes so the portal overlay is visibly on-screen (portal already contains the grading form/results). */
+function ensurePortalUiOpen(){
+  const p=document.getElementById('portal');
+  if(!p) return;
+  p.classList.add('open');
+  p.setAttribute('aria-hidden','false');
+  document.body.classList.remove('deck-mode');
+  document.body.classList.add('portal-open');
+  syncPortalAriaOpen(true);
+}
+async function openPortal(){
+  await ensureSubgroupsLoaded(true);
+  loadStudentProfileIntoForm();
+  tryRestorePortalDraft();
+  ensurePortalUiOpen();
+  attachPortalStepListeners();
+  setPortalStepActive(1);
+  document.getElementById('portal').scrollTop=0;
+}
+function closePortal(){
+  document.getElementById('portal').classList.remove('open');
+  document.getElementById('portal').setAttribute('aria-hidden','true');
+  document.body.classList.add('deck-mode');
+  document.body.classList.remove('portal-open');
+  syncPortalAriaOpen(false);
+}
+
+/** Avoid document-level scrollIntoView — scroll only inside the portal (stable with fixed overlay). */
+function scrollPortalToElement(el,marginPx){
+  const portal=document.getElementById('portal');
+  const m=marginPx==null ? 16 : marginPx;
+  if(!portal||!el) return;
+  const pr=portal.getBoundingClientRect();
+  const er=el.getBoundingClientRect();
+  const raw=portal.scrollTop+(er.top-pr.top)-m;
+  const maxScroll=Math.max(0,portal.scrollHeight-portal.clientHeight);
+  const top=Math.max(0,Math.min(maxScroll,raw));
+  portal.scrollTo({top,behavior:'smooth'});
+}
+
+function clearFieldErrors(){
+  document.querySelectorAll('.field-err').forEach(e=>e.classList.remove('on'));
+  document.querySelectorAll('.fi.invalid').forEach(e=>e.classList.remove('invalid'));
+  document.querySelectorAll('#portalExtraAnswersMount .portal-extra-slot .field-err').forEach(function(e){ e.classList.remove('on'); });
+  document.querySelectorAll('#portalExtraAnswersMount textarea.fi').forEach(function(e){ e.classList.remove('invalid'); });
+}
+
+function showErr(fieldId, errId){
+  const f=document.getElementById(fieldId);
+  const e=document.getElementById(errId);
+  if(f)f.classList.add('invalid');
+  if(e)e.classList.add('on');
+}
+
+// ── GRADER (server-side Groq → POST /api/foundry/grade on AI Foundry) ──
+async function grade(){
+  const name=document.getElementById('sName').value.trim();
+  const subgroup=document.getElementById('subGroup').value.trim();
+  const prompt=document.getElementById('aPrompt').value.trim();
+  const output=document.getElementById('aOutput').value.trim();
+
+  clearFieldErrors();
+  let ok=true;
+  if(!name){showErr('sName','err-name');ok=false;}
+  if(!subgroup){showErr('subGroup','err-sub');ok=false;}
+  if((ASSESSMENT_SLUG || SITE_DEFAULT_MODE) && !CFG_SUBMISSIONS_OPEN){
+    alert('Submissions are closed for this course. Contact your facilitator.');
+    ok=false;
+  }
+  if(!prompt||prompt.length<CFG_MIN_PROMPT){showErr('aPrompt','err-prompt');ok=false;}
+  if(!output||output.length<CFG_MIN_OUTPUT){showErr('aOutput','err-output');ok=false;}
+  var extrasPayload=null;
+  if(ASSESSMENT_SLUG && CFG_EXTRA_ANSWER_SLOTS.length){
+    extrasPayload={};
+    for(var ei=0;ei<CFG_EXTRA_ANSWER_SLOTS.length;ei++){
+      var slot=CFG_EXTRA_ANSWER_SLOTS[ei];
+      var egid=portalExtraFieldGid(slot.id);
+      var tx=document.getElementById(egid);
+      var vx=tx?tx.value.trim():'';
+      extrasPayload[slot.id]=vx;
+      if(slot.required&&!vx){showErr(egid,egid+'_err');ok=false;}
+    }
+  }
+  if(!ok)return;
+  saveStudentProfileFromForm();
+
+  document.getElementById('subBtn').disabled=true;
+  document.getElementById('loading').classList.add('on');
+  document.getElementById('result').classList.remove('on');
+
+  try{
+    var body={
+      name:name,
+      subgroup:subgroup,
+      prompt:prompt,
+      output:output,
+    };
+    if(ASSESSMENT_SLUG){
+      body.assessmentSlug=ASSESSMENT_SLUG;
+      if(extrasPayload) body.extraAnswers=extrasPayload;
+    }
+    const res=await fetch('/api/foundry/grade',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok){
+      const msg=data.error||data.message||res.statusText||'Grading request failed';
+      throw new Error(msg);
+    }
+    if(!data.result)throw new Error('Invalid response from grading service.');
+    saveStudentProfileFromForm();
+    clearPortalDraftSlot();
+    const meta = {
+      submissionId: data.submissionId || null,
+      submittedAt: data.submittedAt || null,
+      assessmentTitle: CURRENT_ASSESSMENT_TITLE || '',
+      gradingProvider: data.gradingProvider,
+      gradingModel: data.gradingModel,
+      gradingFallbackTrail: data.gradingFallbackTrail,
+      levelUpUrl: CURRENT_LEVEL_UP_URL,
+    };
+    render(data.result, meta);
+    if(data.submissionId){
+      saveLastGradeOnDevice({
+        submissionId: data.submissionId,
+        submittedAt: data.submittedAt,
+        assessmentTitle: CURRENT_ASSESSMENT_TITLE,
+        result: data.result,
+      });
+    }
+    if(data.persisted===false){
+      alert('Your work was graded but could not be saved on the server. Copy your prompt and output, then tell your facilitator immediately.');
+    }
+  }catch(err){
+    alert('Grader error: '+(err.message||err)+'\n\nOpen this deck on the hosted AI Builder site (not a saved copy of the HTML file) so /api/foundry/grade can reach the AI Foundry server.');
+  }finally{
+    applySubmissionLockUI();
+    document.getElementById('loading').classList.remove('on');
+  }
+}
+
+function render(r, meta){
+  const score=r.total_score;
+  const grade=r.grade;
+  const scoreEl=document.getElementById('rScore');
+  const gradeEl=document.getElementById('rGrade');
+
+  scoreEl.textContent=score+'/20';
+  scoreEl.style.color=grade==='GO'?'#4ade80':grade==='REVIEW'?'#fbbf24':'#f87171';
+
+  gradeEl.textContent='// STATUS: '+grade;
+  gradeEl.className='r-grade '+grade;
+
+  const bGrid=document.getElementById('bGrid');
+  const cats=[
+    {key:'prompt_quality',label:(location.pathname||'').indexOf('day04')>=0?'UI Craft':'Prompt Quality',max:10},
+    {key:'architecture_viability',label:(location.pathname||'').indexOf('day04')>=0?'Backend Logic':'Architecture Logic',max:10},
+  ];
+  bGrid.innerHTML=cats.map(c=>{
+    const row=r.breakdown[c.key];
+    if(!row)return'';
+    const fb=row.feedback;
+    const esc=String(fb).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+    return`<div class="b-item">
+      <div class="b-cat">${c.label}</div>
+      <div class="b-pts">${row.score}<small>/${c.max}</small></div>
+      <div class="b-fb">${esc}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('luTip').textContent=r.level_up_tip;
+  document.getElementById('verdict').textContent=r.verdict;
+  var gradingNote=document.getElementById('gradingProviderNote');
+  var lvl=document.getElementById('levelUpLink');
+  if(gradingNote){
+    gradingNote.style.display='none';
+    gradingNote.textContent='';
+    if(meta && !meta.fromCache && (meta.gradingProvider||meta.gradingModel)){
+      gradingNote.style.display='block';
+      var gn='Graded with '+String(meta.gradingProvider||'AI provider');
+      if(meta.gradingModel) gn += ' · '+meta.gradingModel;
+      gn+='.';
+      if(meta.gradingFallbackTrail!=null&&Array.isArray(meta.gradingFallbackTrail)&&meta.gradingFallbackTrail.length){
+        gn+=' Busy providers skipped — backups were used.';
+      }
+      gradingNote.textContent=gn;
+    }
+  }
+  if(lvl){
+    var href=(meta&&typeof meta.levelUpUrl==='string'&&/^https?:\/\//i.test(meta.levelUpUrl.trim())) ? meta.levelUpUrl.trim()
+      : (CURRENT_LEVEL_UP_URL && /^https?:\/\//i.test(CURRENT_LEVEL_UP_URL.trim()) ? CURRENT_LEVEL_UP_URL.trim() : '');
+    if(href){
+      lvl.href=href;
+      lvl.style.display='inline-flex';
+    }else{
+      lvl.style.display='none';
+      lvl.removeAttribute('href');
+    }
+  }
+  showReceipt(meta||null);
+  ensurePortalUiOpen();
+  const box=document.getElementById('result');
+  box.classList.add('on');
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>scrollPortalToElement(box));
+  });
+}
+
+function resetForm(){
+  ['sName','aPrompt','aOutput'].forEach(id=>document.getElementById(id).value='');
+  document.querySelectorAll('#portalExtraAnswersMount textarea').forEach(function(el){ el.value=''; });
+  const sg=document.getElementById('subGroup');
+  if(sg&&sg.dataset.ready==='1'){sg.selectedIndex=0;}
+  clearFieldErrors();
+  document.getElementById('result').classList.remove('on');
+  const gn=document.getElementById('gradingProviderNote');
+  if(gn){ gn.style.display='none'; gn.textContent=''; }
+  const lk=document.getElementById('levelUpLink');
+  if(lk){ lk.style.display='none'; lk.removeAttribute('href'); }
+  showReceipt(null);
+  document.getElementById('portal').scrollTop=0;
+  applySubmissionLockUI();
+}
+
+// prefetch subgroup list (& assessment config when ?assessment= is present)
+void ensureSubgroupsLoaded(false);
+
+
+(function initStudentUi(){
+  syncDeckClassHubLink();
+  applyDeckDocumentTitle();
+  syncPortalBookmarkHint();
+  try{
+    var ctr=document.getElementById('deckContrastToggle');
+    if(ctr){
+      var lk='foundry.deckContrast.v1';
+      var readOn=function(){ try{ return localStorage.getItem(lk)==='1'; }catch(__){ return false; } };
+      var onNow=readOn();
+      document.documentElement.setAttribute('data-high-contrast',onNow?'1':'0');
+      ctr.setAttribute('data-on',onNow?'true':'false');
+      ctr.setAttribute('aria-pressed',onNow?'true':'false');
+      ctr.onclick=function(){
+        var next=document.documentElement.getAttribute('data-high-contrast')!=='1';
+        document.documentElement.setAttribute('data-high-contrast',next?'1':'0');
+        try{ localStorage.setItem(lk, next?'1':'0'); }catch(__){}
+        ctr.setAttribute('data-on',next?'true':'false');
+        ctr.setAttribute('aria-pressed',next?'true':'false');
+      };
+    }
+  }catch(_){}
+  const portal=document.getElementById('portal');
+  if(portal){
+    portal.addEventListener('input',function(e){
+      var t=e.target;
+      if(!t||!t.id) return;
+      if(t.id==='sName'||t.id==='aPrompt'||t.id==='aOutput'||(t.classList&&t.classList.contains('portal-extra-input'))) schedulePortalDraftSave();
+    },true);
+    portal.addEventListener('change',function(e){
+      var t=e.target;
+      if(!t)return;
+      if(t.id==='subGroup') schedulePortalDraftSave();
+    },true);
+  }
+  const tg = document.getElementById('facilitator-desk-toggle');
+  if(tg){
+    tg.addEventListener('click', ()=>{
+      const panel = document.getElementById('facilitator-desk-panel');
+      if(!panel) return;
+      panel.hidden = !panel.hidden;
+      syncFacilitatorDesk();
+    });
+  }
+  const btn = document.getElementById('btnLastGrade');
+  if(btn && !lastGradeForCurrentAssessment()) btn.style.display='none';
+})();
+
+// init progress
+updateUI();
+</script>
+</body>
+</html>

@@ -31,7 +31,11 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
 
-  const filePath = path.join(process.cwd(), "public", "day03-ai-builder.html");
+  const deckFile =
+    slug.startsWith("qaf-day04") || slug.includes("day04")
+      ? "day04-build-day.html"
+      : "day03-ai-builder.html";
+  const filePath = path.join(process.cwd(), "public", deckFile);
   const html = await readFile(filePath, "utf8");
   return new Response(html, {
     status: 200,

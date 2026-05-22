@@ -41,6 +41,9 @@ export function clearPersistedLearnerCourseSlug(): void {
 export function learnerDeckPath(slug: string): string {
   const s = normalizeLearnerCourseSlug(slug);
   if (!s) return "/foundry/day03";
+  if (s.startsWith("qaf-day04") || s.includes("day04")) {
+    return `/foundry/day04?assessment=${encodeURIComponent(s)}`;
+  }
   return `/foundry/deck/${encodeURIComponent(s)}`;
 }
 

@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
   const baseFallback = {
     programName: "Qubators AI Foundry",
-    deckHref: "/foundry/day03",
+    deckHref: "/foundry/day04",
     workbookPath,
     assessmentSlug: null as string | null,
     assessmentTitle: null as string | null,

@@ -10,6 +10,8 @@ const nextConfig = {
       beforeFiles: [
         /** Legacy filenames still map to deck; `/` serves `app/page.tsx` (training gateway). */
         { source: "/day03-ai-builder.html", destination: "/foundry/day03" },
+        { source: "/day04-build-day.html", destination: "/foundry/day04" },
+        { source: "/day04-backend.html", destination: "/foundry/day04-backend" },
       ],
     };
   },

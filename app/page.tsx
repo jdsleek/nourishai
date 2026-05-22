@@ -63,7 +63,7 @@ export default function FoundryHomePage() {
           <p
             className={`${jetbrains.className} text-xs font-semibold uppercase tracking-[0.22em] text-orange-400`}
           >
-            Day 03 · AI Builder
+            Day 04 · Build day (live)
           </p>
           <h1
             className={`${bebas.className} mt-3 text-[clamp(3.25rem,12vw,5.5rem)] leading-[0.92] tracking-wide text-white`}
@@ -102,16 +102,16 @@ export default function FoundryHomePage() {
               </p>
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <Link
-                  href="/class"
+                  href="/class/our-classes"
                   className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-6 py-3 text-sm font-semibold text-[#0a0704] transition hover:bg-orange-400"
                 >
-                  I have a course slug → hub
+                  Our classes (Day 04 live)
                 </Link>
                 <Link
-                  href="/foundry/day03"
+                  href="/class"
                   className={`${jetbrains.className} inline-flex items-center justify-center rounded-lg border border-white/15 px-5 py-3 text-xs text-[#9c9a94] transition hover:border-white/25 hover:text-white`}
                 >
-                  Practice deck only
+                  Course hub
                 </Link>
               </div>
             </div>

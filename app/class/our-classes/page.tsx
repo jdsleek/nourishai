@@ -39,6 +39,12 @@ export default function OurClassesPage() {
           >
             Open frontend slides →
           </Link>
+          <Link
+            href="/examples/attendnow/"
+            className="mt-3 block rounded-lg border border-emerald-500/40 bg-emerald-950/25 px-4 py-3 text-center text-sm font-medium text-emerald-100 hover:bg-emerald-950/40"
+          >
+            Live AttendNow demo (UI + app.js) →
+          </Link>
         </section>
 
         <section className="rounded-2xl border border-cyan-500/25 bg-cyan-950/15 p-6">

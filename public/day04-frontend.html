@@ -210,8 +210,9 @@ html[data-high-contrast="1"] .fi{border-color:rgba(255,255,255,0.24);}
   .pillars{grid-template-columns:repeat(3,1fr)!important;}
   .score-grid{grid-template-columns:1fr!important;}
 }
-.slide.active{opacity:1;transform:translateX(0);pointer-events:all;z-index:2;}
-.slide.exit{opacity:0;transform:translateX(-48px);z-index:1;}
+.slide.active{opacity:1;transform:translateX(0);pointer-events:all;z-index:2;visibility:visible;}
+.slide.exit{opacity:0;transform:translateX(-48px);z-index:1;visibility:hidden;}
+.slide:not(.active){visibility:hidden;}
 
 /* ── NAV (thumb-sized for touch + visible on Zoom) ── */
 .nav{

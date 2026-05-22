@@ -91,3 +91,38 @@ export function isDay04AssessmentSlug(slug: string | null | undefined): boolean 
   const s = slug.trim().toLowerCase();
   return s === DAY04_ASSESSMENT_SLUG || s.includes("day04");
 }
+
+/** Built-in learner hub when Day 04 assessment is not yet in Postgres. */
+export function day04ClassHubPayload() {
+  return {
+    programName: "Qubators AI Foundry",
+    deckHref: `/foundry/day04-frontend?assessment=${encodeURIComponent(DAY04_ASSESSMENT_SLUG)}`,
+    workbookPath: "/class-workbook",
+    facilitatorEmail: null as string | null,
+    facilitatorDisplayName: null as string | null,
+    assessmentSlug: DAY04_ASSESSMENT_SLUG,
+    assessmentTitle: DAY04_ASSESSMENT_TITLE,
+    assessmentIntro: DAY04_ASSESSMENT_INTRO,
+    submissionsOpen: true,
+    subgroups: [] as string[],
+    minPromptChars: 40,
+    minOutputChars: 60,
+    siteDefaultActive: false,
+    mode: "course" as const,
+    studentChecklist: [...DAY04_STUDENT_CHECKLIST],
+    levelUpUrl: null as string | null,
+  };
+}
+
+export function day04CohortPickerPayload() {
+  return {
+    courses: [
+      {
+        slug: DAY04_ASSESSMENT_SLUG,
+        title: DAY04_ASSESSMENT_TITLE,
+        submissionsOpen: true,
+      },
+    ],
+    facilitatorDisplayName: null as string | null,
+  };
+}

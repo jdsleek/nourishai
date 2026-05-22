@@ -1,4 +1,8 @@
 import { NextRequest } from "next/server";
+import {
+  day04ClassHubPayload,
+  isDay04AssessmentSlug,
+} from "@/lib/foundry-day04-defaults";
 import { learnerChecklistFromRows } from "@/lib/foundry-learner-checklist";
 import { learnerDeckPath } from "@/lib/foundry-learner-course";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
@@ -36,6 +40,13 @@ export async function GET(req: NextRequest) {
   const slugRequested = req.nextUrl.searchParams.get("slug")?.trim();
 
   if (!pool) {
+    if (slugRequested && isDay04AssessmentSlug(slugRequested)) {
+      const fallback = day04ClassHubPayload();
+      return Response.json({
+        ...fallback,
+        subgroups: [...QAF_COHORT_SUBGROUPS],
+      });
+    }
     if (slugRequested) {
       return Response.json(
         {
@@ -54,6 +65,13 @@ export async function GET(req: NextRequest) {
   if (slugRequested) {
     const a = await pgAssessmentBySlug(pool, slugRequested);
     if (!a) {
+      if (isDay04AssessmentSlug(slugRequested)) {
+        const fallback = day04ClassHubPayload();
+        return Response.json({
+          ...fallback,
+          subgroups: [...QAF_COHORT_SUBGROUPS],
+        });
+      }
       return Response.json(
         {
           error: "UNKNOWN_COURSE",

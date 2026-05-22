@@ -1,4 +1,8 @@
 import { NextRequest } from "next/server";
+import {
+  day04CohortPickerPayload,
+  isDay04AssessmentSlug,
+} from "@/lib/foundry-day04-defaults";
 import { ensureFoundrySubmissionsSchema, getFoundryPgPool } from "@/lib/foundry-pg";
 import { pgFacilitatorCourseCatalogBySlug } from "@/lib/training-pg";
 
@@ -16,6 +20,9 @@ export async function GET(req: NextRequest) {
 
   const pool = getFoundryPgPool();
   if (!pool) {
+    if (isDay04AssessmentSlug(slug)) {
+      return Response.json(day04CohortPickerPayload());
+    }
     return Response.json({ error: "Service unavailable." }, { status: 503 });
   }
 
@@ -23,6 +30,9 @@ export async function GET(req: NextRequest) {
 
   const data = await pgFacilitatorCourseCatalogBySlug(pool, slug);
   if (!data) {
+    if (isDay04AssessmentSlug(slug)) {
+      return Response.json(day04CohortPickerPayload());
+    }
     return Response.json({ error: "Unknown slug." }, { status: 404 });
   }
 

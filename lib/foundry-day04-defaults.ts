@@ -69,7 +69,14 @@ export function day04PortalFormMerged() {
   return mergePortalForm(DAY04_PORTAL_PATCH);
 }
 
-export function day04AssessmentConfigPayload() {
+export function day04AssessmentConfigPayload(submissionsOpen?: boolean) {
+  const envOpen = day04SubmissionsOpenFromEnv();
+  const open =
+    typeof submissionsOpen === "boolean"
+      ? submissionsOpen
+      : envOpen !== null
+        ? envOpen
+        : true;
   return {
     slug: DAY04_ASSESSMENT_SLUG,
     title: DAY04_ASSESSMENT_TITLE,
@@ -77,7 +84,7 @@ export function day04AssessmentConfigPayload() {
     subgroups: [] as string[],
     minPromptChars: 40,
     minOutputChars: 60,
-    submissionsOpen: true,
+    submissionsOpen: open,
     studentChecklist: DAY04_STUDENT_CHECKLIST,
     levelUpUrl: null as string | null,
     portalForm: day04PortalFormMerged(),
@@ -92,6 +99,15 @@ export function isDay04AssessmentSlug(slug: string | null | undefined): boolean 
   return s === DAY04_ASSESSMENT_SLUG || s.includes("day04");
 }
 
+/** Optional ops override: FOUNDRY_DAY04_SUBMISSIONS_OPEN=false closes without Postgres row. */
+export function day04SubmissionsOpenFromEnv(): boolean | null {
+  const v = process.env.FOUNDRY_DAY04_SUBMISSIONS_OPEN?.trim().toLowerCase();
+  if (!v) return null;
+  if (v === "0" || v === "false" || v === "closed" || v === "no") return false;
+  if (v === "1" || v === "true" || v === "open" || v === "yes") return true;
+  return null;
+}
+
 /** Built-in learner hub when Day 04 assessment is not yet in Postgres. */
 export function day04ClassHubPayload() {
   return {
@@ -103,7 +119,7 @@ export function day04ClassHubPayload() {
     assessmentSlug: DAY04_ASSESSMENT_SLUG,
     assessmentTitle: DAY04_ASSESSMENT_TITLE,
     assessmentIntro: DAY04_ASSESSMENT_INTRO,
-    submissionsOpen: true,
+    submissionsOpen: day04SubmissionsOpenFromEnv() ?? true,
     subgroups: [] as string[],
     minPromptChars: 40,
     minOutputChars: 60,

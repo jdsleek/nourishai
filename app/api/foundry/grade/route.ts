@@ -12,6 +12,7 @@ import {
 } from "@/lib/foundry-grade";
 import {
   DAY04_EXTRA_SLOTS,
+  day04SubmissionsOpenFromEnv,
   isDay04AssessmentSlug,
 } from "@/lib/foundry-day04-defaults";
 import { clipFoundryBodiesForGroq } from "@/lib/foundry-grade-clip";
@@ -211,6 +212,17 @@ export async function POST(req: NextRequest) {
           : undefined,
       );
     } else if (isDay04Slug) {
+      const envOpen = day04SubmissionsOpenFromEnv();
+      if (envOpen === false) {
+        return Response.json(
+          {
+            error:
+              "This assessment is closed for new submissions. Contact your facilitator if you need help.",
+            code: "assessment_submissions_closed",
+          },
+          { status: 403 },
+        );
+      }
       if (!QAF_COHORT_SUBGROUPS.includes(subgroup)) {
         return Response.json(
           { error: "Select a valid subgroup from the list." },

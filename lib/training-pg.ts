@@ -508,6 +508,22 @@ export async function pgAdminSetAssessmentSubmissionsOpen(
   return (r.rowCount ?? 0) > 0;
 }
 
+/** Organizer toggles by slug (e.g. qaf-day04-idea-to-product). */
+export async function pgAdminSetAssessmentSubmissionsOpenBySlug(
+  pool: Pool,
+  slug: string,
+  submissionsOpen: boolean,
+): Promise<boolean> {
+  const s = slug.trim();
+  if (s.length < 3) return false;
+  const r = await pool.query(
+    `UPDATE training_assessments SET submissions_open = $2, updated_at = NOW()
+     WHERE lower(slug) = lower($1)`,
+    [s, submissionsOpen],
+  );
+  return (r.rowCount ?? 0) > 0;
+}
+
 /** Organizer removes a facilitator assessment row. Submissions lose FK (SET NULL); slug is freed. */
 export async function pgAdminDeleteAssessment(
   pool: Pool,

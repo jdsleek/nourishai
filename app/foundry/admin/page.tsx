@@ -120,6 +120,7 @@ export default function FoundryAdminPage() {
   const [locks, setLocks] = useState<AssessmentLockRow[]>([]);
   const [locksLoading, setLocksLoading] = useState(false);
   const [locksErr, setLocksErr] = useState<string | null>(null);
+  const [day04EnsureNote, setDay04EnsureNote] = useState<string | null>(null);
   const [lockToggling, setLockToggling] = useState<string | null>(null);
   const [facilitators, setFacilitators] = useState<FacAdminRow[]>([]);
   const [facDirLoading, setFacDirLoading] = useState(false);
@@ -182,12 +183,33 @@ export default function FoundryAdminPage() {
       });
       const data = (await res.json()) as {
         assessments?: AssessmentLockRow[];
+        day04Ensure?: { ok: boolean; created?: boolean; slug?: string; reason?: string };
         error?: string;
       };
       if (!res.ok) {
         throw new Error(data.error || "Could not load assignment locks.");
       }
-      setLocks(data.assessments || []);
+      const rows = data.assessments || [];
+      rows.sort((a, b) => {
+        const aDay = a.slug.includes("day04") ? 0 : 1;
+        const bDay = b.slug.includes("day04") ? 0 : 1;
+        if (aDay !== bDay) return aDay - bDay;
+        return a.title.localeCompare(b.title);
+      });
+      setLocks(rows);
+      if (data.day04Ensure?.ok && data.day04Ensure.created) {
+        setDay04EnsureNote(
+          `Registered live cohort assessment “${data.day04Ensure.slug}” in Postgres — you can close submissions below.`,
+        );
+      } else if (data.day04Ensure && !data.day04Ensure.ok) {
+        setDay04EnsureNote(
+          data.day04Ensure.reason === "no_facilitator"
+            ? "Day 04 is not in Postgres yet — add a facilitator under Facilitators, then refresh this page."
+            : "Day 04 could not be auto-registered. Check facilitators and refresh.",
+        );
+      } else {
+        setDay04EnsureNote(null);
+      }
     } catch (e) {
       setLocksErr(e instanceof Error ? e.message : "Lock list failed.");
       setLocks([]);
@@ -792,6 +814,11 @@ export default function FoundryAdminPage() {
                 {locksErr ? (
                   <p className="mt-2 text-sm text-red-400">{locksErr}</p>
                 ) : null}
+                {day04EnsureNote ? (
+                  <p className="mt-2 rounded-md border border-cyan-500/30 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100">
+                    {day04EnsureNote}
+                  </p>
+                ) : null}
                 {unlocked && locks.length > 0 ? (
                   <p className="mt-2 rounded-md border border-red-500/25 bg-red-950/15 px-3 py-2 text-xs text-red-100/90">
                     <strong className="font-semibold">Organizer delete:</strong> red{" "}
@@ -806,14 +833,19 @@ export default function FoundryAdminPage() {
                   </p>
                 ) : locks.length === 0 ? (
                   <p className="mt-3 text-xs text-slate-500">
-                    No facilitator-created assessments yet.
+                    No facilitator assessments in Postgres yet. Refresh after adding a
+                    facilitator — Day 04 auto-registers on load.
                   </p>
                 ) : (
                   <ul className="mt-4 space-y-3">
                     {locks.map((a) => (
                       <li
                         key={a.id}
-                        className="flex flex-col gap-3 rounded-lg border border-white/10 bg-[#0c0e14] p-4"
+                        className={`flex flex-col gap-3 rounded-lg border p-4 ${
+                          a.slug.includes("day04")
+                            ? "border-orange-500/40 bg-orange-950/15"
+                            : "border-white/10 bg-[#0c0e14]"
+                        }`}
                       >
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0">
